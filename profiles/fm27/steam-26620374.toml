@@ -31,6 +31,10 @@ training_manager = 0x586BED0
 # win and £601,323 per draw: to the pound what build 26577676 read on the same save.
 prize_money = true
 
+# A club's sponsorship deals (layout.toml, [sponsorship]; #114) were read on this build and matched to the entries of
+# VfB Stuttgart's Sponsorship screen, by amount and date, in the reports of the issue; not read by this editor on it yet.
+sponsorships = true
+
 # game_plugin as mapped in memory; these values identify the build.
 [plugin]
 size_of_image = 0x18878000
