@@ -1411,6 +1411,138 @@ export const de: Strings = {
     unavailableBuild: "Noch niemand hat geprüft, wo diese Version des Spiels die Sponsorenverträge ablegt; der Editor zeigt sie daher nicht an, statt den falschen Speicher zu lesen.",
     unavailableUnreadable: "Der Editor hat die Sponsorenverträge dort gesucht, wo er sie in dieser Version des Spiels erwartet, doch was er fand, sieht nicht nach den Daten des Spiels aus; deshalb zeigt er keine an.",
   },
+
+  competitions: {
+    nav: "Wettbewerbe",
+    search: "Wettbewerbe nach Name, Land oder UID suchen",
+    summary: (total, shown) =>
+      total > shown ? `${format(shown)} von ${format(total)} Wettbewerben` : `${format(total)} Wettbewerbe`,
+    empty: (query, filtered) => {
+      if (query === "") {
+        return filtered ? "Kein Wettbewerb dieses Landes hat Kaderregeln." : "Keine Wettbewerbe mit Kaderregeln gefunden.";
+      }
+      return filtered ? `In diesem Land passt kein Wettbewerb zu „${query}“.` : `Kein Wettbewerb passt zu „${query}“.`;
+    },
+    reading: "Die Kaderregeln der Wettbewerbe werden aus dem Spiel gelesen … Das dauert einige Sekunden.",
+    readAgain: "Neu lesen",
+    readAgainTitle: "Die Regeln erneut aus dem Spiel lesen",
+    listNote: "Wettbewerbe ohne Kaderregeln werden nicht aufgeführt.",
+    unavailableTitle: "Keine Kaderregeln anzuzeigen",
+    unavailableBuild: "Noch niemand hat geprüft, wo diese Version des Spiels die Kaderregeln der Wettbewerbe ablegt; der Editor zeigt daher keine an, statt den falschen Speicher zu lesen.",
+    unavailableUnreadable: "Der Editor hat die Kaderregeln dort gesucht, wo er sie in dieser Version des Spiels erwartet, doch was er fand, sieht nicht nach den Daten des Spiels aus; deshalb zeigt er keine an.",
+    columns: {
+      name: "Wettbewerb",
+      nation: "Land",
+      level: "Ebene",
+      rules: "Regeln",
+      uid: "UID",
+    },
+    level: (level) => format(level),
+    rulesCount: (current, next) =>
+      next === null || next === current ? format(current) : `${format(current)} · ${format(next)}`,
+    rulesCountTitle: "Kaderregeln in dieser Saison und, wenn die Anzahl abweicht, in der nächsten",
+    international: "International",
+    filters: {
+      nation: "Land",
+      allNations: "Alle Länder",
+    },
+    title: "Kaderregeln",
+    intro: "Wie viele Spieler einer Art in diesem Wettbewerb in einen Kader eingetragen oder von einer Mannschaft für ein Spiel aufgestellt werden dürfen. Wer als Ausländer oder als Eigengewächs gilt, bestimmt das Spiel selbst.",
+    seasons: { current: "Diese Saison", next: "Nächste Saison" },
+    began: (year) => `begann ${year}`,
+    begins: (year) => `beginnt ${year}`,
+    noRules: "Keine Kaderregeln.",
+    noNext: "Das Spiel führt keine Regeln für die nächste Saison.",
+    ruleColumns: {
+      rule: "Regel",
+      where: "Gezählt bei",
+      limit: "Grenze",
+      value: "Spieler",
+    },
+    atMost: "Höchstens",
+    atLeast: "Mindestens",
+    scopes: {
+      squad: "Kader",
+      matchSquad: "Spieltagskader",
+      eleven: "Elf auf dem Platz",
+      startingEleven: "Startelf",
+      bench: "Ersatzbank",
+    },
+    who: {
+      squadSize: "Spieler im Kader",
+      foreign: "Ausländische Spieler",
+      foreignExceptAsian: "Ausländische Spieler, außer asiatischen",
+      foreignGoalkeepers: "Ausländische Torwarte",
+      nonEu: "Nicht-EU-Spieler",
+      domestic: "Einheimische Spieler",
+      domesticGoalkeepers: "Einheimische Torwarte",
+      goalkeepers: "Torwarte",
+      outfield: "Feldspieler",
+      nonHomegrown: "Spieler, die keine Eigengewächse sind",
+      youthContract: "Spieler mit Jugendvertrag",
+      fullTime: "Spieler mit Vollzeitvertrag",
+      amateur: "Amateurspieler",
+      youthOrAmateur: "Jugend- oder Amateurspieler",
+      trialists: "Probespieler",
+      loans: "Leihspieler",
+      internationals: "Nationalspieler",
+      otherTeam: "Für eine andere Mannschaft gemeldete Spieler",
+      firstTeam: "Für die erste Mannschaft gemeldete Spieler",
+      over: (age) => `Spieler über ${format(age)} Jahre`,
+      under: (age) => `Spieler unter ${format(age)} Jahren`,
+      domesticUnder: (age) => `Einheimische Spieler unter ${format(age)} Jahren`,
+      foreignOver: (age) => `Ausländische Spieler über ${format(age)} Jahre`,
+      goalkeepersOver: (age) => `Torwarte über ${format(age)} Jahre`,
+      outfieldOver: (age) => `Feldspieler über ${format(age)} Jahre`,
+      homegrown: (from, fromAge, toAge) => {
+        const ages = `ausgebildet mit ${format(fromAge)}–${format(toAge)} Jahren`;
+        if (from === "club") {
+          return `Eigengewächse des Vereins (${ages})`;
+        }
+        return from === "nation" ? `Eigengewächse des Landes (${ages})` : `Eigengewächse des Vereins oder des Landes (${ages})`;
+      },
+      homegrownUnder: (age, fromAge, toAge) =>
+        `Eigengewächse des Landes unter ${format(age)} Jahren (ausgebildet mit ${format(fromAge)}–${format(toAge)} Jahren)`,
+    },
+    unnamedKind: (kind) => `Regel vom Typ ${format(kind)}`,
+    gameKey: (key) => `Name dieser Regel im Spiel: ${key}`,
+    teamsFrom: (competition) => `Mannschaften aus ${competition}`,
+    teamsFromUnknown: "Mannschaften einer anderen Liga",
+    condition: (code) => `Bedingt (${code})`,
+    conditionTitle: "Das Spiel wendet diese Regel unter einer eigenen Bedingung an, die der Editor noch nicht erklärt.",
+    years: (from, to) => {
+      if (from !== null && to !== null) {
+        return from === to ? `${from}` : `${from}–${to}`;
+      }
+      return from !== null ? `ab ${from}` : `bis ${to}`;
+    },
+    yearsTitle: "Die Saisons, für die die Regeln des Landes diese Regel vorsehen, nach dem Jahr, in dem eine Saison beginnt",
+    leftAlone: "Unberührt",
+    notSavedTitle: "Die Regeln des Landes, wie ein Spielstand sie speichert, enthalten keine solche Regel; eine Änderung wäre beim Laden des Spielstands weg. Der Editor lässt sie unberührt.",
+    notACountTitle: "Ein Geldbetrag, keine Spielerzahl: Der Editor lässt ihn unberührt.",
+    noneChangeable: "Diese Regeln lassen sich noch nicht ändern, zu keinem Zeitpunkt: Der Editor ändert eine Regel nur, wenn er sie auch in den Regeln findet, die der Spielstand speichert, damit die Änderung nach dem Laden des Spielstands noch da ist, und die Regeln dieses Wettbewerbs hat er dort nicht gefunden. Bisher gilt das für die Frauenligen, die Major League Soccer und einige Pokale.",
+    unsavedNote: "Das Spiel speichert die Regeln dieses Wettbewerbs in keinem Spielstand: Es erstellt sie bei jedem Laden selbst neu, und für jede neue Saison erneut. Deshalb hält der Editor eine Änderung hier fest: Er schreibt sie ins laufende Spiel, merkt sie sich für diese Karriere und schreibt sie erneut, sobald er sich verbindet oder die Daten neu liest. Verbinden Sie den Editor nach dem Laden eines Spielstands einmal (oder klicken Sie auf „Daten neu laden“), damit die Änderung wieder da ist. „Rückgängig“ unter „Änderungen“ gibt sie wieder frei.",
+    heldTag: "Festgehalten",
+    heldTitle: (original) => `Der Editor hält diese Anzahl fest und schreibt sie erneut, sobald er das Spiel liest. Der Wert des Spiels ist ${format(original)}.`,
+    savedDiffers: (value) => `Die Regeln im Spielstand enthalten ${format(value)}`,
+    savedDiffersTitle: "Das Spiel richtet sich nach der Liste und erstellt die Liste beim Laden des Spielstands aus den Regeln im Spielstand. Eine hier gespeicherte Änderung setzt beides.",
+    edit: "Regeln ändern",
+    editTitle: "Die Anzahlen der Kaderregeln dieses Wettbewerbs ändern",
+    save: "Regeln speichern",
+    saving: "Wird gespeichert…",
+    cancel: "Abbrechen",
+    invalid: (most) => `Geben Sie eine ganze Zahl von 0 bis ${format(most)} ein.`,
+    shared: (names) => `Diese Regeln gelten auch für ${names}: Eine Änderung gilt dort ebenfalls.`,
+    currentNote: (turn) =>
+      `Eine Änderung hier gilt für den Rest dieser Saison${turn === null ? "" : `; die Saison wechselt am ${turn}`}. Das Spiel zählt Kader sofort mit der Änderung; seine eigenen Bildschirme zeigen sie erst, wenn ein Tag vergangen ist.`,
+    nextNote: (turn) =>
+      `Eine Änderung hier wird beim Saisonwechsel${turn === null ? "" : ` am ${turn}`} zur Regel dieser Saison und bleibt für die Saisons danach, sofern das Spiel für eine spätere Saison keine eigenen Regeln hat. Die Seite „Nächste Saison“ des Spiels zeigt sie sofort.`,
+    lasts: "Eine Änderung wird in die Liste geschrieben, nach der das Spiel spielt, und in die Regeln des Landes, die der Spielstand speichert; sie ist also nach dem Laden des Spielstands wieder da. Eine Änderung an einer Regel dieser Saison endet mit dem Saisonwechsel: Dann treten die Regeln der nächsten Saison an ihre Stelle. „Rückgängig“ unter „Änderungen“ stellt die alte Anzahl wieder her.",
+    infoLabel: "Wie lange eine Änderung einer Kaderregel hält",
+    ruleField: (season, rule) => `${season} · Kaderregel: ${rule}`,
+    alsoFor: (count) =>
+      count === 1 ? "Gilt auch für 1 weiteren Wettbewerb mit denselben Regeln" : `Gilt auch für ${format(count)} weitere Wettbewerbe mit denselben Regeln`,
+  },
   app: {
     stage: "Beta",
     settingsLabel: "Einstellungen",
@@ -1688,7 +1820,7 @@ export const de: Strings = {
       change: "Änderung",
       status: "Status",
     },
-    kinds: { player: "Spieler", staff: "Mitarbeiter", club: "Verein", nationalTeam: "Nationalteam" },
+    kinds: { player: "Spieler", staff: "Mitarbeiter", club: "Verein", nationalTeam: "Nationalteam", competition: "Wettbewerb" },
     stored: (change) => `Rohwerte ${change}`,
     undone: (time) => `Rückgängig gemacht um ${time}`,
     undo: "Rückgängig",
@@ -2356,6 +2488,23 @@ export const de: Strings = {
     cancel: "Abbrechen",
   },
 
+  batchTraits: {
+    title: "Eigenschaften für Kader",
+    addMode: "+ Zum Kader hinzufügen",
+    removeMode: "- Aus dem Kader entfernen",
+    addHint: "Fügt den Spielern dieser Mannschaft ausgewählte Eigenschaften hinzu, die sie noch nicht haben. Bestehende Eigenschaften bleiben erhalten.",
+    removeHint: "Entfernt die ausgewählten Eigenschaften von Spielern dieser Mannschaft, die sie haben. Andere Eigenschaften bleiben unberührt.",
+    noneSelected: "Keine Eigenschaften in diesem Modus ausgewählt",
+    selectedCount: (count: number) => (count === 1 ? "1 Eigenschaft ausgewählt" : `${format(count)} Eigenschaften ausgewählt`),
+    deselectAll: "Auswahl aufheben",
+    oppositeModeNote: "Im anderen Modus ausgewählt",
+    applyNote: (players: number) => `Betrifft ${format(players)} Spieler · Kann mit 1 Klick rückgängig gemacht werden`,
+    emptySquad: (players: number) => `Kader von ${format(players)} Spielern`,
+    cancel: "Abbrechen",
+    apply: "Anwenden",
+    applying: "Wird angewendet…",
+  },
+
   squad: {
     teamsLabel: "Mannschaft",
     teams: {
@@ -2414,6 +2563,8 @@ export const de: Strings = {
     refreshAllTitle:
       "Setzt Energie und Spielpraxis jedes Spielers dieser Mannschaft auf 100 % und lässt ihn sich voll erholen " +
       "(Erschöpfung -500)",
+    batchTraits: "Eigenschaften für Kader",
+    batchTraitsTitle: "Bevorzugte Spielweisen für Spieler dieser Mannschaft hinzufügen oder entfernen",
     maxAll: "Attribute maximieren",
     maxAllTitle:
       "Setzt jedes Attribut jedes Spielers dieser Mannschaft auf den besten Wert: 20, und 1 für " +
@@ -2427,6 +2578,34 @@ export const de: Strings = {
       "Wochen, und eine andere Taktik braucht einen weiteren Klick. Das Spiel zeigt die Änderungen, sobald es " +
       "weiterläuft: Klicken Sie im Spiel auf Fortfahren",
     atItsBestSkipped: (step, reason) => `„${step}“ übersprungen: ${reason}`,
+    destroy: "Mannschaft in Tiefstform",
+    destroyTitle:
+      "Bringt jeden Spieler dieser Mannschaft auf seinen Tiefstwert: Moral und Zufriedenheit, Energie, Spielpraxis " +
+      "und Erschöpfung, Teambuilding mit dem Verein und, wenn Sie die Taktik der Mannschaft wählen, wie gut er sie " +
+      "kennt. Kein Wert wird besser, als er ist; Attribute, Verletzungen und Sperren bleiben. Es fragt vorher, und " +
+      "ein einziges „Rückgängig“ nimmt alles zurück",
+    destroySteps: {
+      demoralize: "Moral und Zufriedenheit",
+      exhaust: "Energie und Spielpraxis",
+      minCohesion: "Teambuilding",
+      minTactics: "Taktik",
+    },
+    moreActions: "Weitere Aktionen",
+    moreActionsTitle: "Die Aktionen für die ganze Mannschaft, einzeln",
+    destroyDialog: {
+      title: "Mannschaft in Tiefstform bringen?",
+      doesHeading: "Für jeden Spieler der Liste, auch die verliehenen",
+      does: [
+        "Moral auf 1, den Tiefstwert; Zufriedenheit und Zufriedenheit mit Einsatzzeiten auf -100",
+        "Energie auf 0 %, Spielpraxis auf 35 % und Erschöpfung auf 1000",
+        "Teambuilding mit dem Verein auf 1, bei denen, die einen Wert haben",
+        "Wie gut er die Taktik kennt, auf das Mindeste, wenn Sie die Taktik der Mannschaft wählen",
+      ],
+      keeps: "Kein Wert wird besser, als er ist. Attribute, Verletzungen und Sperren bleiben, wie sie sind.",
+      ownClub: "Das ist eine Mannschaft Ihres eigenen Vereins.",
+      hint: "Ein einziges „Rückgängig“ nimmt alles zurück, bevor das Spiel weiterläuft.",
+      cancel: "Abbrechen",
+    },
     hint:
       "Die Aktionen betreffen jeden Spieler der Liste, auch die verliehenen. Rückgängig machen lässt sich auch in der " +
       "Ansicht Änderungen.",
@@ -3093,6 +3272,31 @@ export const de: Strings = {
     },
   },
 
+  /** A player's development: the Development tab of his profile, the note under his abilities, the squad's arrows (see en.ts). */
+  progress: {
+    tabsLabel: "Bereiche des Spielerprofils",
+    tabs: { overview: "Profil", progress: "Entwicklung" },
+    lockedWhileEdited: "Beenden Sie die Bearbeitung, um diesen Reiter zu öffnen",
+    openTab: "Reiter „Entwicklung“ öffnen",
+    loading: "Aufzeichnungen werden gelesen…",
+    failed: (reason: string) => `Die Aufzeichnungen konnten nicht gelesen werden: ${reason}`,
+    since: (date: string) => `seit ${date}`,
+    change: (from: string, to: string, date: string) => `${from} → ${to} seit ${date}`,
+    rangeLabel: "Zeitraum",
+    ranges: { quarter: "3 Monate", year: "1 Jahr", all: "Alle" },
+    recorded: (count: number, first: string) => `Aufzeichnungen: ${count} · erste am ${first}`,
+    abilityTitle: "Fähigkeit",
+    valueTitle: "Wert",
+    attributesTitle: "Geänderte Attribute",
+    noAttributeChanges: (date: string) => `Seit ${date} hat sich kein Attribut geändert.`,
+    emptyTitle: "Noch nichts zum Vergleichen",
+    emptyText:
+      "Die App hält etwa einmal pro Woche der Spielzeit Fähigkeiten, Wert und Attribute aller Spieler fest, immer wenn sie die Spieldaten liest. Spielen Sie weiter und lesen Sie die Daten erneut: Dann zeigt sich hier, wie sich dieser Spieler entwickelt.",
+    offTitle: "Keine Aufzeichnungen für diesen Spielstand",
+    offText:
+      "Die App zeichnet bei Spielständen auf, in denen Sie einen Trainer steuern, und bei Spielversionen, deren Daten ihre Prüfungen bestehen.",
+  },
+
   /** The command palette and the names of the keys in the keyboard shortcuts (see en.ts). */
   palette: {
     button: "Suchen",
@@ -3161,6 +3365,36 @@ export const de: Strings = {
     link: "Neuigkeiten",
     command: "Neu in dieser Version",
     versions: {
+      "0.5.4": [
+        {
+          title: "Transfers im Karriereverlauf.",
+          text: "„Transfer“, jetzt die erste Wahl, wenn Sie einen Spieler verschieben, vereinbart den Wechsel für den nächsten Tag im Spiel. Das Spiel führt ihn wie einen eigenen aus: Es zahlt die Ablöse und trägt den Wechsel in den Karriereverlauf des Spielers ein, wobei die Spiele dieser Saison beim alten Verein eine eigene Zeile behalten. „Jetzt verschieben“ verschiebt ihn weiterhin sofort.",
+        },
+        {
+          title: "Mannschaft in Bestform und in Tiefstform.",
+          text: "Unter „Kader“ eines Vereins heilt, motiviert und regeneriert ein Klick die ganze Mannschaft und bringt Teambuilding und Taktik ganz nach oben; „Mannschaft in Tiefstform“ bewirkt nach einer Rückfrage das Gegenteil. Ein einziges „Rückgängig“ nimmt beides zurück, und die einzelnen Aktionen stehen unter „Weitere Aktionen“.",
+        },
+        {
+          title: "Eigenschaften für Kader.",
+          text: "Unter „Kader“ eines Vereins, im Menü „Weitere Aktionen“, gibt „Eigenschaften für Kader“ allen Spielern der Mannschaft die Spielereigenschaften, die Sie wählen, oder nimmt sie ihnen, und lässt ihre übrigen Eigenschaften, wie sie sind. Ein einziges „Rückgängig“ nimmt es zurück.",
+        },
+        {
+          title: "Alle Mitarbeiter transferieren.",
+          text: "Unter „Mitarbeiter“ eines Vereins wechseln alle Mitarbeiter auf einmal zu einem anderen Verein, jeder in derselben Aufgabe, und ein einziges „Rückgängig“ holt alle zurück.",
+        },
+        {
+          title: "Nationalteams.",
+          text: "Der A-Kader einer Nationalmannschaft bekommt „Alle heilen“, „Alle motivieren“ und „Alle regenerieren“, und seine Tabelle zeigt Energie, Spielpraxis und Moral.",
+        },
+        {
+          title: "Sponsorenverträge.",
+          text: "Die Finanzen eines Vereins listen seine Sponsorenverträge auf, nur zum Lesen: was jeder pro Saison und insgesamt zahlt, seine Laufzeit und was ein Abstieg ändert. Bisher unter Game Pass 0.9.2524.0.",
+        },
+        {
+          title: "Korrektur.",
+          text: "In manchen Karrieren scheiterten die Mitarbeiter an der Prüfung, die der Editor vor dem Schreiben macht, obwohl sie richtig gelesen wurden. Sie blieben dann schreibgeschützt, und Heilen, „Teambuilding maximieren“ und „Taktik maximieren“ wurden abgelehnt. Jetzt besteht die Prüfung.",
+        },
+      ],
       "0.5.3": [
         {
           title: "FM27-Update vom 17. November.",

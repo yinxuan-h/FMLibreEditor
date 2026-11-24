@@ -1417,6 +1417,138 @@ export const zhCN: Strings = {
     unavailableBuild: "尚无人确认此版本游戏把赞助合同存放在哪里，因此编辑器不显示，以免读取错误的内存。",
     unavailableUnreadable: "编辑器在此版本游戏中预期的位置查找了赞助合同，但找到的内容不像游戏的数据，因此不显示。",
   },
+
+  competitions: {
+    nav: "赛事",
+    search: "按名称、国家/地区或 UID 搜索赛事",
+    summary: (total: number, shown: number) =>
+      total > shown ? `共 ${format(total)} 项赛事，显示 ${format(shown)} 项` : `${format(total)} 项赛事`,
+    empty: (query: string, filtered: boolean) => {
+      if (query === "") {
+        return filtered ? "该国家/地区没有设有阵容规则的赛事。" : "未找到设有阵容规则的赛事。";
+      }
+      return filtered ? `该国家/地区没有匹配“${query}”的赛事。` : `没有匹配“${query}”的赛事。`;
+    },
+    reading: "正在从游戏读取各赛事的阵容规则…这需要几秒钟。",
+    readAgain: "重新读取",
+    readAgainTitle: "重新从游戏读取规则",
+    listNote: "没有阵容规则的赛事不会列出。",
+    unavailableTitle: "没有可显示的阵容规则",
+    unavailableBuild: "还没有人确认此版本的游戏把赛事的阵容规则存放在哪里，因此编辑器不显示，以免读取错误的内存。",
+    unavailableUnreadable: "编辑器在此版本游戏中预期的位置查找了阵容规则，但找到的内容不像游戏的数据，因此不显示。",
+    columns: {
+      name: "赛事",
+      nation: "国家/地区",
+      level: "级别",
+      rules: "规则",
+      uid: "UID",
+    },
+    level: (level: number) => format(level),
+    rulesCount: (current: number, next: number | null) =>
+      next === null || next === current ? format(current) : `${format(current)} · ${format(next)}`,
+    rulesCountTitle: "本赛季的阵容规则数；下赛季数量不同时一并显示",
+    international: "国际",
+    filters: {
+      nation: "国家/地区",
+      allNations: "所有国家/地区",
+    },
+    title: "阵容规则",
+    intro: "在此赛事中，一支球队的阵容最多可注册、或一场比赛最多可选用某类球员多少人。谁算外籍球员或本土培养球员由游戏自己决定。",
+    seasons: { current: "本赛季", next: "下赛季" },
+    began: (year: number) => `始于 ${year} 年`,
+    begins: (year: number) => `将于 ${year} 年开始`,
+    noRules: "没有阵容规则。",
+    noNext: "游戏中没有下赛季的规则。",
+    ruleColumns: {
+      rule: "规则",
+      where: "计入范围",
+      limit: "限制",
+      value: "球员",
+    },
+    atMost: "最多",
+    atLeast: "至少",
+    scopes: {
+      squad: "阵容",
+      matchSquad: "比赛名单",
+      eleven: "场上十一人",
+      startingEleven: "首发十一人",
+      bench: "替补席",
+    },
+    who: {
+      squadSize: "阵容中的球员",
+      foreign: "外籍球员",
+      foreignExceptAsian: "外籍球员（亚洲球员除外）",
+      foreignGoalkeepers: "外籍门将",
+      nonEu: "非欧盟球员",
+      domestic: "本国球员",
+      domesticGoalkeepers: "本国门将",
+      goalkeepers: "门将",
+      outfield: "外场球员",
+      nonHomegrown: "非本土培养球员",
+      youthContract: "青年合同球员",
+      fullTime: "全职合同球员",
+      amateur: "业余球员",
+      youthOrAmateur: "青年或业余球员",
+      trialists: "试训球员",
+      loans: "租借球员",
+      internationals: "国脚",
+      otherTeam: "注册于其他球队的球员",
+      firstTeam: "注册于一线队的球员",
+      over: (age: number) => `${format(age)} 岁以上的球员`,
+      under: (age: number) => `${format(age)} 岁以下的球员`,
+      domesticUnder: (age: number) => `${format(age)} 岁以下的本国球员`,
+      foreignOver: (age: number) => `${format(age)} 岁以上的外籍球员`,
+      goalkeepersOver: (age: number) => `${format(age)} 岁以上的门将`,
+      outfieldOver: (age: number) => `${format(age)} 岁以上的外场球员`,
+      homegrown: (from: "club" | "nation" | "clubOrNation", fromAge: number, toAge: number) => {
+        const ages = `${format(fromAge)}–${format(toAge)} 岁期间培养`;
+        if (from === "club") {
+          return `俱乐部培养（${ages}）`;
+        }
+        return from === "nation" ? `本国培养（${ages}）` : `俱乐部或本国培养（${ages}）`;
+      },
+      homegrownUnder: (age: number, fromAge: number, toAge: number) =>
+        `${format(age)} 岁以下的本国培养球员（${format(fromAge)}–${format(toAge)} 岁期间培养）`,
+    },
+    unnamedKind: (kind: number) => `类型 ${format(kind)} 的规则`,
+    gameKey: (key: string) => `游戏中此规则的名称：${key}`,
+    teamsFrom: (competition: string) => `来自${competition}的球队`,
+    teamsFromUnknown: "来自其他级别的球队",
+    condition: (code: string) => `有条件（${code}）`,
+    conditionTitle: "游戏在其自身的某个条件下才应用此规则，编辑器暂未解释该条件。",
+    years: (from: number | null, to: number | null) => {
+      if (from !== null && to !== null) {
+        return from === to ? `${from}` : `${from}–${to}`;
+      }
+      return from !== null ? `${from} 年起` : `至 ${to} 年`;
+    },
+    yearsTitle: "该国规则适用此规则的赛季，按赛季开始的年份计",
+    leftAlone: "保持不变",
+    notSavedTitle: "存档保存的该国规则中没有这条规则，因此改动会在加载存档后消失：编辑器不会改动它。",
+    notACountTitle: "这是一笔金额，不是球员人数：编辑器不会改动它。",
+    noneChangeable: "这些规则目前无法修改，与日期无关：只有在存档保存的规则中也找到同一条规则时，编辑器才会修改它（这样加载存档后改动仍然存在），而本赛事的规则尚未在其中找到。目前女子联赛、美国职业足球大联盟和部分杯赛属于这种情况。",
+    unsavedNote: "游戏不会把本赛事的规则保存在任何存档里：每次加载存档时以及每个新赛季，游戏都会自行重新生成。因此编辑器会保持此处的改动：把它写入运行中的游戏，为本生涯记住它，并在每次连接或重新读取数据时再次写入。加载存档后，请连接一次编辑器（或点击“重新读取数据”），改动才会恢复。在“改动记录”中点击“撤销”可取消保持。",
+    heldTag: "保持中",
+    heldTitle: (original: number) => `编辑器保持这个人数，并在每次读取游戏时再次写入。游戏原本的数值是${format(original)}。`,
+    savedDiffers: (value: number) => `存档的规则中为 ${format(value)}`,
+    savedDiffersTitle: "游戏按列表运行，并在加载存档时根据存档的规则生成列表。在此保存改动会同时设置两者。",
+    edit: "修改规则",
+    editTitle: "修改此赛事阵容规则中的人数",
+    save: "保存规则",
+    saving: "正在保存…",
+    cancel: "取消",
+    invalid: (most: number) => `请输入 0 到 ${format(most)} 之间的整数。`,
+    shared: (names: string) => `这些规则同时也是 ${names} 的规则：改动对它们同样生效。`,
+    currentNote: (turn: string | null) =>
+      `此处的改动在本赛季结束前有效${turn === null ? "" : `（赛季于${turn}更替）`}。游戏会立即按改动后的规则统计阵容；游戏自己的界面要过一天后才会显示。`,
+    nextNote: (turn: string | null) =>
+      `此处的改动会在赛季更替时${turn === null ? "" : `（${turn}）`}成为本赛季的规则，并在之后的赛季继续保留，除非游戏对更晚的赛季另有规则。游戏的“下赛季”页面会立即显示改动。`,
+    lasts: "改动会写入游戏所依据的列表，以及存档保存的该国规则，因此加载存档后依然有效。对本赛季规则的改动在赛季更替时结束，由下赛季的规则取代。在“改动记录”中点击“撤销”可恢复原来的人数。",
+    infoLabel: "阵容规则的改动如何保留",
+    ruleField: (season: string, rule: string) => `阵容规则，${season}：${rule}`,
+    alsoFor: (count: number) =>
+      count === 1 ? "同样适用于另 1 项使用相同规则的赛事" : `同样适用于另 ${format(count)} 项使用相同规则的赛事`,
+  },
   app: {
     /** The small line under the name in the sidebar. */
     stage: "测试版",
@@ -1744,7 +1876,7 @@ export const zhCN: Strings = {
       status: "状态",
     },
     /** The small tag after a name. */
-    kinds: { player: "球员", staff: "职员", club: "俱乐部", nationalTeam: "国家队" } satisfies Record<EditEntity, string>,
+    kinds: { player: "球员", staff: "职员", club: "俱乐部", nationalTeam: "国家队", competition: "赛事" } satisfies Record<EditEntity, string>,
     /** Hover text of a change of an attribute: the values as stored; `change` is from `valueChange`. */
     stored: (change: string) => `游戏中记录为：${change}`,
     undone: (time: string) => `已于 ${time} 撤销`,
@@ -2507,6 +2639,23 @@ export const zhCN: Strings = {
    * A club's squad: the tab of the club profile that lists the players of each of its teams, with the actions on a
    * whole team and the captains.
    */
+  batchTraits: {
+    title: "批量球队习惯设置",
+    addMode: "+ 添加至球队",
+    removeMode: "- 从球队中移除",
+    addHint: "将所选习惯添加到球队中尚未掌握该习惯的球员。现有习惯将予以保留。",
+    removeHint: "从掌握所选习惯的球员中将其移除。其余习惯保持不变。",
+    noneSelected: "该模式下未选择任何习惯",
+    selectedCount: (count: number) => `已选择 ${format(count)} 项`,
+    deselectAll: "全部取消",
+    oppositeModeNote: "已在另一模式中选择",
+    applyNote: (players: number) => `将应用至 ${format(players)} 名球员 · 支持一键撤销`,
+    emptySquad: (players: number) => `共有 ${format(players)} 名球员的阵容`,
+    cancel: "取消",
+    apply: "应用",
+    applying: "正在应用…",
+  },
+
   squad: {
     // The switch between the club's teams
     /** The name of the switch for assistive technology. */
@@ -2562,6 +2711,8 @@ export const zhCN: Strings = {
     tacticsUntrained: (count: number) => `${format(count)} 名球员没有训练（例如受伤），其训练记录保持不变`,
     refreshAll: "恢复全队状态",
     refreshAllTitle: "将全队体能和比赛状态恢复至 100%，并彻底消除疲劳（疲劳度 -500）",
+    batchTraits: "批量设置球员习惯",
+    batchTraitsTitle: "为该球队中的球员批量添加或移除习惯动作",
     maxAll: "属性拉满",
     maxAllTitle:
       "将全队所有球员的属性设为最高值 20；受伤倾向和肮脏动作设为最低值 1",
@@ -2569,6 +2720,32 @@ export const zhCN: Strings = {
     atItsBestTitle:
       "一键完成“治疗全队”“鼓舞全队”“恢复全队状态”“凝聚力拉满”和“战术拉满”，点一次“撤销”即可全部撤回。属性和停赛保持不变。无法执行的步骤（例如没有球员受伤时的“治疗全队”）会被跳过，结果中会注明。随着训练变旧，约六周后战术各方面会再次下降；换用其他战术需要再点一次。在游戏中点击“继续”推进后，页面才会显示更新后的数值。",
     atItsBestSkipped: (step, reason) => `已跳过“${step}”：${reason}`,
+    destroy: "全队状态跌入谷底",
+    destroyTitle:
+      "将这支球队每位球员的状态降到最差：士气和满意度、体能、比赛状态和疲劳度、与俱乐部的凝聚力，以及在由你选择球队" +
+      "战术时的战术熟悉度。不会让任何数值变好；属性、伤病和停赛保持不变。执行前会先确认，点一次“撤销”即可全部撤回",
+    destroySteps: {
+      demoralize: "士气和满意度",
+      exhaust: "体能和比赛状态",
+      minCohesion: "凝聚力",
+      minTactics: "战术",
+    },
+    moreActions: "更多操作",
+    moreActionsTitle: "逐项执行针对全队的操作",
+    destroyDialog: {
+      title: "让全队状态跌入谷底？",
+      doesHeading: "名单中的每位球员，包括外租球员",
+      does: [
+        "士气降到最低值 1；满意度和出场时间满意度降到 -100",
+        "体能降到 0%，比赛状态降到 35%，疲劳度升到 1000",
+        "与俱乐部的凝聚力降到 1（仅限有凝聚力记录的球员）",
+        "战术熟悉度降到最低（仅当由你选择球队战术时）",
+      ],
+      keeps: "不会让任何数值变好。属性、伤病和停赛保持不变。",
+      ownClub: "这是你自己俱乐部的球队。",
+      hint: "在游戏推进之前，点一次“撤销”即可全部撤回。",
+      cancel: "取消",
+    },
     /** Beside the buttons: whom they cover, and where undoing is. */
     hint: "操作会应用于列表中的所有球员，包括外租球员。也可以在“改动记录”中撤销。",
 
@@ -3260,6 +3437,31 @@ export const zhCN: Strings = {
     } as Record<string, (value: string) => string>,
   },
 
+  /** A player's development: the Development tab of his profile, the note under his abilities, the squad's arrows (see en.ts). */
+  progress: {
+    tabsLabel: "球员档案的分区",
+    tabs: { overview: "档案", progress: "成长" },
+    lockedWhileEdited: "完成编辑后才能打开此标签页",
+    openTab: "打开“成长”标签页",
+    loading: "正在读取记录…",
+    failed: (reason: string) => `无法读取记录：${reason}`,
+    since: (date: string) => `自 ${date} 起`,
+    change: (from: string, to: string, date: string) => `自 ${date} 起 ${from} → ${to}`,
+    rangeLabel: "时间段",
+    ranges: { quarter: "3 个月", year: "1 年", all: "全部" },
+    recorded: (count: number, first: string) => `记录：${count} 条 · 首条记录于 ${first}`,
+    abilityTitle: "能力",
+    valueTitle: "身价",
+    attributesTitle: "发生变化的属性",
+    noAttributeChanges: (date: string) => `自 ${date} 起没有属性发生变化。`,
+    emptyTitle: "暂时没有可比较的记录",
+    emptyText:
+      "每次读取游戏数据时，应用会按游戏内时间大约每周一次，记下所有球员的能力、身价和属性。继续游戏并重新读取数据，这名球员的成长就会显示在这里。",
+    offTitle: "这个存档没有记录",
+    offText:
+      "只有存档里有你操控的主教练，并且游戏版本的数据通过了应用的检查时，应用才会保存记录。",
+  },
+
   /** The command palette and the names of the keys in the keyboard shortcuts (see en.ts). */
   palette: {
     button: "搜索",
@@ -3326,6 +3528,36 @@ export const zhCN: Strings = {
     link: "新功能",
     command: "此版本的新功能",
     versions: {
+      "0.5.4": [
+        {
+          title: "转会写入球员履历：",
+          text: "“转会”现在是调动球员时的第一个选项，会把转会安排在游戏中的第二天。游戏会像处理自己的转会一样完成它：支付转会费，并把这次转会记入球员的职业履历，本赛季在原俱乐部的比赛单独保留一行。“立即调动”仍会立刻调动球员。",
+        },
+        {
+          title: "全队状态拉满与跌入谷底：",
+          text: "在俱乐部的“阵容”标签页，一键即可治疗、鼓舞并恢复全队状态，把凝聚力和战术拉满；“全队状态跌入谷底”会在确认后做相反的事。两者都可以用一次“撤销”还原，单项操作在“更多操作”中。",
+        },
+        {
+          title: "批量设置球员习惯：",
+          text: "在俱乐部“阵容”标签页的“更多操作”中，“批量设置球员习惯”可为全队球员添加或移除所选的习惯动作，其他习惯保持不变；一次“撤销”即可还原。",
+        },
+        {
+          title: "调动全部职员：",
+          text: "在俱乐部的“职员”标签页，可一次把全部职员调到另一家俱乐部，每人保持原职务；一次“撤销”即可全部调回。",
+        },
+        {
+          title: "国家队：",
+          text: "国家队一线队阵容新增“治疗全队”“鼓舞全队”和“恢复全队状态”，阵容表格会显示体能、比赛状态和士气。",
+        },
+        {
+          title: "赞助合同：",
+          text: "俱乐部财务会以只读方式列出赞助合同：每份合同每赛季和总共支付的金额、期限，以及降级时的变化。目前仅限 Game Pass 0.9.2524.0。",
+        },
+        {
+          title: "修复：",
+          text: "在部分生涯中，职员明明读取正确，职员检查却会失败，导致职员只能查看，治疗、“凝聚力拉满”和“战术拉满”也被拒绝。现在可以通过检查了。",
+        },
+      ],
       "0.5.3": [
         {
           title: "FM27 11 月 17 日的更新：",

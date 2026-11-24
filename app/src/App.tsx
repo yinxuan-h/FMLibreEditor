@@ -6,6 +6,7 @@ import { ChangesView, useChangeFilter, useChangeLog } from "./ChangesView";
 import { ClubBrowser } from "./ClubBrowser";
 import { NationalBrowser } from "./NationalBrowser";
 import { CommandPalette, Keys, SearchIcon, type Command, type Found, type FoundKind } from "./CommandPalette";
+import { CompetitionBrowser } from "./CompetitionBrowser";
 import { CompatibilityNotice } from "./CompatibilityNotice";
 import { CopyDiagnostics } from "./CopyDiagnostics";
 import { forgetFieldTables } from "./fieldTables";
@@ -17,6 +18,7 @@ import {
   appText,
   changesText,
   clubListText,
+  competitionsText,
   nationalText,
   homeText,
   paletteText,
@@ -55,7 +57,7 @@ import { useWhatsNew } from "./whatsNew";
 import { WhatsNewDialog } from "./WhatsNewDialog";
 import "./App.css";
 
-type View = "home" | "players" | "staff" | "clubs" | "scouting" | "changes";
+type View = "home" | "players" | "staff" | "clubs" | "competitions" | "scouting" | "changes";
 
 // The national teams are listed in the Clubs tab, behind its switch (see `TeamsSwitch`), not in a tab of their own.
 const VIEWS: { id: View; label: string }[] = [
@@ -63,6 +65,7 @@ const VIEWS: { id: View; label: string }[] = [
   { id: "players", label: playerListText.nav },
   { id: "staff", label: staffListText.nav },
   { id: "clubs", label: clubListText.nav },
+  { id: "competitions", label: competitionsText.nav },
   { id: "scouting", label: scoutingText.nav },
   { id: "changes", label: changesText.nav },
 ];
@@ -352,7 +355,8 @@ function App() {
   const game = detection?.games[0];
   const idle = busy === null;
   const searchable =
-    connection !== null && (view === "players" || view === "staff" || view === "clubs" || view === "changes");
+    connection !== null &&
+    (view === "players" || view === "staff" || view === "clubs" || view === "competitions" || view === "changes");
 
   // What the palette lists, read when it opens: the commands of the profile on show, then the lists, then the rest.
   const commands: Command[] = [];
@@ -580,6 +584,7 @@ function App() {
                   active={view === "clubs" && teams === "nationals"}
                   scope={teamsSwitch}
                 />
+                <CompetitionBrowser version={dataVersion} active={view === "competitions"} />
                 <ScoutingBrowser version={dataVersion} active={view === "scouting"} gameDate={connection.gameDate} />
                 {view === "changes" && (
                   <ChangesView

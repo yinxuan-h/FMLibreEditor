@@ -30,6 +30,9 @@ pub enum Entity {
     Club,
     /// A nation's national team, by the UID of its container (see `national.rs`): the senior team is the one edited.
     NationalTeam,
+    /// A competition, by its UID: what the editor changes of one are its squad rules (see `rules.rs`), which are no
+    /// fields of an object, so it has none here; the kind is there for the changes of them to be told by.
+    Competition,
 }
 
 impl fmt::Display for Entity {
@@ -39,6 +42,7 @@ impl fmt::Display for Entity {
             Entity::Staff => "staff",
             Entity::Club => "club",
             Entity::NationalTeam => "national team",
+            Entity::Competition => "competition",
         })
     }
 }
@@ -324,6 +328,7 @@ pub fn fields(layout: &Layout, entity: Entity) -> Vec<Field> {
         Entity::Staff => staff_fields(layout),
         Entity::Club => club_fields(layout),
         Entity::NationalTeam => national_team_fields(layout),
+        Entity::Competition => Vec::new(),
     }
 }
 
@@ -1118,6 +1123,10 @@ impl Session {
                 Some(national) => national.container_uid,
                 None => return Err(EditError::Moved { entity: target.entity, uid: target.uid }),
             },
+            Entity::Competition => match &self.layout.competition {
+                Some(competition) => competition.uid,
+                None => return Err(EditError::Moved { entity: target.entity, uid: target.uid }),
+            },
         };
         if self.process.read_u32(target.address + uid_offset)? != target.uid {
             return Err(EditError::Moved { entity: target.entity, uid: target.uid });
@@ -1535,7 +1544,7 @@ mod tests {
     #[test]
     fn keys_are_unique() {
         let layout = crate::layout_for(27).expect("FM27 layout");
-        for entity in [Entity::Player, Entity::Staff, Entity::Club, Entity::NationalTeam] {
+        for entity in [Entity::Player, Entity::Staff, Entity::Club, Entity::NationalTeam, Entity::Competition] {
             let mut keys: Vec<String> = fields(&layout, entity).into_iter().map(|f| f.key).collect();
             let all = keys.len();
             keys.sort();

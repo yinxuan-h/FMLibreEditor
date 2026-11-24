@@ -236,7 +236,13 @@ impl Stacks {
 
 /// Calls `visit` with each readable stretch of `[start, end)`, `overlap` bytes longer than the part it should look at
 /// (`limit`), so that a pattern across two stretches is seen once.
-fn each_chunk(process: &Process, start: u64, end: u64, overlap: usize, mut visit: impl FnMut(u64, &[u8], usize)) {
+pub(crate) fn each_chunk(
+    process: &Process,
+    start: u64,
+    end: u64,
+    overlap: usize,
+    mut visit: impl FnMut(u64, &[u8], usize),
+) {
     for region in regions(process, start, end).into_iter().filter(|r| r.is_readable()) {
         let mut offset = 0;
         while offset < region.size {
@@ -252,7 +258,7 @@ fn each_chunk(process: &Process, start: u64, end: u64, overlap: usize, mut visit
 }
 
 /// The addresses of the 8-byte aligned words in `[start, end)` that hold one of `values`.
-fn words_equal_to(process: &Process, start: u64, end: u64, values: &[u64]) -> Vec<u64> {
+pub(crate) fn words_equal_to(process: &Process, start: u64, end: u64, values: &[u64]) -> Vec<u64> {
     let mut found = Vec::new();
     each_chunk(process, start, end, 0, |base, bytes, _| {
         for (i, word) in bytes.as_chunks::<8>().0.iter().enumerate() {

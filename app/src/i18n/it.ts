@@ -1381,6 +1381,138 @@ export const it: Strings = {
     unavailableBuild: "Nessuno ha ancora verificato dove questa versione del gioco tenga le sponsorizzazioni, quindi l'editor non le mostra per non leggere la memoria sbagliata.",
     unavailableUnreadable: "L'editor ha cercato le sponsorizzazioni dove se le aspetta in questa versione del gioco, ma ciò che ha trovato non sembra quello del gioco, quindi non le mostra.",
   },
+
+  competitions: {
+    nav: "Competizioni",
+    search: "Cerca competizioni per nome, nazione o UID",
+    summary: (total, shown) =>
+      total > shown ? `${format(shown)} di ${format(total)} competizioni` : `${format(total)} competizioni`,
+    empty: (query, filtered) => {
+      if (query === "") {
+        return filtered ? "Nessuna competizione di questa nazione ha regole di rosa." : "Nessuna competizione con regole di rosa trovata.";
+      }
+      return filtered ? `Nessuna competizione di questa nazione corrisponde a «${query}».` : `Nessuna competizione corrisponde a «${query}».`;
+    },
+    reading: "Lettura delle regole di rosa delle competizioni dal gioco… Ci vogliono alcuni secondi.",
+    readAgain: "Rileggi",
+    readAgainTitle: "Rileggi le regole dal gioco",
+    listNote: "Le competizioni senza regole di rosa non sono elencate.",
+    unavailableTitle: "Nessuna regola di rosa da mostrare",
+    unavailableBuild: "Nessuno ha ancora verificato dove questa versione del gioco tenga le regole di rosa delle competizioni, quindi l'editor non ne mostra per non leggere la memoria sbagliata.",
+    unavailableUnreadable: "L'editor ha cercato le regole di rosa dove se le aspetta in questa versione del gioco, ma ciò che ha trovato non sembra quello del gioco, quindi non ne mostra.",
+    columns: {
+      name: "Competizione",
+      nation: "Nazione",
+      level: "Livello",
+      rules: "Regole",
+      uid: "UID",
+    },
+    level: (level) => format(level),
+    rulesCount: (current, next) =>
+      next === null || next === current ? format(current) : `${format(current)} · ${format(next)}`,
+    rulesCountTitle: "Regole di rosa in questa stagione e, se il numero è diverso, nella prossima",
+    international: "Internazionale",
+    filters: {
+      nation: "Nazione",
+      allNations: "Tutte le nazioni",
+    },
+    title: "Regole di rosa",
+    intro: "Quanti giocatori di un tipo una rosa può registrare, o una squadra schierare per una partita, in questa competizione. Chi conta come straniero o formato in casa lo decide il gioco stesso.",
+    seasons: { current: "Questa stagione", next: "Prossima stagione" },
+    began: (year) => `iniziata nel ${year}`,
+    begins: (year) => `inizia nel ${year}`,
+    noRules: "Nessuna regola di rosa.",
+    noNext: "Il gioco non ha regole per la prossima stagione.",
+    ruleColumns: {
+      rule: "Regola",
+      where: "Conteggio in",
+      limit: "Limite",
+      value: "Giocatori",
+    },
+    atMost: "Al massimo",
+    atLeast: "Almeno",
+    scopes: {
+      squad: "Rosa",
+      matchSquad: "Lista gara",
+      eleven: "Undici in campo",
+      startingEleven: "Formazione titolare",
+      bench: "Panchina",
+    },
+    who: {
+      squadSize: "Giocatori in rosa",
+      foreign: "Giocatori stranieri",
+      foreignExceptAsian: "Giocatori stranieri, esclusi gli asiatici",
+      foreignGoalkeepers: "Portieri stranieri",
+      nonEu: "Giocatori non UE",
+      domestic: "Giocatori nazionali",
+      domesticGoalkeepers: "Portieri nazionali",
+      goalkeepers: "Portieri",
+      outfield: "Giocatori di movimento",
+      nonHomegrown: "Giocatori non formati in casa",
+      youthContract: "Giocatori con contratto giovanile",
+      fullTime: "Giocatori con contratto a tempo pieno",
+      amateur: "Giocatori dilettanti",
+      youthOrAmateur: "Giocatori giovani o dilettanti",
+      trialists: "Giocatori in prova",
+      loans: "Giocatori in prestito",
+      internationals: "Giocatori internazionali",
+      otherTeam: "Giocatori registrati per un'altra squadra",
+      firstTeam: "Giocatori registrati per la prima squadra",
+      over: (age) => `Giocatori sopra i ${format(age)} anni`,
+      under: (age) => `Giocatori sotto i ${format(age)} anni`,
+      domesticUnder: (age) => `Giocatori nazionali sotto i ${format(age)} anni`,
+      foreignOver: (age) => `Giocatori stranieri sopra i ${format(age)} anni`,
+      goalkeepersOver: (age) => `Portieri sopra i ${format(age)} anni`,
+      outfieldOver: (age) => `Giocatori di movimento sopra i ${format(age)} anni`,
+      homegrown: (from, fromAge, toAge) => {
+        const ages = `formati tra i ${format(fromAge)} e i ${format(toAge)} anni`;
+        if (from === "club") {
+          return `Formati nel club (${ages})`;
+        }
+        return from === "nation" ? `Formati nella nazione (${ages})` : `Formati nel club o nella nazione (${ages})`;
+      },
+      homegrownUnder: (age, fromAge, toAge) =>
+        `Giocatori sotto i ${format(age)} anni formati nella nazione (formati tra i ${format(fromAge)} e i ${format(toAge)} anni)`,
+    },
+    unnamedKind: (kind) => `Regola di tipo ${format(kind)}`,
+    gameKey: (key) => `Nome di questa regola nel gioco: ${key}`,
+    teamsFrom: (competition) => `Squadre di ${competition}`,
+    teamsFromUnknown: "Squadre di un'altra divisione",
+    condition: (code) => `Condizionale (${code})`,
+    conditionTitle: "Il gioco applica questa regola a una condizione sua, che l'editor non spiega ancora.",
+    years: (from, to) => {
+      if (from !== null && to !== null) {
+        return from === to ? `${from}` : `${from}–${to}`;
+      }
+      return from !== null ? `dal ${from}` : `fino al ${to}`;
+    },
+    yearsTitle: "Le stagioni per cui le regole della nazione prevedono questa regola, per anno in cui inizia la stagione",
+    leftAlone: "Lasciata stare",
+    notSavedTitle: "Le regole della nazione come le conserva un salvataggio non contengono questa regola, quindi una modifica sparirebbe al caricamento del salvataggio: l'editor la lascia stare.",
+    notACountTitle: "Una somma di denaro, non un numero di giocatori: l'editor la lascia stare.",
+    noneChangeable: "Queste regole non si possono ancora modificare, in nessuna data: l'editor modifica una regola solo se la trova anche nelle regole che il salvataggio conserva, così la modifica c'è ancora quando il salvataggio viene caricato, e quelle di questa competizione non le ha trovate lì. Per ora vale per i campionati femminili, la Major League Soccer e alcune coppe.",
+    unsavedNote: "Il gioco non conserva le regole di questa competizione in nessun salvataggio: le crea da sé ogni volta che ne carica uno, e di nuovo a ogni stagione. Per questo l'editor mantiene una modifica qui: la scrive nel gioco in corso, la ricorda per questa carriera e la riscrive ogni volta che si connette o rilegge i dati. Dopo aver caricato un salvataggio, connetti l'editor (o premi Ricarica i dati) una volta perché la modifica torni. Ripristina in Modifiche la rilascia.",
+    heldTag: "Mantenuta",
+    heldTitle: (original) => `L'editor mantiene questo numero e lo riscrive ogni volta che legge il gioco. Quello del gioco è ${format(original)}.`,
+    savedDiffers: (value) => `Le regole del salvataggio hanno ${format(value)}`,
+    savedDiffersTitle: "Il gioco segue la lista e la ricrea dalle regole del salvataggio quando lo carica. Salvare qui una modifica imposta entrambe.",
+    edit: "Modifica regole",
+    editTitle: "Modifica i numeri delle regole di rosa di questa competizione",
+    save: "Salva regole",
+    saving: "Salvataggio…",
+    cancel: "Annulla",
+    invalid: (most) => `Inserisci un numero intero da 0 a ${format(most)}.`,
+    shared: (names) => `Queste regole sono anche quelle di ${names}: una modifica vale anche per loro.`,
+    currentNote: (turn) =>
+      `Una modifica qui vale per il resto di questa stagione${turn === null ? "" : `, che cambia il ${turn}`}. Il gioco conta subito le rose con la modifica; le sue schermate la mostrano quando è passato un giorno.`,
+    nextNote: (turn) =>
+      `Una modifica qui diventa la regola di questa stagione al cambio di stagione${turn === null ? "" : ` (il ${turn})`} e resta per le stagioni successive, a meno che il gioco non abbia regole proprie per una stagione più avanti. La pagina Prossima stagione del gioco la mostra subito.`,
+    lasts: "Una modifica viene scritta nella lista che il gioco segue e nelle regole della nazione che il salvataggio conserva, quindi c'è ancora quando il salvataggio viene caricato. Una modifica a una regola di questa stagione finisce al cambio di stagione: le regole della prossima prendono il suo posto. Ripristina in Modifiche rimette il vecchio numero.",
+    infoLabel: "Quanto dura la modifica di una regola di rosa",
+    ruleField: (season, rule) => `Regola di rosa, ${season.toLowerCase()}: ${rule}`,
+    alsoFor: (count) =>
+      count === 1 ? "Anche per 1 altra competizione con le stesse regole" : `Anche per ${format(count)} altre competizioni con le stesse regole`,
+  },
   app: {
     stage: "beta",
     settingsLabel: "Impostazioni",
@@ -1647,7 +1779,7 @@ export const it: Strings = {
       change: "Modifica",
       status: "Stato",
     },
-    kinds: { player: "Giocatore", staff: "Staff", club: "Società", nationalTeam: "Nazionale" },
+    kinds: { player: "Giocatore", staff: "Staff", club: "Società", nationalTeam: "Nazionale", competition: "Competizione" },
     stored: (change) => `valore interno ${change}`,
     undone: (time) => `Annullata alle ${time}`,
     undo: "Ripristina",
@@ -2298,6 +2430,23 @@ export const it: Strings = {
     cancel: "Annulla",
   },
 
+  batchTraits: {
+    title: "Caratteristiche della squadra",
+    addMode: "+ Aggiungi alla rosa",
+    removeMode: "- Rimuovi dalla rosa",
+    addHint: "Applica le caratteristiche selezionate ai giocatori della squadra che non le hanno. Le caratteristiche esistenti rimangono invariate.",
+    removeHint: "Rimuove le caratteristiche selezionate dai giocatori della squadra che le hanno. Le altre caratteristiche non vengono toccate.",
+    noneSelected: "Nessuna caratteristica selezionata in questa modalità",
+    selectedCount: (count: number) => (count === 1 ? "1 caratteristica selezionata" : `${format(count)} caratteristiche selezionate`),
+    deselectAll: "Deseleziona tutto",
+    oppositeModeNote: "Selezionata nell'altra modalità",
+    applyNote: (players: number) => `Si applica a ${format(players)} giocatori · Si può annullare con 1 clic`,
+    emptySquad: (players: number) => `Rosa di ${format(players)} giocatori`,
+    cancel: "Annulla",
+    apply: "Applica",
+    applying: "Applicazione in corso…",
+  },
+
   squad: {
     teamsLabel: "Squadra",
     teams: {
@@ -2350,6 +2499,8 @@ export const it: Strings = {
     refreshAllTitle:
       "Porta al 100% energia e forma partita di ogni giocatore di questa squadra e lo fa riposare del tutto " +
       "(stanchezza -500)",
+    batchTraits: "Caratteristiche della rosa",
+    batchTraitsTitle: "Aggiungi o rimuovi movimenti preferiti per i giocatori di questa squadra",
     maxAll: "Attributi al massimo",
     maxAllTitle:
       "Porta ogni attributo di ogni giocatore di questa squadra al suo meglio: 20, e 1 per propensione agli infortuni " +
@@ -2362,6 +2513,33 @@ export const it: Strings = {
       "a calare man mano che l'allenamento invecchia, dopo circa sei settimane, e un'altra tattica chiede un altro clic. " +
       "Il gioco mostra le modifiche quando va avanti: premi Continua nel gioco",
     atItsBestSkipped: (step, reason) => `${step} saltato: ${reason}`,
+    destroy: "Squadra a pezzi",
+    destroyTitle:
+      "Porta ogni giocatore di questa squadra al suo peggio: morale e felicità, energia, forma partita e stanchezza, " +
+      "affiatamento con la società e, se scegli tu la tattica della squadra, quanto la conosce. Nessun valore " +
+      "migliora; attributi, infortuni e squalifiche restano. Prima chiede, e un solo Ripristina annulla tutto",
+    destroySteps: {
+      demoralize: "Morale e felicità",
+      exhaust: "Energia e forma partita",
+      minCohesion: "Affiatamento",
+      minTactics: "Tattica",
+    },
+    moreActions: "Altre azioni",
+    moreActionsTitle: "Le azioni su tutta la squadra, una alla volta",
+    destroyDialog: {
+      title: "Mandare la squadra a pezzi?",
+      doesHeading: "Per ogni giocatore dell'elenco, anche quelli in prestito altrove",
+      does: [
+        "Morale a 1, il minimo; felicità e felicità per il minutaggio a -100",
+        "Energia allo 0%, forma partita al 35% e stanchezza a 1000",
+        "Affiatamento con la società a 1, per chi ce l'ha",
+        "Quanto conosce la tattica al minimo, se scegli tu la tattica della squadra",
+      ],
+      keeps: "Nessun valore migliora. Attributi, infortuni e squalifiche restano come sono.",
+      ownClub: "È una squadra della tua società.",
+      hint: "Un solo Ripristina annulla tutto, prima che il gioco vada avanti.",
+      cancel: "Annulla",
+    },
     hint:
       "Le azioni riguardano ogni giocatore dell'elenco, anche quelli in prestito altrove. Si possono annullare anche " +
       "nella vista Modifiche.",
@@ -3022,6 +3200,31 @@ export const it: Strings = {
     },
   },
 
+  /** A player's development: the Development tab of his profile, the note under his abilities, the squad's arrows (see en.ts). */
+  progress: {
+    tabsLabel: "Sezioni del profilo del giocatore",
+    tabs: { overview: "Profilo", progress: "Sviluppo" },
+    lockedWhileEdited: "Termina la modifica per aprire questa scheda",
+    openTab: "Apri la scheda Sviluppo",
+    loading: "Lettura delle registrazioni…",
+    failed: (reason: string) => `Impossibile leggere le registrazioni: ${reason}`,
+    since: (date: string) => `dal ${date}`,
+    change: (from: string, to: string, date: string) => `${from} → ${to} dal ${date}`,
+    rangeLabel: "Periodo",
+    ranges: { quarter: "3 mesi", year: "1 anno", all: "Tutto" },
+    recorded: (count: number, first: string) => `Registrazioni: ${count} · la prima il ${first}`,
+    abilityTitle: "Abilità",
+    valueTitle: "Valore",
+    attributesTitle: "Attributi cambiati",
+    noAttributeChanges: (date: string) => `Nessun attributo è cambiato dal ${date}.`,
+    emptyTitle: "Ancora niente con cui confrontare",
+    emptyText:
+      "L'app annota abilità, valore e attributi di tutti i giocatori circa una volta alla settimana del gioco, ogni volta che legge i dati del gioco. Continua a giocare, rileggi i dati e qui vedrai come si sviluppa questo giocatore.",
+    offTitle: "Nessuna registrazione per questo salvataggio",
+    offText:
+      "L'app tiene le registrazioni per un salvataggio in cui controlli un allenatore, su una versione del gioco i cui dati superano i suoi controlli.",
+  },
+
   /** The command palette and the names of the keys in the keyboard shortcuts (see en.ts). */
   palette: {
     button: "Cerca",
@@ -3090,6 +3293,36 @@ export const it: Strings = {
     link: "Novità",
     command: "Novità di questa versione",
     versions: {
+      "0.5.4": [
+        {
+          title: "I trasferimenti nella carriera del giocatore.",
+          text: "Trasferimento, ora la prima scelta quando sposti un giocatore, prepara il trasferimento per il giorno dopo nel gioco. Il gioco lo esegue come uno dei suoi: paga il costo del cartellino e registra il trasferimento nella storia della sua carriera, con le partite di questa stagione nella vecchia società in una riga a parte. Sposta subito lo sposta ancora all'istante.",
+        },
+        {
+          title: "Squadra al top, e a pezzi.",
+          text: "Nella scheda Rosa di una società, un solo clic guarisce, motiva e rigenera tutta la squadra e porta affiatamento e tattica al massimo; Squadra a pezzi, dopo una domanda, fa il contrario. Un solo Ripristina annulla l'una o l'altra, e le singole azioni sono in Altre azioni.",
+        },
+        {
+          title: "Caratteristiche della rosa.",
+          text: "Nella scheda Rosa di una società, sotto Altre azioni, Caratteristiche della rosa dà a tutti i giocatori della squadra le caratteristiche che scegli, o gliele toglie, e lascia le altre come sono. Un solo Ripristina lo annulla.",
+        },
+        {
+          title: "Trasferisci tutto lo staff.",
+          text: "La scheda Staff di una società trasferisce tutto il suo staff a un'altra società in una volta, ognuno nello stesso ruolo, e un solo Ripristina li riporta tutti indietro.",
+        },
+        {
+          title: "Nazionali.",
+          text: "La rosa della prima squadra di una nazionale ha Guarisci tutti, Motiva tutti e Rigenera tutti, e la sua tabella mostra energia, forma partita e morale.",
+        },
+        {
+          title: "Sponsorizzazioni.",
+          text: "Le finanze di una società elencano le sue sponsorizzazioni, in sola lettura: quanto paga ciascuna a stagione e in totale, la durata e cosa cambia con una retrocessione. Per ora su Game Pass 0.9.2524.0.",
+        },
+        {
+          title: "Correzione.",
+          text: "In alcune carriere il controllo dello staff falliva anche se lo staff era letto bene, lasciandolo in sola lettura e rifiutando guarigioni, Massimo affiatamento e Tattica al massimo. Ora passa.",
+        },
+      ],
       "0.5.3": [
         {
           title: "L'aggiornamento di FM27 del 17 novembre.",

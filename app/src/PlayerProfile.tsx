@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { AttributeActions } from "./AttributeActions";
 import { ClauseList } from "./ClauseList";
@@ -7,13 +7,15 @@ import { EditableValue, EditInput } from "./EditControls";
 import { call } from "./api";
 import { keepPlaying } from "./editing";
 import { describeError, formatDate, formatNumber, formatMoney } from "./format";
-import { ATTRIBUTE_LABELS, editText, profileText, type AttributeKey } from "./labels";
+import { ATTRIBUTE_LABELS, editText, profileText, progressText, type AttributeKey } from "./labels";
 import { MedicalGroup } from "./MedicalGroup";
 import { MoveButton } from "./MoveDialog";
 import { ClubLogo, NationFlag, PersonFace, PICTURE_SIZE, WithPicture } from "./Picture";
 import { FEET, GOALKEEPING, HIDDEN, isGoalkeeper, MENTAL, PHYSICAL, TECHNICAL } from "./playerAttributes";
 import { PositionFreeze, PositionPitch, PositionRatings } from "./PositionPitch";
 import { PermanentDialog } from "./PermanentDialog";
+import { AbilityTrend, changeTitle, ProgressTab } from "./PlayerProgress";
+import { attributeChanges, DEFAULT_RANGE, referenceOf, type Change } from "./progress";
 import { RecallDialog } from "./RecallDialog";
 import { RenameButton } from "./NamesDialog";
 import { ReleaseButton } from "./ReleaseDialog";
@@ -30,9 +32,19 @@ import {
   ReputationBars,
   useProfileDetails,
   WageFact,
+  type PanelIds,
   type RatingRow,
 } from "./ProfileParts";
-import type { ApplyReport, Concern, Contract, FmDate, LoanDetails, PlayerDetails, PlayerSummary } from "./types";
+import type {
+  ApplyReport,
+  Concern,
+  Contract,
+  FmDate,
+  LoanDetails,
+  PlayerDetails,
+  PlayerProgress,
+  PlayerSummary,
+} from "./types";
 import { ComparisonContext, type Comparison } from "./useComparison";
 import { EditorContext, useEditableField, useProfileEditing } from "./useProfileEditing";
 
@@ -81,10 +93,30 @@ export function PlayerDialog({ player, version, onClose }: Omit<PlayerProfilePro
   );
 }
 
+/** The tabs of the profile: what the player is, and how he developed. */
+type PlayerTab = "overview" | "progress";
+
+const TABS: readonly PlayerTab[] = ["overview", "progress"];
+
+/** The tab the profile last shown was on: the next player opens on it too, as the next club does on a club's tab. */
+let lastTab: PlayerTab = "overview";
+
 /** The profile of one player. Mount it with `key={uid}` so a new player starts at the top. */
 export function PlayerProfile({ player, version, onClose, comparison, modal }: PlayerProfileProps) {
   const loaded = useProfileDetails<PlayerDetails>("player_details", player.uid, version);
+  // The records the app keeps of the career: read by themselves, so that the profile does not wait for them.
+  const progress = useProfileDetails<PlayerProgress>("player_progress", player.uid, version);
   const editing = useProfileEditing("player", player.uid);
+  const base = useId();
+  const [tab, setTab] = useState<PlayerTab>(lastTab);
+  const select = (next: PlayerTab) => {
+    lastTab = next;
+    setTab(next);
+  };
+  // He is edited on the profile itself: the Development tab is out of reach until that is done.
+  const locked = editing.stage !== "view";
+  const shown = locked ? "overview" : tab;
+  const panel: PanelIds = { id: `${base}-panel`, labelledBy: `${base}-${shown}` };
   const details = loaded?.details;
   const info = details ?? player;
   // The birth date and the height, like the nationality above them and the abilities, are inputs where they are shown
@@ -124,6 +156,8 @@ export function PlayerProfile({ player, version, onClose, comparison, modal }: P
       vitals={vitals}
       currentAbility={info.currentAbility}
       potentialAbility={info.potentialAbility}
+      abilityNote={progress?.details && <AbilityTrend progress={progress.details} onOpen={() => select("progress")} />}
+      tabs={details && <PlayerTabs tab={shown} base={base} locked={locked} onSelect={select} />}
       loaded={loaded}
       onClose={onClose}
       editing={editing}
@@ -149,15 +183,88 @@ export function PlayerProfile({ player, version, onClose, comparison, modal }: P
         </>
       }
     >
-      {details && <ProfileBody details={details} />}
+      {details &&
+        (shown === "progress" ? (
+          <ProgressTab loaded={progress} panel={panel} />
+        ) : (
+          <ProfileBody details={details} progress={progress?.details} panel={panel} />
+        ))}
     </ProfileFrame>
   );
 }
 
-function ProfileBody({ details }: { details: PlayerDetails }) {
-  const goalkeeper = isGoalkeeper(details);
+interface PlayerTabsProps {
+  tab: PlayerTab;
+  /** The start of the ids of the tabs, which the panel they open names itself by (see `PanelIds`). */
+  base: string;
+  /** Whether the player is being edited. */
+  locked: boolean;
+  onSelect: (tab: PlayerTab) => void;
+}
+
+/** The tabs under the header. The arrow keys move between them, as in any tab list. */
+function PlayerTabs({ tab, base, locked, onSelect }: PlayerTabsProps) {
+  const buttons = useRef<Partial<Record<PlayerTab, HTMLButtonElement | null>>>({});
+
+  const keyDown = (event: KeyboardEvent) => {
+    if (locked || !["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key)) {
+      return;
+    }
+    const at = TABS.indexOf(tab);
+    const target =
+      event.key === "Home"
+        ? TABS[0]
+        : event.key === "End"
+          ? TABS[TABS.length - 1]
+          : TABS[(at + (event.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length];
+    event.preventDefault();
+    onSelect(target);
+    buttons.current[target]?.focus();
+  };
+
   return (
-    <>
+    <div className="profile-tabs" role="tablist" aria-label={progressText.tabsLabel} onKeyDown={keyDown}>
+      {TABS.map((id) => {
+        const unavailable = locked && id !== "overview";
+        return (
+          <button
+            key={id}
+            ref={(button) => {
+              buttons.current[id] = button;
+            }}
+            type="button"
+            role="tab"
+            id={`${base}-${id}`}
+            className="profile-tab"
+            aria-selected={id === tab}
+            aria-controls={`${base}-panel`}
+            // Only the tab that is open is a Tab stop; the arrow keys reach the other.
+            tabIndex={id === tab ? 0 : -1}
+            disabled={unavailable}
+            title={unavailable ? progressText.lockedWhileEdited : undefined}
+            onClick={() => onSelect(id)}
+          >
+            {progressText.tabs[id]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+interface ProfileBodyProps {
+  details: PlayerDetails;
+  /** The records of him, once read: the attributes that moved over the last year get an arrow. */
+  progress: PlayerProgress | undefined;
+  panel: PanelIds;
+}
+
+function ProfileBody({ details, progress, panel }: ProfileBodyProps) {
+  const goalkeeper = isGoalkeeper(details);
+  const moved = progress ? attributeChanges(progress, referenceOf(progress, DEFAULT_RANGE)) : NO_CHANGES;
+  const attributeRows = (shown: PlayerDetails, keys: readonly AttributeKey[]) => rowsOf(shown, keys, moved);
+  return (
+    <div className="profile-overview" role="tabpanel" id={panel.id} aria-labelledby={panel.labelledBy}>
       <AttributeActions entity="player" details={details} />
 
       <div className="profile-pair">
@@ -195,9 +302,11 @@ function ProfileBody({ details }: { details: PlayerDetails }) {
       {details.contract && <ContractGroup details={details} contract={details.contract} />}
       <CareerGroup details={details} />
       <TiesGroup details={details} />
-    </>
+    </div>
   );
 }
+
+const NO_CHANGES: ReadonlyMap<string, Change> = new Map();
 
 /** "178 cm" in the header; the number is an input while the player is edited. */
 function Height({ cm }: { cm: number }) {
@@ -212,10 +321,19 @@ function Height({ cm }: { cm: number }) {
   );
 }
 
-function attributeRows(details: PlayerDetails, keys: readonly AttributeKey[]): RatingRow[] {
-  return keys.map((key) =>
-    attributeRow(key, ATTRIBUTE_LABELS[key], details.attributes[key], { lowerIsBetter: LOWER_IS_BETTER.has(key) }),
-  );
+/** The rows of the attributes `keys`; one that moved (see `attributeChanges`) gets an arrow that says from what. */
+function rowsOf(details: PlayerDetails, keys: readonly AttributeKey[], moved: ReadonlyMap<string, Change>): RatingRow[] {
+  return keys.map((key) => {
+    const lowerIsBetter = LOWER_IS_BETTER.has(key);
+    const row = attributeRow(key, ATTRIBUTE_LABELS[key], details.attributes[key], { lowerIsBetter });
+    const change = moved.get(key);
+    // Only while the profile shows what the record ends with: not a value edited since.
+    if (!change || change.to !== row.value) {
+      return row;
+    }
+    const up = change.to > change.from;
+    return { ...row, trend: { up, good: up !== lowerIsBetter, title: changeTitle(change) } };
+  });
 }
 
 /**

@@ -38,6 +38,9 @@
 
   --danger: #b23a2b;
   --danger-soft: rgb(178 58 43 / 0.09);
+  /* Destroy's red fill, and its words on it. */
+  --danger-hover: #952e21;
+  --on-danger: #ffffff;
   --ok: #1f7547;
   /* What dims the app behind a dialog. */
   --scrim: rgb(22 24 29 / 0.42);
@@ -105,6 +108,8 @@
 
     --danger: #f0705f;
     --danger-soft: rgb(240 112 95 / 0.14);
+    --danger-hover: #f48d7f;
+    --on-danger: #15161a;
     --ok: #57b784;
     --scrim: rgb(0 0 0 / 0.6);
 
@@ -2844,6 +2849,22 @@ button.danger:hover:not(:disabled) {
   background: var(--danger-soft);
 }
 
+/* Destroy, the one action that makes a team worse: filled red, in the squad's row and in its question. */
+button.destroy {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--on-danger);
+}
+
+button.destroy:hover:not(:disabled, [aria-disabled="true"]) {
+  border-color: var(--danger-hover);
+  background: var(--danger-hover);
+}
+
+button.destroy[aria-disabled="true"]:hover {
+  background: var(--danger);
+}
+
 /* Changes */
 
 .view-title {
@@ -2886,6 +2907,14 @@ button.danger:hover:not(:disabled) {
 .changes-grid .change-value {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+/* A long field name (a squad rule's with its season), the notes under a change and the fields of a mass edit wrap:
+   on one line they would push the Status column, and its Undo, out of the window. */
+.changes-grid .col-field,
+.changes-grid .col-batch .name,
+.changes-grid .change-value .sub {
+  white-space: normal;
 }
 
 /* The one cell that may be tall: an undo that failed says why under its button. */
@@ -4661,6 +4690,57 @@ button.danger:hover:not(:disabled) {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* More actions: its word and a caret that says a menu opens. */
+.squad-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.squad-more svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.squad-more[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* Destroy keeps a little room from the actions that make the team better. */
+.squad-buttons .destroy {
+  margin-left: 8px;
+}
+
+/* An action of the menu that cannot run now is dimmed, and its hover text says why. */
+.squad-actions-menu button[aria-disabled="true"] {
+  color: var(--muted);
+  cursor: default;
+}
+
+.squad-actions-menu button[aria-disabled="true"]:hover {
+  background: transparent;
+}
+
+/* Destroy's question: the line that says the club is the user's own, and what it leaves alone. */
+.destroy-own {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.destroy-keeps {
+  margin: 0;
 }
 
 .squad-hint {
@@ -7704,4 +7784,350 @@ kbd {
 /* The national teams table: the code takes the place of the league. */
 .national-grid td.col-league {
   width: 18%;
+}
+
+/* The competitions table: the nation takes the place of the league. */
+.competition-grid td.col-league {
+  width: 24%;
+}
+
+.competition-list-note {
+  margin: 10px 12px;
+}
+
+/* A competition's squad rules: an area for this season and one for the next, side by side where the panel has room. */
+.rule-seasons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+  gap: 14px 20px;
+  margin: 10px 0 4px;
+}
+
+.rule-season {
+  min-width: 0;
+}
+
+/* The season's heading, and beside it the year it begins in. */
+.rule-season h4 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.rule-season h4 small {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-stretch: normal;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.rule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rule-table th,
+.rule-table td {
+  padding: 5px 10px 5px 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.rule-table thead th {
+  padding-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rule-table tbody th {
+  font-weight: 600;
+}
+
+.rule-table td {
+  white-space: nowrap;
+}
+
+.rule-table .num {
+  padding-right: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rule-who {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+/* For which teams a rule holds, the years it is given for, what the save's rules hold when that is another count. */
+.rule-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 4px;
+  margin-top: 3px;
+}
+
+.rule-tags .tag {
+  white-space: normal;
+}
+
+/* A rule the editor leaves alone. */
+.rule-fixed .rule-who,
+.rule-fixed td {
+  color: var(--muted);
+}
+
+.rule-value {
+  font-weight: 600;
+}
+
+.rule-season-note {
+  margin: 8px 0 0;
+}
+
+/* Over the areas: whose rules these are too, and why none of them can be changed where that is so. */
+.squad-rules .rule-notice {
+  margin-top: 6px;
+  color: var(--text);
+}
+
+/* A player's development (see PlayerProgress.tsx): the records the app keeps of a career. */
+
+/* The two tab panels of a player's profile set their groups apart as the body of a profile does. */
+.profile-overview > * + *,
+.progress-tab > * + * {
+  margin-top: 22px;
+}
+
+/* Under the abilities in the header: how far the current ability moved, and since when. It reads as a note, and is the
+   way into the Development tab. */
+.ability-trend {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-height: 0;
+  margin: -3px -5px -2px 0;
+  padding: 1px 5px;
+  border: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ability-trend:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.ability-trend-figure {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.ability-trend .trend-mark,
+.ability-trend-figure,
+.ability-change,
+.progress-delta,
+.stat .value .trend {
+  color: var(--trend);
+}
+
+.ability-trend.good,
+.ability-change.good,
+.progress-delta.good,
+.trend.good {
+  --trend: var(--ok);
+}
+
+.ability-trend.bad,
+.ability-change.bad,
+.progress-delta.bad,
+.trend.bad {
+  --trend: var(--danger);
+}
+
+.trend-mark {
+  font-size: 0.72em;
+}
+
+/* Before a rating that moved over the last year: a small arrow, whose hover text says from what. */
+.stat .value .trend {
+  margin-right: 5px;
+  font-size: 8.5px;
+  vertical-align: 2px;
+  cursor: help;
+}
+
+/* The Development tab: the period and how many records there are, then the charts and the attributes that changed. */
+.progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.progress-recorded {
+  margin: 0 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.progress-chart {
+  max-width: 640px;
+  margin: 8px 0 0;
+}
+
+.progress-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.progress-grid line {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.progress-grid text,
+.progress-axis text {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-line polyline {
+  fill: none;
+  stroke: var(--line);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.25;
+}
+
+.progress-line circle {
+  fill: var(--panel);
+  stroke: var(--line);
+  stroke-width: 1.75;
+}
+
+.progress-line,
+.progress-key {
+  --line: var(--accent-text);
+}
+
+.progress-line.potential,
+.progress-key.potential {
+  --line: var(--border-strong);
+}
+
+.progress-line.potential polyline {
+  stroke-dasharray: 5 4;
+}
+
+.progress-chart figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 4px;
+  padding-left: 6px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.progress-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.progress-swatch {
+  width: 14px;
+  border-top: 3px solid var(--line);
+}
+
+.progress-key.potential .progress-swatch {
+  border-top-style: dashed;
+}
+
+.progress-key-values {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+}
+
+/* The attributes that changed: two columns where the panel is wide enough for them. */
+.progress-changes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  column-gap: 18px;
+}
+
+.progress-changes dt {
+  color: var(--text);
+}
+
+.progress-changes dd {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.progress-from,
+.progress-arrow {
+  color: var(--muted);
+}
+
+.progress-to {
+  min-width: 18px;
+  font-size: 15px;
+  font-stretch: 85%;
+  font-weight: 800;
+}
+
+.progress-delta {
+  min-width: 30px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+/* With nothing to compare with yet: how the records come about, in the middle of the tab. */
+.progress-empty {
+  max-width: 46ch;
+  margin: 36px auto 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+.progress-empty h3 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.progress-empty p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Before a current ability in a squad's table: how far it moved, small, so that the ability stays the figure read. */
+.ability-change {
+  margin-right: 6px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  cursor: help;
+}
+
+/* The ability keeps to the right edge of its column, and the change sits just before it, not across the column by the
+   age. */
+.ability-change + .ability {
+  min-width: 0;
 }

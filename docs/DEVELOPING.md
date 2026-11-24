@@ -145,9 +145,14 @@ For a build without one, or where a place a profile names does not check out, th
     value for the day before sits some 0x2F000 bytes away;
   - the one that fits the witnesses better than every other: no more contracts after it, no fewer injuries, and
     better on one count. On a day on which no contract was signed and no injury began, the day before fits exactly
-    as well as the date, so this alone cannot tell them apart.
+    as well as the date, so this alone cannot tell them apart;
+  - of the dates none fits better than, the one held in more places than any other. Game Pass 0.9.2524.0 keeps a
+    value for the day after (`game_plugin.dll+0x53bb3b4`), which only an injury over on the day rules out: on a save
+    of 23 October 2026 none was, and the 24th fitted exactly as well as the 23rd, which three places held against its
+    one. Each value for another day seen so far was held in one place.
 
-  Otherwise none is used.
+  Otherwise none is used, as where two dates are held in as many places: right after a load the date's own variable
+  can be the only place that holds it.
 - **The retirement manager's static** where other builds keep it, as far from the players' array, checked by the
   name of the class its object has. Otherwise the plugin's writable data is searched for a pointer to an object of
   the class `RETIREMENT_MANAGER`, which takes about half a second.
@@ -196,8 +201,8 @@ are, in `[layout.<section>]` tables: a session reads its build's layout with tho
 #### On the day of an update
 
 1. Load a save in the updated game. If the probe finds values that read as two dates a day apart (the value the
-   game keeps for the day before), it says how it chose between them: check that the date it took is the one the game
-   shows, and that it read it where the other builds keep their date.
+   game keeps for the day before, or for the day after), it says how it chose between them: check that the date it
+   took is the one the game shows, and that it read it where the other builds keep their date.
 2. `fmlibre-probe profile --out profiles/fm27/<storefront>-<version>.toml` looks for everything as for a build
    without a profile, runs the checks with what it found, and writes the profile. It lists the values that read as a
    plausible date, and whether the guessed and the searched places of the retirement manager and of the game object
@@ -215,7 +220,10 @@ are, in `[layout.<section>]` tables: a session reads its build's layout with tho
    A club's finances show no league prize money on the new build, and cannot change it, until someone has checked
    that `fmlibre-probe prizes` lists the amounts the game's Rules pages show, and added `prize_money = true` to the
    profile. The same goes for a club's sponsorship deals: `fmlibre-probe sponsorships <club UID>` has to list the
-   deals the game's Sponsorship screen shows, with its amounts and dates, before `sponsorships = true` goes in.
+   deals the game's Sponsorship screen shows, with its amounts and dates, before `sponsorships = true` goes in; and
+   for the Competitions tab's squad rules: `fmlibre-probe rules <a league's UID>` has to list the rules the game's
+   Competition Stages page lists for it, this season's and next season's, and a rule changed with `--next` has to show
+   on that page and come back from a save, before `squad_rules = true` goes in.
 4. Build the app (`npm run release`), and run the smoke tests on both storefronts (see
    [`tools/smoke`](../tools/smoke/README.md)).
 
@@ -326,6 +334,19 @@ in `app/src-tauri/src/lib.rs`). A change from an earlier session is undone as a 
 its old value, with every check; one whose undo needed the game's memory as it was (a move,
 healing, a tie, a clause, a name...) stays as history. Clear history in the Changes view empties
 the file.
+
+How a career's players develop is kept there too, in `timeline\<storefront>-<UIDs of the human
+managers>.jsonl.gz` (see `Records` in `app/src-tauri/src/lib.rs` and
+`crates/fmlibre-core/src/timeline.rs`). As the lists are read, on connecting and on Reload data, a
+record is added to the end of the file when seven days of the game's time have passed since the
+last: every player's current and potential ability, transfer value and attributes (1–20), taken
+from the lists as read, so that it costs no further reading of the game. The first record holds
+every player whole; a later one only what changed, and the new players. Each record is one line
+of JSON, compressed on its own, so `gzip -dc` gives the file as lines. A date before the last
+record's means the game has gone back to an older save: that record is whole again, and the ones
+dated on or after it no longer count. Nothing is recorded without a human manager in the save, or
+where the checks of the players' values or of their attributes fail. Deleting the file starts the
+records afresh.
 
 The same file as the freezes (`frozen.json`) keeps the names the editor gave stadiums. The game keeps no stadium names in
 its saves and gives each stadium the name in its database whenever it loads one, so the app
@@ -455,6 +476,10 @@ fmlibre-probe concerns --all                         # every reason to be unhapp
 fmlibre-probe captain 680 43425040 --restore         # make a player captain (--vice: vice-captain) and back
 fmlibre-probe prizes                                 # the prize money competitions pay, by final position and per match
 fmlibre-probe prizes 130286 --win 1234567 --restore  # change what a Süper Lig win pays and back: this writes too
+fmlibre-probe rules                                  # the competitions with squad rules; rules 130286 for the Süper Lig's
+fmlibre-probe rules 130286 --current 1 16 --restore  # change rule 1 of this season's list and back: this writes too
+fmlibre-probe rules 11 --where --sources             # where its lists are, and what each of the nation's records holds
+fmlibre-probe rules 1301394 --current 4 30 --restore # the Champions League's: no record keeps them, so the list alone
 fmlibre-probe sponsorships 2188                      # a club's sponsorship deals: kind, term, amounts (reads only)
 fmlibre-probe scan                                   # find arrays of game objects in game_plugin.dll
 fmlibre-probe refs 0x1a5a5396990 --span 0x3c8        # every pointer into an object (holders, lists, squads too)
@@ -471,7 +496,8 @@ arrays, the in-game date, the retirement manager and the game object the way it 
 
 Only `set`, `move`, `swap`, `release`, `staff-move`, `staff-job`, `staff-sign`, `staff-release`, `heal --heal`,
 `bans --lift`, `tie-set`, `tie-add`, `tie-remove`, `captain`, `cohesion --set`, `familiarity --set`,
-`training-history --max` and `prizes` with an amount to change write to the game. Unlike the app, the probe writes to a build without a profile too, as far as the checks allow, so
+`training-history --max`, `prizes` with an amount to change and `rules` with `--current` or `--next` write to the
+game. Unlike the app, the probe writes to a build without a profile too, as far as the checks allow, so
 that a new build can be mapped.
 - `set` changes one field after the checks above. Values are as stored:
   attributes run 0–100, or 1–20 with `--shown`.
@@ -479,10 +505,11 @@ that a new build can be mapped.
   staff without a club.
 - With `--restore`, each one puts the old values back straight away, to test
   without changing the save. `set`, `move`, `release`, `staff-release`, `heal`, `bans`, the `tie`
-  commands, `captain`, `cohesion`, `familiarity`, `training-history` and `prizes` also take `--hold <seconds>` to
-  wait first, so the
+  commands, `captain`, `cohesion`, `familiarity`, `training-history`, `prizes` and `rules` also take
+  `--hold <seconds>` to wait first, so the
   change can be looked at in the game. The Dynamics page shows a team's cohesion as the game last
-  worked it out, and works it out again only once the game moves on (Continue).
+  worked it out, and works it out again only once the game moves on (Continue); so do the pages that show this
+  season's squad rules.
 
 If Windows denies access, run the probe from an administrator terminal.
 

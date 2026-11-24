@@ -84,6 +84,57 @@ pub struct Layout {
     /// checked in.
     #[serde(default)]
     pub transfers: Option<TransfersLayout>,
+    /// The rules a competition's squads are registered under (see `rules.rs`); only in the layouts they have been
+    /// checked in.
+    #[serde(default)]
+    pub rules: Option<RulesLayout>,
+}
+
+/// Where the game keeps the rules a competition's squads are registered under (see `rules.rs` and
+/// docs/recon/fm27-league-rules.md): the lists it checks a squad against, one for this season and one for the next,
+/// and the records of the nation's rule files it makes those lists from.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RulesLayout {
+    /// The class of the object the game keeps for a competition as it is played, as written in C++; and in it: the
+    /// pointer to its `db::COMP`, its own rules as a record, and the pointer to its rule group.
+    pub competition_class: String,
+    pub competition_db: u64,
+    pub competition_record: u64,
+    pub competition_group: u64,
+    /// In a `db::COMP`: the pointer back to that object.
+    pub db_competition: u64,
+    /// In a rule group: the pointer to its nation's rules as the game plays by them; and in those, the `(begin, end,
+    /// capacity)` of pointers to its fixture rules, which a competition's record names one of by its place.
+    pub group_nation_rules: u64,
+    pub nation_fixture_rules: u64,
+    /// In fixture rules: the pointer to those of the next season, and the pointer to the list `(begin, end, capacity)`
+    /// of pointers to its squad rules.
+    pub fixture_next: u64,
+    pub fixture_squad_rules: u64,
+    /// In a set of fixture rules, the `(begin, end)` of a table of pointers to the days squads are registered by, for
+    /// the competitions that have such days (UEFA's), most of its places empty. An entry's size, and in it the UID
+    /// of its competition, the key that marks it and the `u8` of the most players a squad may register by that day.
+    pub fixture_registration: u64,
+    pub registration_size: u64,
+    pub registration_competition: u64,
+    pub registration_key: u64,
+    pub registration_most: u64,
+    /// A squad rule: its size, and in it the `u32` key of its condition (0 for none), the `u32` UID of the competition
+    /// the condition names, the `i32` value, the `u16` kind and the `i8` that says which way it limits (-1 at most, 1
+    /// at least).
+    pub rule_size: u64,
+    pub rule_condition: u64,
+    pub rule_competition: u64,
+    pub rule_value: u64,
+    pub rule_kind: u64,
+    pub rule_compare: u64,
+    /// In the container of a nation's men's teams: the record its rule files make together, and after it the list of
+    /// the records of the files themselves.
+    pub container_rules: u64,
+    pub container_files: u64,
+    /// The name of one kind of squad rule, by which the game's table of all of them is found in the plugin.
+    pub kind_anchor: String,
 }
 
 /// How the game keeps its transfers and a move agreed for a later day (see `arranged.rs` and
@@ -1117,6 +1168,11 @@ pub struct BuildProfile {
     /// Sponsorship screen. The app shows them only on such builds; the probe reads them on any.
     #[serde(default)]
     pub sponsorships: bool,
+    /// Whether the rules competitions register their squads under ([`RulesLayout`]) were read on this build and matched
+    /// to the game's Competition Stages screen. The app shows and changes them only on such builds; the probe reads
+    /// them on any.
+    #[serde(default)]
+    pub squad_rules: bool,
     /// Where the build keeps its arrays of national teams' containers, for the builds they were read on; none where
     /// they were not, which leaves the National teams tab off.
     #[serde(default)]
@@ -1345,6 +1401,9 @@ pub fn profile_text(profile: &BuildProfile, notes: &ProfileNotes) -> String {
     }
     if profile.sponsorships {
         text += "\nsponsorships = true\n";
+    }
+    if profile.squad_rules {
+        text += "\nsquad_rules = true\n";
     }
     text += "\n# game_plugin as mapped in memory; these values identify the build.\n[plugin]\n";
     match profile.plugin {
@@ -1897,6 +1956,16 @@ mod tests {
             ]
         );
         assert!(layout_for(27).is_some_and(|layout| layout.sponsorship.is_some()));
+    }
+
+    /// The app shows the competitions' squad rules only on the builds they were read on and matched to the game's
+    /// screens: Game Pass 0.9.2524.0, where the Süper Lig's were changed and seen in the game, and the Apple silicon
+    /// half of Steam build 26620374, where the Premier League's were. The Intel half was not run.
+    #[test]
+    fn squad_rules_are_shown_only_on_the_builds_they_were_checked_on() {
+        let checked: Vec<String> =
+            built_in_profiles().filter(|profile| profile.squad_rules).map(|profile| profile.name).collect();
+        assert_eq!(checked, ["FM27 0.9.2524.0 (Game Pass)", "FM27 Steam build 26620374 (macOS, Apple silicon)"]);
     }
 
     /// Since the update of 17 November 2026 the club finance record keeps corporate facilities 4 bytes further on, and a

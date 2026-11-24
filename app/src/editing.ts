@@ -13,6 +13,8 @@ import type {
   ClubName,
   ClubStaffRow,
   ClubTeam,
+  CompetitionRulesRead,
+  CompetitionRulesSet,
   EditField,
   EditEntity,
   Entity,
@@ -34,6 +36,7 @@ import type {
   NationalTeamAction,
   PersonNames,
   RoomMaker,
+  RuleInput,
   StadiumName,
   TeamAction,
   TeamFreeze,
@@ -43,6 +46,20 @@ import type {
 
 /** The fields of players or of staff the editor can change, in display order. */
 export const editFields = (entity: EditEntity) => call<EditField[]>("edit_fields", { entity });
+
+/**
+ * The squad rules of every competition that has some, this season's and next season's, or why this version of the game
+ * shows none. The first time, and with `again`, the editor reads them from the game, which takes a few seconds; after
+ * that it gives them as read then, with the changes it made since.
+ */
+export const competitionRules = (again: boolean) => call<CompetitionRulesRead>("competition_rules", { again });
+
+/**
+ * Sets squad rules of the competition `competition`, each as its list showed it, and logs each rule changed (in one
+ * batch when there are more), which Undo in Changes puts back.
+ */
+export const setCompetitionRules = (competition: number, changes: RuleInput[]) =>
+  call<CompetitionRulesSet>("set_competition_rules", { competition, changes });
 
 /**
  * Brings the player `uid` back from his loan: it now ends on the game's date, its last day, and he is back at his club
@@ -473,6 +490,19 @@ export const teamAction = (club: number, team: number, action: TeamAction) =>
 /** Heal all, Inspire all or Refresh all for the players the senior team of the national team `uid` lists. */
 export const nationalTeamAction = (uid: number, action: NationalTeamAction) =>
   call<MassReport>("national_team_action", { uid, action });
+
+/**
+ * Adds or removes traits for every player of the club's team `team`.
+ * `addTraits` are trait bits (0..63) to set to 1.
+ * `removeTraits` are trait bits (0..63) to set to 0.
+ * The changes are logged as one batch, undone with `undoBatch`.
+ */
+export const batchTraitsTeam = (
+  club: number,
+  team: number,
+  addTraits: number[],
+  removeTraits: number[],
+) => call<MassReport>("batch_traits_team", { club, team, addTraits, removeTraits });
 
 /** The human manager's club, its money, its squad line by line and the players to let go; fast. */
 export const scoutingOverview = () => call<ScoutingOverview>("scouting_overview");

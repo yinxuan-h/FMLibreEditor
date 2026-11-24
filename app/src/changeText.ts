@@ -8,6 +8,7 @@ import { dateFromNumber, shownValue } from "./editing";
 import { formatDate, formatIsoLocal, formatMoney, formatNumber } from "./format";
 import {
   changesText as text,
+  competitionsText,
   editText,
   leaguePrizesText,
   fieldLabel,
@@ -17,6 +18,7 @@ import {
   teamLabel,
   valueChange,
 } from "./labels";
+import { limitWord } from "./squadRules";
 import { ruleLabel } from "./TiesGroup";
 import type { ChangeExportRow, Clause, EditField, LoggedChange } from "./types";
 
@@ -123,6 +125,26 @@ export function changeWords(change: LoggedChange, field: EditField | undefined):
     // Logged in pounds, with the league it was set for, for every club in it.
     const league = leaguePrizesText.changedIn(change.prize.league, change.prize.settings);
     return { ...sides(formatMoney(change.old), formatMoney(change.new)), notes: [...notes, league] };
+  }
+  if (change.rule) {
+    // Logged as counts of players, with what the rule limits and for whom.
+    const { compare, condition, conditionCompetition, nation, shared, held } = change.rule;
+    const about = [limitWord(compare)];
+    if (held) {
+      about.push(competitionsText.heldTag);
+    }
+    if (condition === "tfrd") {
+      about.push(conditionCompetition ? competitionsText.teamsFrom(conditionCompetition) : competitionsText.teamsFromUnknown);
+    } else if (condition !== null) {
+      about.push(competitionsText.condition(condition));
+    }
+    if (nation !== null) {
+      about.push(nation);
+    }
+    if (shared > 0) {
+      about.push(competitionsText.alsoFor(shared));
+    }
+    return { ...sides(formatNumber(change.old), formatNumber(change.new)), notes: [...notes, about.join(" · ")] };
   }
   if (change.objects) {
     return sides(change.objects.from ?? unknownObject, change.objects.to ?? unknownObject);

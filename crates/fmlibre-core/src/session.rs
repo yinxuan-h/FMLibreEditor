@@ -195,6 +195,9 @@ pub struct Session {
     pub(crate) runtime: OnceLock<Option<crate::heap::Runtime>>,
     /// The game's transfer manager and its vtable, once found (see `arranged.rs`).
     pub(crate) transfer_manager: Mutex<Option<(u64, u64)>>,
+    /// The game's names for the kinds of squad rule, read from its table the first time they are needed (see
+    /// `rules.rs`): empty where the layout does not place the rules or the table is not found.
+    pub(crate) rule_kinds: OnceLock<Arc<std::collections::HashMap<u16, String>>>,
     /// What the checks found: worked out the first time it is needed, and again by [`Session::recheck`].
     health: Mutex<Option<Arc<Health>>>,
     /// Whether editing a build without a profile was allowed.
@@ -246,6 +249,7 @@ impl Session {
             pools_found: Mutex::new(Vec::new()),
             runtime: OnceLock::new(),
             transfer_manager: Mutex::new(None),
+            rule_kinds: OnceLock::new(),
             health: Mutex::new(None),
             unknown_build_allowed: AtomicBool::new(false),
             search_all: source == ArraySource::ScanOnly,
@@ -590,6 +594,7 @@ impl Session {
             pools_found: Mutex::new(Vec::new()),
             runtime: OnceLock::new(),
             transfer_manager: Mutex::new(None),
+            rule_kinds: OnceLock::new(),
             health: Mutex::new(None),
             unknown_build_allowed: AtomicBool::new(false),
             search_all: false,

@@ -1301,6 +1301,138 @@ export const ja: Strings = {
     unavailableBuild: "このバージョンのゲームがスポンサー契約をどこに保存しているかはまだ確認されていないため、誤ったメモリを読まないよう表示しません。",
     unavailableUnreadable: "このバージョンのゲームで想定される場所からスポンサー契約を探しましたが、見つかったものがゲームのデータとして読めないため、表示しません。",
   },
+
+  competitions: {
+    nav: "大会",
+    search: "名前、国、UIDで大会を検索",
+    summary: (total: number, shown: number) =>
+      total > shown ? `${format(total)}大会中${format(shown)}大会` : `${format(total)}大会`,
+    empty: (query: string, filtered: boolean) => {
+      if (query === "") {
+        return filtered ? "この国にスカッドルールのある大会はありません。" : "スカッドルールのある大会が見つかりません。";
+      }
+      return filtered ? `この国で「${query}」に一致する大会はありません。` : `「${query}」に一致する大会はありません。`;
+    },
+    reading: "ゲームから大会のスカッドルールを読み込んでいます… 数秒かかります。",
+    readAgain: "再読み込み",
+    readAgainTitle: "ゲームからルールを読み込み直します",
+    listNote: "スカッドルールのない大会は一覧に表示されません。",
+    unavailableTitle: "表示できるスカッドルールがありません",
+    unavailableBuild: "このバージョンのゲームが大会のスカッドルールをどこに保持しているか、まだ誰も確認していません。誤ったメモリを読まないよう、エディターは何も表示しません。",
+    unavailableUnreadable: "エディターはこのバージョンのゲームでスカッドルールがあるはずの場所を調べましたが、見つかったものはゲームのものとして読めないため、何も表示しません。",
+    columns: {
+      name: "大会",
+      nation: "国",
+      level: "レベル",
+      rules: "ルール",
+      uid: "UID",
+    },
+    level: (level: number) => format(level),
+    rulesCount: (current: number, next: number | null) =>
+      next === null || next === current ? format(current) : `${format(current)} · ${format(next)}`,
+    rulesCountTitle: "今シーズンのスカッドルールの数。来シーズンで数が異なる場合はその数も表示します",
+    international: "国際",
+    filters: {
+      nation: "国",
+      allNations: "すべての国",
+    },
+    title: "スカッドルール",
+    intro: "この大会で、スカッドに登録できる、またはチームが1試合で選べる、ある種類の選手の人数です。外国籍やホームグロウンに数えられる選手はゲーム自身が決めます。",
+    seasons: { current: "今シーズン", next: "来シーズン" },
+    began: (year: number) => `${year}年に開始`,
+    begins: (year: number) => `${year}年に開始予定`,
+    noRules: "スカッドルールはありません。",
+    noNext: "ゲームに来シーズンのルールはありません。",
+    ruleColumns: {
+      rule: "ルール",
+      where: "カウント対象",
+      limit: "制限",
+      value: "選手",
+    },
+    atMost: "最大",
+    atLeast: "最低",
+    scopes: {
+      squad: "スカッド",
+      matchSquad: "試合登録メンバー",
+      eleven: "出場11人",
+      startingEleven: "先発11人",
+      bench: "ベンチ",
+    },
+    who: {
+      squadSize: "スカッドの選手",
+      foreign: "外国籍選手",
+      foreignExceptAsian: "外国籍選手（アジア人を除く）",
+      foreignGoalkeepers: "外国籍ゴールキーパー",
+      nonEu: "EU圏外の選手",
+      domestic: "自国籍選手",
+      domesticGoalkeepers: "自国籍ゴールキーパー",
+      goalkeepers: "ゴールキーパー",
+      outfield: "フィールドプレーヤー",
+      nonHomegrown: "ホームグロウンでない選手",
+      youthContract: "ユース契約の選手",
+      fullTime: "フルタイム契約の選手",
+      amateur: "アマチュア選手",
+      youthOrAmateur: "ユースまたはアマチュアの選手",
+      trialists: "テスト生",
+      loans: "レンタル選手",
+      internationals: "代表選手",
+      otherTeam: "他チームに登録された選手",
+      firstTeam: "トップチームに登録された選手",
+      over: (age: number) => `${format(age)}歳超の選手`,
+      under: (age: number) => `${format(age)}歳未満の選手`,
+      domesticUnder: (age: number) => `${format(age)}歳未満の自国籍選手`,
+      foreignOver: (age: number) => `${format(age)}歳超の外国籍選手`,
+      goalkeepersOver: (age: number) => `${format(age)}歳超のゴールキーパー`,
+      outfieldOver: (age: number) => `${format(age)}歳超のフィールドプレーヤー`,
+      homegrown: (from: "club" | "nation" | "clubOrNation", fromAge: number, toAge: number) => {
+        const ages = `${format(fromAge)}–${format(toAge)}歳で育成`;
+        if (from === "club") {
+          return `クラブのホームグロウン（${ages}）`;
+        }
+        return from === "nation" ? `国のホームグロウン（${ages}）` : `クラブまたは国のホームグロウン（${ages}）`;
+      },
+      homegrownUnder: (age: number, fromAge: number, toAge: number) =>
+        `国のホームグロウンの${format(age)}歳未満の選手（${format(fromAge)}–${format(toAge)}歳で育成）`,
+    },
+    unnamedKind: (kind: number) => `種類${format(kind)}のルール`,
+    gameKey: (key: string) => `ゲーム内でのこのルールの名前：${key}`,
+    teamsFrom: (competition: string) => `${competition}のチーム`,
+    teamsFromUnknown: "別のディビジョンのチーム",
+    condition: (code: string) => `条件付き（${code}）`,
+    conditionTitle: "ゲームはこのルールを独自の条件で適用しますが、エディターはまだその条件を説明していません。",
+    years: (from: number | null, to: number | null) => {
+      if (from !== null && to !== null) {
+        return from === to ? `${from}` : `${from}–${to}`;
+      }
+      return from !== null ? `${from}年以降` : `${to}年まで`;
+    },
+    yearsTitle: "国のルールがこのルールを適用するシーズン（シーズンが始まる年で表示）",
+    leftAlone: "変更しません",
+    notSavedTitle: "セーブが保持する国のルールにはこのルールがないため、変更はセーブを読み込むと消えてしまいます。エディターは変更しません。",
+    notACountTitle: "選手数ではなく金額です。エディターは変更しません。",
+    noneChangeable: "これらのルールは、時期にかかわらずまだ変更できません。エディターは、セーブが保持するルールの中にも同じルールが見つかった場合にのみ変更します（セーブを読み込んでも変更が残るようにするためです）が、この大会のルールはそこに見つかっていません。現時点では、女子リーグ、メジャーリーグサッカー、一部のカップ戦が該当します。",
+    unsavedNote: "ゲームはこの大会のルールをどのセーブにも保持しません。セーブを読み込むたびに、また新しいシーズンのたびに、ゲーム自身が作り直します。そのためエディターはここでの変更を保持します：実行中のゲームに書き込み、このキャリア用に記憶し、接続するたび、またはデータを再読み込みするたびに書き直します。セーブを読み込んだ後は、変更を戻すためにエディターを一度接続してください（または「データを再読み込み」を押してください）。「変更履歴」の「元に戻す」で保持を解除できます。",
+    heldTag: "保持中",
+    heldTitle: (original: number) => `エディターがこの人数を保持し、ゲームを読み込むたびに書き直します。ゲーム本来の値は${format(original)}です。`,
+    savedDiffers: (value: number) => `セーブのルールでは${format(value)}`,
+    savedDiffersTitle: "ゲームはリストに従ってプレーし、セーブを読み込むときにセーブのルールからリストを作ります。ここで変更を保存すると両方が設定されます。",
+    edit: "ルールを変更",
+    editTitle: "この大会のスカッドルールの人数を変更します",
+    save: "ルールを保存",
+    saving: "保存中…",
+    cancel: "キャンセル",
+    invalid: (most: number) => `0から${format(most)}までの整数を入力してください。`,
+    shared: (names: string) => `このルールは${names}のルールでもあります。変更はそちらにも適用されます。`,
+    currentNote: (turn: string | null) =>
+      `ここでの変更は今シーズンの終わりまで有効です${turn === null ? "" : `（シーズンは${turn}に切り替わります）`}。ゲームはスカッドの人数を変更後の値ですぐに数えます。ゲーム自身の画面には1日経つと反映されます。`,
+    nextNote: (turn: string | null) =>
+      `ここでの変更は、シーズンが切り替わると${turn === null ? "" : `（${turn}）`}今シーズンのルールになり、それより後のシーズンにゲーム独自のルールがない限り、その後のシーズンにも残ります。ゲームの来シーズンのページにはすぐに表示されます。`,
+    lasts: "変更は、ゲームが従うリストと、セーブが保持する国のルールの両方に書き込まれるため、セーブを読み込んでも残ります。今シーズンのルールへの変更はシーズンの切り替わりで終わり、来シーズンのルールに置き換わります。「変更履歴」の「元に戻す」で元の人数に戻せます。",
+    infoLabel: "スカッドルールの変更はどう保持されるか",
+    ruleField: (season: string, rule: string) => `スカッドルール、${season}：${rule}`,
+    alsoFor: (count: number) =>
+      count === 1 ? "同じルールの他の1大会にも適用" : `同じルールの他の${format(count)}大会にも適用`,
+  },
   app: {
     stage: "ベータ",
     settingsLabel: "設定",
@@ -1551,7 +1683,7 @@ export const ja: Strings = {
       change: "変更",
       status: "状態",
     },
-    kinds: { player: "選手", staff: "スタッフ", club: "クラブ", nationalTeam: "代表チーム" },
+    kinds: { player: "選手", staff: "スタッフ", club: "クラブ", nationalTeam: "代表チーム", competition: "大会" },
     stored: (change: string) => `内部値 ${change}`,
     undone: (time: string) => `${time}に元に戻しました`,
     undo: "元に戻す",
@@ -2170,6 +2302,23 @@ export const ja: Strings = {
     cancel: "キャンセル",
   },
 
+  batchTraits: {
+    title: "チーム特徴の一括設定",
+    addMode: "+ チームに追加",
+    removeMode: "- チームから削除",
+    addHint: "選択したプレイスタイルをまだ持っていない選手に追加します。既存のプレイスタイルは保持されます。",
+    removeHint: "選択したプレイスタイルを持っている選手から削除します。他のプレイスタイルには影響しません。",
+    noneSelected: "このモードで選択された特徴はありません",
+    selectedCount: (count: number) => `${format(count)}件選択中`,
+    deselectAll: "すべて解除",
+    oppositeModeNote: "別のモードで選択済み",
+    applyNote: (players: number) => `選手${format(players)}人に適用 · 1クリックで元に戻せます`,
+    emptySquad: (players: number) => `選手${format(players)}人のスカッド`,
+    cancel: "キャンセル",
+    apply: "適用",
+    applying: "適用中…",
+  },
+
   squad: {
     teamsLabel: "チーム",
     teams: {
@@ -2212,12 +2361,41 @@ export const ja: Strings = {
       `${format(count)}人はトレーニングしていない（負傷など）ため、トレーニング履歴はそのままです`,
     refreshAll: "全員を回復",
     refreshAllTitle: "このチームの全選手のコンディションと試合勘を100%にし、完全に休養させます（疲労蓄積 -500）",
+    batchTraits: "チーム特徴の一括設定",
+    batchTraitsTitle: "このチームの選手にプレイスタイルを追加または削除します",
     maxAll: "能力値を最大化",
     maxAllTitle: "このチームの全選手の能力値をすべて最高にします：20（負傷しやすさとラフプレーは1）",
     atItsBest: "チームを万全の状態に",
     atItsBestTitle:
       "「全員を治療」「全員を鼓舞」「全員を回復」「連携を最大化」「戦術を最大化」を一度に行います。「元に戻す」1回ですべて取り消せます。能力値と出場停止はそのままです。実行できない手順（負傷者がいないときの「全員を治療」など）は飛ばされ、結果にその旨が表示されます。戦術の各分野は、トレーニングが古くなるにつれ約6週間後から再び下がります。別の戦術に変えたら、もう一度押してください。ゲームが進むと画面に反映されます：ゲームで「続ける」を押してください",
     atItsBestSkipped: (step, reason) => `「${step}」をスキップしました：${reason}`,
+    destroy: "チームを最悪の状態に",
+    destroyTitle:
+      "このチームの全選手を最悪の状態にします：士気と満足度、コンディション、試合勘と疲労蓄積、クラブとの連携、" +
+      "そしてチームの戦術をあなたが選んでいる場合は戦術の理解度。どの値も今より良くなることはなく、能力値・負傷・" +
+      "出場停止はそのままです。実行前に確認し、「元に戻す」1回ですべて取り消せます",
+    destroySteps: {
+      demoralize: "士気と満足度",
+      exhaust: "コンディションと試合勘",
+      minCohesion: "連携",
+      minTactics: "戦術",
+    },
+    moreActions: "その他の操作",
+    moreActionsTitle: "チーム全体への操作を1つずつ",
+    destroyDialog: {
+      title: "チームを最悪の状態にしますか？",
+      doesHeading: "一覧のすべての選手（ローン移籍中の選手も含む）が対象です",
+      does: [
+        "士気を最低の1に、満足度と出場時間への満足度を-100に",
+        "コンディションを0%、試合勘を35%、疲労蓄積を1000に",
+        "クラブとの連携を1に（連携の記録がある選手）",
+        "戦術の理解度を最低に（チームの戦術をあなたが選んでいる場合）",
+      ],
+      keeps: "どの値も今より良くなることはありません。能力値、負傷、出場停止はそのままです。",
+      ownClub: "これはあなた自身のクラブのチームです。",
+      hint: "ゲームが進行する前なら、「元に戻す」1回ですべて取り消せます。",
+      cancel: "キャンセル",
+    },
     hint: "操作は一覧のすべての選手（ローン移籍中の選手も含む）が対象です。元に戻す操作は変更履歴でも行えます。",
 
     // Freezing the whole team, under the actions
@@ -2878,6 +3056,31 @@ export const ja: Strings = {
     } as Record<string, (value: string) => string>,
   },
 
+  /** A player's development: the Development tab of his profile, the note under his abilities, the squad's arrows (see en.ts). */
+  progress: {
+    tabsLabel: "選手プロフィールのセクション",
+    tabs: { overview: "プロフィール", progress: "成長" },
+    lockedWhileEdited: "このタブを開くには編集を終了してください",
+    openTab: "成長タブを開く",
+    loading: "記録を読み込み中…",
+    failed: (reason: string) => `記録を読み込めませんでした：${reason}`,
+    since: (date: string) => `${date}以降`,
+    change: (from: string, to: string, date: string) => `${date}以降 ${from} → ${to}`,
+    rangeLabel: "期間",
+    ranges: { quarter: "3か月", year: "1年", all: "すべて" },
+    recorded: (count: number, first: string) => `記録：${count}件 · 最初の記録 ${first}`,
+    abilityTitle: "能力",
+    valueTitle: "市場価値",
+    attributesTitle: "変化した能力値",
+    noAttributeChanges: (date: string) => `${date}以降、変化した能力値はありません。`,
+    emptyTitle: "比較できる記録がまだありません",
+    emptyText:
+      "アプリはゲームのデータを読み込むたびに、ゲーム内時間でおよそ週に1回、全選手の能力、市場価値、能力値を記録します。ゲームを進めてデータを再読み込みすると、この選手の成長がここに表示されます。",
+    offTitle: "このセーブの記録はありません",
+    offText:
+      "アプリが記録を残すのは、あなたが操作する監督がいるセーブで、データがアプリのチェックに通るゲームバージョンの場合です。",
+  },
+
   /** The command palette and the names of the keys in the keyboard shortcuts (see en.ts). */
   palette: {
     button: "検索",
@@ -2945,6 +3148,36 @@ export const ja: Strings = {
     link: "新機能",
     command: "このバージョンの新機能",
     versions: {
+      "0.5.4": [
+        {
+          title: "移籍が選手の経歴に：",
+          text: "選手を移動するときの最初の選択肢になった「移籍」は、移籍をゲーム内の翌日に手配します。ゲームは自分の移籍と同じように実行し、移籍金を支払って選手の経歴に記録します。今シーズンの元のクラブでの試合は別の行に残ります。「今すぐ移動」はこれまでどおりすぐに移動します。",
+        },
+        {
+          title: "チームを万全の状態に、そして最悪の状態に：",
+          text: "クラブのスカッドタブで、ワンクリックでチーム全員を治療・鼓舞・回復し、連携と戦術を最大にします。「チームを最悪の状態に」は確認のあとで逆のことをします。どちらも 1 回の「元に戻す」で取り消せます。個別の操作は「その他の操作」にあります。",
+        },
+        {
+          title: "チーム特徴の一括設定：",
+          text: "クラブのスカッドタブの「その他の操作」にある「チーム特徴の一括設定」で、選んだ特性をチームの全選手に追加、または削除します。ほかの特性はそのままです。1 回の「元に戻す」で取り消せます。",
+        },
+        {
+          title: "全スタッフの移籍：",
+          text: "クラブのスタッフタブから、スタッフ全員を一度に別のクラブへ、それぞれ同じ役職のまま移籍させます。1 回の「元に戻す」で全員が戻ります。",
+        },
+        {
+          title: "代表チーム：",
+          text: "代表チームの A 代表に「全員を治療」「全員を鼓舞」「全員を回復」が加わり、スカッドの表にコンディション、試合勘、士気が表示されます。",
+        },
+        {
+          title: "スポンサー契約：",
+          text: "クラブの財務にスポンサー契約を読み取り専用で表示します。各契約のシーズンごとと合計の金額、期間、降格時に変わる内容がわかります。現在は Game Pass 0.9.2524.0 のみです。",
+        },
+        {
+          title: "修正：",
+          text: "一部のキャリアで、スタッフを正しく読み取れているのにスタッフのチェックが失敗し、スタッフが読み取り専用になって、治療、「連携を最大化」、「戦術を最大化」が拒否されていました。今は通ります。",
+        },
+      ],
       "0.5.3": [
         {
           title: "FM27 の 11 月 17 日のアップデート：",
