@@ -4,7 +4,7 @@
 //! Pass) and to map where the game keeps its data. Only `set` writes to the game, one
 //! field at a time, through the same checks as the app.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Instant;
@@ -16,9 +16,10 @@ use fmlibre_core::{
     ClubIndex, Entity, ExportFormat, ExportHeader, Exported, Field, FmDate, Found, GAME_EXE, GAME_PLUGIN, GameInfo,
     GraphicsIndex, Kind, Loan, MANAGER, MoveTerms, NameKind, PERSONALITY, POSITIONS, PersonNames, Picture,
     PlayerFilter, PlayerIndex, PlayerOrder, PlayerSort, PrizeAmount, PrizeMoney, PrizeStage, ProfileNotes, Purpose,
-    STAFF_ATTRIBUTE_GROUPS, SUPPORTER_MIX, SUPPORTER_TRAITS, Scale, ScanOptions, ScoutOrder, ScoutRequest, Session,
-    SessionError, SponsorshipReadError, StaffIndex, Target, Tie, TieTarget, date_line, diagnostics_report, find_game,
-    job_name, nations, profile_text, retirement_line, saves_loaded_line, scan_object_arrays, sort_players,
+    STAFF_ATTRIBUTE_GROUPS, SUPPORTER_MIX, SUPPORTER_TRAITS, Scale, ScanOptions, ScoutOrder, ScoutRequest, Season,
+    Session, SessionError, SponsorshipReadError, SquadRule, StaffIndex, Target, Tie, TieTarget, date_line,
+    diagnostics_report, find_game, job_name, nations, profile_text, retirement_line, saves_loaded_line,
+    scan_object_arrays, sort_players,
 };
 #[cfg(target_os = "macos")]
 use fmlibre_mem::MachImage;
@@ -397,6 +398,42 @@ enum Command {
         #[arg(long)]
         all: bool,
         /// Put the amounts back afterwards and check them: tests the change without changing the save.
+        #[arg(long)]
+        restore: bool,
+        /// With --restore, how many seconds to wait before putting them back, to look at the game meanwhile.
+        #[arg(long, default_value_t = 0)]
+        hold: u64,
+    },
+    /// Show the rules competitions register their squads under (how many foreign players, goalkeepers, players in
+    /// all), this season's and next season's, optionally only for the competitions matching TEXT. With --current or
+    /// --next, change a rule of the one competition TEXT names in the running game: in the list the game counts squads
+    /// against, and in the nation's rules as a save keeps them.
+    Rules {
+        /// Words to look for in the competitions' names (accents and case are ignored), or a competition's UID.
+        text: Option<String>,
+        /// Change rule RULE of this season's list, as numbered in the listing, to VALUE; may be given more than once.
+        #[arg(long, num_args = 2, value_names = ["RULE", "VALUE"])]
+        current: Option<Vec<i32>>,
+        /// Change rule RULE of next season's list to VALUE; may be given more than once.
+        #[arg(long, num_args = 2, value_names = ["RULE", "VALUE"])]
+        next: Option<Vec<i32>>,
+        /// Also list the competitions with no squad rule at all.
+        #[arg(long)]
+        all: bool,
+        /// Also say where things are in the game's memory: the competition's set of fixture rules, next season's and
+        /// the one that one points at in its turn, each rule's struct and its value in the nation's rules.
+        #[arg(long = "where")]
+        places: bool,
+        /// Also show what each of the nation's records holds for the competition's set of fixture rules: the record
+        /// its files make together and each file's own, with where each value is.
+        #[arg(long)]
+        sources: bool,
+        /// With --current or --next: change the list the game plays by and nothing else, whether or not the nation's
+        /// rules hold the rule. For a competition whose rules the game keeps in no record (UEFA's), to see what the
+        /// game makes of such a change.
+        #[arg(long)]
+        list_only: bool,
+        /// Put the rules back afterwards and check them: tests the change without changing the save.
         #[arg(long)]
         restore: bool,
         /// With --restore, how many seconds to wait before putting them back, to look at the game meanwhile.
@@ -1264,6 +1301,8 @@ fn run(cli: Cli) -> Result<()> {
                 | Command::Prizes { win: Some(_), .. }
                 | Command::Prizes { draw: Some(_), .. }
                 | Command::Prizes { loss: Some(_), .. }
+                | Command::Rules { current: Some(_), .. }
+                | Command::Rules { next: Some(_), .. }
                 | Command::Release { .. }
                 | Command::StaffRelease { .. }
                 | Command::StaffMove { .. }
@@ -1409,6 +1448,15 @@ fn run(cli: Cli) -> Result<()> {
             let settings = settings.as_deref().map(parse_hex).transpose()?;
             let session = connect(process, ArraySource::ProfileFirst)?;
             prizes(&session, text.as_deref(), settings, &amounts, all, restore.then_some(hold))
+        }
+        Command::Rules { text, current, next, all, places, sources, list_only, restore, hold } => {
+            let pairs = |season: Season, pairs: Option<Vec<i32>>| -> Vec<(Season, i32, i32)> {
+                pairs.unwrap_or_default().chunks(2).map(|pair| (season, pair[0], pair[1])).collect()
+            };
+            let mut changes = pairs(Season::Current, current);
+            changes.extend(pairs(Season::Next, next));
+            let session = connect(process, ArraySource::ProfileFirst)?;
+            rules(&session, text.as_deref(), &changes, (all, places, sources, list_only), restore.then_some(hold))
         }
         Command::Plan { uid, club, release } => {
             plan_move(&connect(process, ArraySource::ProfileFirst)?, uid, club, release)
@@ -3634,6 +3682,7 @@ fn profile(session: &Session, out: Option<&Path>) -> Result<()> {
         // Checked against the game's screens, not looked for: kept from the built-in profile.
         prize_money: session.profile.as_ref().is_some_and(|profile| profile.prize_money),
         sponsorships: session.profile.as_ref().is_some_and(|profile| profile.sponsorships),
+        squad_rules: session.profile.as_ref().is_some_and(|profile| profile.squad_rules),
         national_teams: session.profile.as_ref().and_then(|profile| profile.national_teams),
         // What the build lays out otherwise (the finances: `fields club --stats` says whether their class is found; a
         // team's tactics: `training-history` finds the one in use), not looked for: kept from the built-in profile.
@@ -4791,6 +4840,7 @@ fn targets(session: &Session, entity: Entity) -> Result<Vec<(Target, String)>> {
         Entity::Player => session.players()?.into_iter().map(|p| (p.target(), p.name)).collect(),
         Entity::Staff => session.staff()?.into_iter().map(|s| (s.target(), s.name)).collect(),
         Entity::Club => session.clubs()?.into_iter().map(|c| (c.target(), c.name)).collect(),
+        Entity::Competition => bail!("a competition has no fields: `rules` reads its squad rules"),
         Entity::NationalTeam => session
             .national_teams()
             .map_err(|reason| anyhow::anyhow!("no national teams to read on this build ({reason:?})"))?
@@ -5437,6 +5487,309 @@ fn print_prize_money(prize: &PrizeMoney, addresses: &[u64]) {
         false => format!("{} and {}", pounds(prize.win), pounds(prize.win_again)),
     };
     println!("  per match: win {win}, draw {}, loss {}", pounds(prize.draw), pounds(prize.loss));
+}
+
+/// Lists the squad rules of the competitions matching `text`, this season's and next season's, and makes `changes`
+/// (a season, the rule's number in its list as listed, the new value) in the one competition they name. `all` also
+/// lists the competitions with no rule, `places` where the lists and rules are in the game's memory, `sources` what
+/// each of the nation's records holds for the competition's set; with `list_only` the changes are made in the lists
+/// alone.
+fn rules(
+    session: &Session,
+    text: Option<&str>,
+    changes: &[(Season, i32, i32)],
+    (all, places, sources, list_only): (bool, bool, bool, bool),
+    restore: Option<u64>,
+) -> Result<()> {
+    let started = Instant::now();
+    let found = session.squad_rules()?;
+    let ruled = |rules: &&fmlibre_core::CompetitionRules| {
+        !rules.current.is_empty() || rules.next.as_ref().is_some_and(|next| !next.is_empty())
+    };
+    println!(
+        "{} competitions being played, {} with squad rules; {} kinds of rule named by the game (read in {:.1} s)",
+        found.len(),
+        found.iter().filter(ruled).count(),
+        session.rule_kinds().len(),
+        started.elapsed().as_secs_f64()
+    );
+    if let Some(date) = session.game_date() {
+        println!("In-game date: {:04}-{:02}-{:02}", date.year, date.month, date.day);
+    }
+    let uid = text.and_then(|text| text.trim().parse::<u32>().ok());
+    let words: Vec<String> =
+        text.map(fmlibre_core::fold).unwrap_or_default().split_whitespace().map(str::to_owned).collect();
+    let wanted = |rules: &&fmlibre_core::CompetitionRules| {
+        let competition = &rules.competition;
+        match uid {
+            Some(uid) => competition.uid == uid,
+            None => {
+                let short = competition.short_name.as_deref().unwrap_or_default();
+                let nation = competition.nation.as_deref().unwrap_or_default();
+                let names = fmlibre_core::fold(&format!("{} {short} {nation}", competition.name));
+                words.iter().all(|word| names.contains(word.as_str()))
+            }
+        }
+    };
+    let mut shown: Vec<&fmlibre_core::CompetitionRules> =
+        found.iter().filter(wanted).filter(|rules| all || ruled(rules)).collect();
+    shown.sort_by_cached_key(|rules| {
+        let competition = &rules.competition;
+        (competition.nation.as_deref().map(fmlibre_core::fold), rules.level.unwrap_or(i32::MAX), competition.uid)
+    });
+    let names: HashMap<u32, &str> =
+        found.iter().map(|rules| (rules.competition.uid, rules.competition.name.as_str())).collect();
+    // Without a name to look for, one line each; with one, the rules themselves.
+    for rules in &shown {
+        let competition = &rules.competition;
+        let nation = competition.nation.as_deref().unwrap_or("no nation");
+        let level = rules.level.map_or_else(String::new, |level| format!(" · level {level}"));
+        let next = rules.next.as_ref().map_or_else(|| "none".to_owned(), |next| next.len().to_string());
+        if text.is_none() {
+            println!(
+                "{:>10}  {} · {nation}{level} · rules: {} this season, {next} next",
+                competition.uid,
+                competition.name,
+                rules.current.len()
+            );
+            continue;
+        }
+        println!();
+        let turn = rules
+            .season_turn
+            .map_or_else(String::new, |turn| format!(" · its seasons turn on {:02}-{:02}", turn.month, turn.day));
+        println!(
+            "{} (UID {}) · {nation}{level} · the nation's fixture rules {}{turn}",
+            competition.name, competition.uid, rules.fixture_rules
+        );
+        if !rules.shared_with.is_empty() {
+            let others: Vec<&str> =
+                rules.shared_with.iter().map(|uid| names.get(uid).copied().unwrap_or("another competition")).collect();
+            println!("  Its lists are also those of: {}", others.join("; "));
+        }
+        if rules.unsaved {
+            println!("  No record keeps its rules: the game makes them itself, and a change lasts until it does again");
+        }
+        if let Some(registration) = rules.registration {
+            let most = registration.most.map_or_else(|| "differing numbers of".to_owned(), |most| most.to_string());
+            println!("  Its squads are registered by {} days, at most {most} players by each", registration.days);
+        }
+        if places {
+            // The set of the season after next is the one next season's points at in its turn.
+            let at = rules.places();
+            let after = at.next_set.and_then(|next| {
+                let next_at = session.layout.rules.as_ref()?.fixture_next;
+                session.process.read_u64(next + next_at).ok()
+            });
+            let hex = |at: Option<u64>| at.map_or_else(|| "none".to_owned(), |at| format!("{at:#x}"));
+            println!(
+                "  As it is played at {:#x}, in the database at {:#x}, its rule group at {:#x}",
+                at.competition, at.db, at.group
+            );
+            println!(
+                "  Its fixture rules are at {:#x}, next season's at {}, which point on at {}",
+                at.set,
+                hex(at.next_set),
+                hex(after)
+            );
+        }
+        let year = |ahead: i32| rules.season.map_or_else(String::new, |year| format!(" ({})", year + ahead));
+        println!("  This season{}", year(0));
+        print_squad_rules(&rules.current, &names, places);
+        match &rules.next {
+            Some(next) => {
+                println!("  Next season{}", year(1));
+                print_squad_rules(next, &names, places);
+            }
+            None => println!("  Next season: the game holds no rules for it"),
+        }
+        if sources {
+            print_rule_records(session, competition.uid, rules.fixture_rules)?;
+        }
+    }
+    if shown.is_empty() {
+        let hint = if all { "" } else { " (--all also lists those with no squad rule)" };
+        println!("No competitions match{hint}");
+    }
+    if changes.is_empty() {
+        return Ok(());
+    }
+
+    ensure!(text.is_some(), "name the competition to change, by words of its name or by its UID");
+    let targets: Vec<&fmlibre_core::CompetitionRules> = found.iter().filter(wanted).collect();
+    ensure!(!targets.is_empty(), "no competition matches, so nothing was changed");
+    // Enough of them to pick from: "lig" matches a hundred.
+    const NAMED: usize = 8;
+    let some: Vec<String> = targets
+        .iter()
+        .take(NAMED)
+        .map(|rules| format!("{} (UID {})", rules.competition.name, rules.competition.uid))
+        .collect();
+    let more = match targets.len().saturating_sub(NAMED) {
+        0 => String::new(),
+        more => format!("; and {more} more"),
+    };
+    ensure!(
+        targets.len() == 1,
+        "{} competitions match ({}{more}): name one by its UID",
+        targets.len(),
+        some.join("; ")
+    );
+    let target = targets[0];
+    // Rules are numbered from 1 in the listing.
+    let numbered: Vec<(Season, usize, i32)> = changes
+        .iter()
+        .map(|&(season, rule, value)| {
+            let at = usize::try_from(rule - 1).map_err(|_| anyhow!("rules are numbered from 1, not {rule}"))?;
+            Ok((season, at, value))
+        })
+        .collect::<Result<_>>()?;
+    let plan = match list_only {
+        true => session.plan_list_change(target, &numbered)?,
+        false => session.plan_rule_change(target, &numbered)?,
+    };
+    let done = session.apply_rule_change(&plan)?;
+    println!();
+    let only = if list_only { ", in the list alone" } else { "" };
+    println!("Changed in the running game{only}, {} (UID {}):", target.competition.name, target.competition.uid);
+    let kinds = session.rule_kinds();
+    for edit in &done.edits {
+        let name = kinds.get(&edit.kind).map_or_else(|| format!("kind {}", edit.kind), Clone::clone);
+        let saved = match edit.source_from == edit.from {
+            true => String::new(),
+            false => format!(" (the nation's rules held {})", edit.source_from),
+        };
+        println!("  {}, rule {} ({name}): {} -> {}{saved}", edit.season, edit.rule + 1, edit.from, edit.to);
+    }
+    match restore {
+        Some(hold) => {
+            if hold > 0 {
+                println!("  putting them back in {hold} s");
+                std::thread::sleep(std::time::Duration::from_secs(hold));
+            }
+            session.undo_rule_change(&done)?;
+            println!("Put back, and read back.");
+        }
+        None => {
+            println!("The game's screens show a change of this season's rules once a day has passed.");
+            println!("To put it back:");
+            let args: Vec<String> = done
+                .edits
+                .iter()
+                .map(|edit| {
+                    let season = match edit.season {
+                        Season::Current => "--current",
+                        Season::Next => "--next",
+                    };
+                    format!("{season} {} {}", edit.rule + 1, edit.from)
+                })
+                .collect();
+            let only = if list_only { " --list-only" } else { "" };
+            println!("  fmlibre-probe rules {} {}{only}", target.competition.uid, args.join(" "));
+            if !list_only && done.edits.iter().any(|edit| edit.source_from != edit.from) {
+                println!("  (the nation's rules as a save keeps them then hold the same value as the list)");
+            }
+        }
+    }
+    Ok(())
+}
+
+/// What each record of the competition's nation holds for its set of fixture rules, the `set`th: the record the files
+/// make together, then each file's own, with where each value is.
+fn print_rule_records(session: &Session, uid: u32, set: usize) -> Result<()> {
+    let kinds = session.rule_kinds();
+    let found = session.rule_records(uid)?;
+    if found.is_empty() {
+        println!("  The nation's records: none (a competition of no nation)");
+        return Ok(());
+    }
+    println!("  The nation's records, for its fixture rules {set}:");
+    let mut file = 0;
+    for record in &found {
+        let whose = if record.women { " (women's teams)" } else { "" };
+        let what = if record.together {
+            "the files together".to_owned()
+        } else {
+            file += 1;
+            format!("file {file}")
+        };
+        let sets = match record.sets {
+            Some(sets) => format!("{sets} sets of fixture rules"),
+            None => "no fixture rules".to_owned(),
+        };
+        let years = match (record.from_year, record.to_year) {
+            (Some(from), Some(to)) => format!(", for the seasons {from} to {to}"),
+            (Some(from), None) => format!(", for the seasons from {from}"),
+            (None, Some(to)) => format!(", for the seasons to {to}"),
+            (None, None) => String::new(),
+        };
+        let chosen = if record.chosen { "  <- the editor takes next season's rules from this one" } else { "" };
+        println!("    {what}{whose}, at {:#x}: {sets}{years}{chosen}", record.record);
+        for rule in &record.rules {
+            let limit = match rule.compare {
+                Some(-1) => "at most ",
+                Some(1) => "at least",
+                Some(_) => "compare?",
+                None => "no limit",
+            };
+            let name = kinds.get(&rule.kind).cloned().unwrap_or_else(|| format!("kind {}", rule.kind));
+            let value = rule.value.map_or_else(|| "?".to_owned(), |value| value.to_string());
+            let condition = rule.condition.as_ref().map_or_else(String::new, |key| format!("  [{key}]"));
+            let years = match (rule.from_year, rule.to_year) {
+                (Some(from), Some(to)) => format!("  {from} to {to}"),
+                (Some(from), None) => format!("  from {from}"),
+                (None, Some(to)) => format!("  to {to}"),
+                (None, None) => String::new(),
+            };
+            println!("        {limit} {value:>4}  {name}{condition}{years}  · at {:#x}", rule.value_at);
+        }
+    }
+    Ok(())
+}
+
+/// The rules of one season's list, numbered from 1 as `rules --current` and `--next` take them.
+fn print_squad_rules(rules: &[SquadRule], competitions: &HashMap<u32, &str>, places: bool) {
+    if rules.is_empty() {
+        println!("    no squad rules");
+    }
+    for (at, rule) in rules.iter().enumerate() {
+        let limit = match rule.compare {
+            -1 => "at most ",
+            1 => "at least",
+            _ => "compare?",
+        };
+        let name = rule.name.clone().unwrap_or_else(|| format!("kind {}", rule.kind));
+        let condition = match (&rule.condition, rule.condition_competition) {
+            (Some(_), Some(uid)) => match competitions.get(&uid) {
+                Some(name) => format!("  [teams from {name}]"),
+                None => format!("  [teams from the competition {uid}]"),
+            },
+            (Some(key), None) => format!("  [{key}]"),
+            (None, _) => String::new(),
+        };
+        let saved = match rule.source {
+            Some(source) => {
+                let years = match (source.from_year, source.to_year) {
+                    (Some(from), Some(to)) => format!(", {from} to {to}"),
+                    (Some(from), None) => format!(", from {from}"),
+                    (None, Some(to)) => format!(", to {to}"),
+                    (None, None) => String::new(),
+                };
+                match source.value == rule.value {
+                    true => format!("  · saved{years}"),
+                    false => format!("  · saved as {}{years}", source.value),
+                }
+            }
+            None if rule.unsaved => "  · in no record: changed in the list alone".to_owned(),
+            None => "  · not in the nation's rules as such: left alone".to_owned(),
+        };
+        let place = match (places, rule.addresses()) {
+            (false, _) => String::new(),
+            (true, (rule, Some(value))) => format!("  · at {rule:#x}, its value in the rules at {value:#x}"),
+            (true, (rule, None)) => format!("  · at {rule:#x}"),
+        };
+        println!("    {:>2}  {limit} {:>4}  {name}{condition}{saved}{place}", at + 1, rule.value);
+    }
 }
 
 /// An amount with commas between thousands: 10,222,480.

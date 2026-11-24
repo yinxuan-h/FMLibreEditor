@@ -1336,6 +1336,138 @@ export const es: Strings = {
     unavailableBuild: "Nadie ha comprobado todavía dónde guarda esta versión del juego los patrocinios, así que el editor no los muestra en lugar de leer la memoria equivocada.",
     unavailableUnreadable: "El editor buscó los patrocinios donde los espera en esta versión del juego, pero lo que encontró no parece del juego, así que no los muestra.",
   },
+
+  competitions: {
+    nav: "Competiciones",
+    search: "Buscar competiciones por nombre, país o UID",
+    summary: (total, shown) =>
+      total > shown ? `${format(shown)} de ${format(total)} competiciones` : `${format(total)} competiciones`,
+    empty: (query, filtered) => {
+      if (query === "") {
+        return filtered ? "Ninguna competición de este país tiene reglas de plantilla." : "No se han encontrado competiciones con reglas de plantilla.";
+      }
+      return filtered ? `Ninguna competición de este país coincide con «${query}».` : `Ninguna competición coincide con «${query}».`;
+    },
+    reading: "Leyendo las reglas de plantilla de las competiciones desde el juego… Tardará unos segundos.",
+    readAgain: "Leer de nuevo",
+    readAgainTitle: "Volver a leer las reglas del juego",
+    listNote: "No se muestran las competiciones sin reglas de plantilla.",
+    unavailableTitle: "No hay reglas de plantilla que mostrar",
+    unavailableBuild: "Nadie ha comprobado todavía dónde guarda esta versión del juego las reglas de plantilla de las competiciones, así que el editor no muestra ninguna en lugar de leer la memoria equivocada.",
+    unavailableUnreadable: "El editor buscó las reglas de plantilla donde las espera en esta versión del juego, pero lo que encontró no parece del juego, así que no muestra ninguna.",
+    columns: {
+      name: "Competición",
+      nation: "País",
+      level: "Nivel",
+      rules: "Reglas",
+      uid: "UID",
+    },
+    level: (level) => format(level),
+    rulesCount: (current, next) =>
+      next === null || next === current ? format(current) : `${format(current)} · ${format(next)}`,
+    rulesCountTitle: "Reglas de plantilla esta temporada y, si tiene otro número, la próxima",
+    international: "Internacional",
+    filters: {
+      nation: "País",
+      allNations: "Todos los países",
+    },
+    title: "Reglas de plantilla",
+    intro: "Cuántos jugadores de cada tipo puede inscribir una plantilla, o alinear un equipo en un partido, en esta competición. Qué cuenta como extranjero o formado en casa lo decide el propio juego.",
+    seasons: { current: "Esta temporada", next: "Próxima temporada" },
+    began: (year) => `empezó en ${year}`,
+    begins: (year) => `empieza en ${year}`,
+    noRules: "Sin reglas de plantilla.",
+    noNext: "El juego no tiene reglas para la próxima temporada.",
+    ruleColumns: {
+      rule: "Regla",
+      where: "Se cuenta en",
+      limit: "Límite",
+      value: "Jugadores",
+    },
+    atMost: "Como máximo",
+    atLeast: "Como mínimo",
+    scopes: {
+      squad: "Plantilla",
+      matchSquad: "Convocatoria",
+      eleven: "Once",
+      startingEleven: "Once inicial",
+      bench: "Banquillo",
+    },
+    who: {
+      squadSize: "Jugadores en la plantilla",
+      foreign: "Jugadores extranjeros",
+      foreignExceptAsian: "Jugadores extranjeros, salvo asiáticos",
+      foreignGoalkeepers: "Porteros extranjeros",
+      nonEu: "Jugadores no comunitarios",
+      domestic: "Jugadores nacionales",
+      domesticGoalkeepers: "Porteros nacionales",
+      goalkeepers: "Porteros",
+      outfield: "Jugadores de campo",
+      nonHomegrown: "Jugadores no formados en casa",
+      youthContract: "Jugadores con contrato juvenil",
+      fullTime: "Jugadores con contrato a tiempo completo",
+      amateur: "Jugadores aficionados",
+      youthOrAmateur: "Jugadores juveniles o aficionados",
+      trialists: "Jugadores a prueba",
+      loans: "Jugadores cedidos",
+      internationals: "Jugadores internacionales",
+      otherTeam: "Jugadores inscritos en otro equipo",
+      firstTeam: "Jugadores inscritos en el primer equipo",
+      over: (age) => `Jugadores de más de ${format(age)} años`,
+      under: (age) => `Jugadores de menos de ${format(age)} años`,
+      domesticUnder: (age) => `Jugadores nacionales de menos de ${format(age)} años`,
+      foreignOver: (age) => `Jugadores extranjeros de más de ${format(age)} años`,
+      goalkeepersOver: (age) => `Porteros de más de ${format(age)} años`,
+      outfieldOver: (age) => `Jugadores de campo de más de ${format(age)} años`,
+      homegrown: (from, fromAge, toAge) => {
+        const ages = `formados entre los ${format(fromAge)} y los ${format(toAge)} años`;
+        if (from === "club") {
+          return `Formados en el club (${ages})`;
+        }
+        return from === "nation" ? `Formados en el país (${ages})` : `Formados en el club o en el país (${ages})`;
+      },
+      homegrownUnder: (age, fromAge, toAge) =>
+        `Menores de ${format(age)} años formados en el país (formados entre los ${format(fromAge)} y los ${format(toAge)} años)`,
+    },
+    unnamedKind: (kind) => `Regla de tipo ${format(kind)}`,
+    gameKey: (key) => `Nombre de esta regla en el juego: ${key}`,
+    teamsFrom: (competition) => `Equipos de ${competition}`,
+    teamsFromUnknown: "Equipos de otra división",
+    condition: (code) => `Condicional (${code})`,
+    conditionTitle: "El juego aplica esta regla bajo una condición propia que el editor aún no explica.",
+    years: (from, to) => {
+      if (from !== null && to !== null) {
+        return from === to ? `${from}` : `${from}–${to}`;
+      }
+      return from !== null ? `desde ${from}` : `hasta ${to}`;
+    },
+    yearsTitle: "Las temporadas para las que las reglas del país dan esta regla, según el año en que empieza cada temporada",
+    leftAlone: "Se deja como está",
+    notSavedTitle: "Las reglas del país tal como las guarda una partida no tienen esa regla, así que un cambio desaparecería al cargar la partida: el editor la deja como está.",
+    notACountTitle: "Es una cantidad de dinero, no un número de jugadores: el editor la deja como está.",
+    noneChangeable: "Estas reglas aún no se pueden cambiar, en ninguna fecha: el editor solo cambia una regla si la encuentra también en las reglas que guarda la partida, para que el cambio siga ahí al cargarla, y no ha encontrado ahí las de esta competición. Por ahora ocurre con las ligas femeninas, la Major League Soccer y algunas copas.",
+    unsavedNote: "El juego no guarda las reglas de esta competición en ninguna partida: las crea él mismo cada vez que carga una, y de nuevo en cada temporada. Por eso el editor mantiene un cambio aquí: lo escribe en el juego en marcha, lo recuerda para esta carrera y lo vuelve a escribir cada vez que se conecta o vuelve a leer los datos. Después de cargar una partida, conecta el editor (o pulsa Recargar datos) una vez para que el cambio vuelva. Deshacer en Cambios lo suelta.",
+    heldTag: "Mantenida",
+    heldTitle: (original) => `El editor mantiene este número y lo vuelve a escribir cada vez que lee el juego. El del juego es ${format(original)}.`,
+    savedDiffers: (value) => `Las reglas de la partida tienen ${format(value)}`,
+    savedDiffersTitle: "El juego se rige por la lista y la crea a partir de las reglas de la partida al cargarla. Guardar un cambio aquí fija ambas.",
+    edit: "Cambiar reglas",
+    editTitle: "Cambiar los números de las reglas de plantilla de esta competición",
+    save: "Guardar reglas",
+    saving: "Guardando…",
+    cancel: "Cancelar",
+    invalid: (most) => `Introduce un número entero de 0 a ${format(most)}.`,
+    shared: (names) => `Estas reglas son también las de ${names}: un cambio vale para ellas también.`,
+    currentNote: (turn) =>
+      `Un cambio aquí vale para el resto de esta temporada${turn === null ? "" : `, que cambia el ${turn}`}. El juego cuenta las plantillas con él al instante; sus propias pantallas lo muestran cuando pasa un día.`,
+    nextNote: (turn) =>
+      `Un cambio aquí pasa a ser la regla de esta temporada cuando cambia la temporada${turn === null ? "" : ` (el ${turn})`}, y se mantiene en las siguientes salvo que el juego tenga reglas propias para una temporada posterior. La página Próxima temporada del juego lo muestra al instante.`,
+    lasts: "Un cambio se escribe en la lista por la que se rige el juego y en las reglas del país que guarda la partida, así que sigue ahí al cargar la partida. Un cambio en una regla de esta temporada termina al cambiar de temporada: las reglas de la próxima ocupan su lugar. Deshacer en Cambios devuelve el número anterior.",
+    infoLabel: "Cuánto dura un cambio de una regla de plantilla",
+    ruleField: (season, rule) => `Regla de plantilla, ${season.toLowerCase()}: ${rule}`,
+    alsoFor: (count) =>
+      count === 1 ? "También para 1 competición más con las mismas reglas" : `También para ${format(count)} competiciones más con las mismas reglas`,
+  },
   app: {
     stage: "beta",
     settingsLabel: "Ajustes",
@@ -1611,7 +1743,7 @@ export const es: Strings = {
       change: "Cambio",
       status: "Estado",
     },
-    kinds: { player: "Jugador", staff: "Personal", club: "Club", nationalTeam: "Selección" },
+    kinds: { player: "Jugador", staff: "Personal", club: "Club", nationalTeam: "Selección", competition: "Competición" },
     stored: (change) => `valor interno ${change}`,
     undone: (time) => `Deshecho a las ${time}`,
     undo: "Deshacer",
@@ -2268,6 +2400,23 @@ export const es: Strings = {
     cancel: "Cancelar",
   },
 
+  batchTraits: {
+    title: "Características del equipo",
+    addMode: "+ Añadir a la plantilla",
+    removeMode: "- Quitar de la plantilla",
+    addHint: "Aplica las características marcadas a los jugadores del equipo que no las tengan. Las características existentes no se tocan.",
+    removeHint: "Quita las características marcadas a los jugadores del equipo que las tengan. Las demás características no se tocan.",
+    noneSelected: "Ninguna característica seleccionada en este modo",
+    selectedCount: (count: number) => `${format(count)} seleccionada${count === 1 ? "" : "s"}`,
+    deselectAll: "Desmarcar todo",
+    oppositeModeNote: "Marcada en el otro modo",
+    applyNote: (players: number) => `Se aplicará a ${format(players)} jugadores · Se puede deshacer con 1 clic`,
+    emptySquad: (players: number) => `Plantilla de ${format(players)} jugadores`,
+    cancel: "Cancelar",
+    apply: "Aplicar",
+    applying: "Aplicando…",
+  },
+
   squad: {
     teamsLabel: "Equipo",
     teams: {
@@ -2323,6 +2472,8 @@ export const es: Strings = {
     refreshAllTitle:
       "Poner la energía y el ritmo de competición de todos los jugadores de este equipo al 100 % y dejarlos " +
       "totalmente descansados (fatiga -500)",
+    batchTraits: "Características del lote",
+    batchTraitsTitle: "Añade o quita características a los jugadores de este equipo",
     maxAll: "Atributos al máximo",
     maxAllTitle:
       "Poner cada atributo de cada jugador de este equipo en su mejor valor: 20, y 1 para la propensión a lesiones y " +
@@ -2335,6 +2486,33 @@ export const es: Strings = {
       "áreas de la táctica vuelven a bajar a medida que el entrenamiento envejece, al cabo de unas seis semanas, y " +
       "otra táctica necesita otra pulsación. El juego muestra los cambios cuando avanza: pulsa Continuar en el juego",
     atItsBestSkipped: (step, reason) => `Se omitió «${step}»: ${reason}`,
+    destroy: "Equipo por los suelos",
+    destroyTitle:
+      "Llevar a cada jugador de este equipo a lo peor: moral y felicidad, energía, ritmo de competición y fatiga, " +
+      "cohesión con el club y, si eliges tú la táctica del equipo, cuánto la conoce. Ningún valor mejora; los " +
+      "atributos, las lesiones y las sanciones se quedan como están. Pregunta antes, y un solo «Deshacer» lo revierte todo",
+    destroySteps: {
+      demoralize: "Moral y felicidad",
+      exhaust: "Energía y ritmo",
+      minCohesion: "Cohesión",
+      minTactics: "Táctica",
+    },
+    moreActions: "Más acciones",
+    moreActionsTitle: "Las acciones sobre todo el equipo, una a una",
+    destroyDialog: {
+      title: "¿Dejar el equipo por los suelos?",
+      doesHeading: "Para cada jugador de la lista, también los cedidos",
+      does: [
+        "Moral a 1, la más baja; felicidad y felicidad con los minutos a -100",
+        "Energía al 0 %, ritmo de competición al 35 % y fatiga a 1000",
+        "Cohesión con el club a 1, para quienes la tienen",
+        "Cuánto conoce la táctica, al mínimo, si eliges tú la táctica del equipo",
+      ],
+      keeps: "Ningún valor mejora. Los atributos, las lesiones y las sanciones se quedan como están.",
+      ownClub: "Es un equipo de tu propio club.",
+      hint: "Un solo «Deshacer» lo revierte todo, antes de que el juego avance.",
+      cancel: "Cancelar",
+    },
     hint:
       "Las acciones abarcan a todos los jugadores de la lista, también a los cedidos. Se pueden deshacer también " +
       "en Cambios.",
@@ -3004,6 +3182,31 @@ export const es: Strings = {
     },
   },
 
+  /** A player's development: the Development tab of his profile, the note under his abilities, the squad's arrows (see en.ts). */
+  progress: {
+    tabsLabel: "Secciones del perfil del jugador",
+    tabs: { overview: "Perfil", progress: "Progresión" },
+    lockedWhileEdited: "Termina de editar para abrir esta pestaña",
+    openTab: "Abrir la pestaña Progresión",
+    loading: "Leyendo los registros…",
+    failed: (reason: string) => `No se pudieron leer los registros: ${reason}`,
+    since: (date: string) => `desde el ${date}`,
+    change: (from: string, to: string, date: string) => `${from} → ${to} desde el ${date}`,
+    rangeLabel: "Periodo",
+    ranges: { quarter: "3 meses", year: "1 año", all: "Todo" },
+    recorded: (count: number, first: string) => `Registros: ${count} · el primero, el ${first}`,
+    abilityTitle: "Habilidad",
+    valueTitle: "Valor",
+    attributesTitle: "Atributos que han cambiado",
+    noAttributeChanges: (date: string) => `Ningún atributo ha cambiado desde el ${date}.`,
+    emptyTitle: "Todavía no hay con qué comparar",
+    emptyText:
+      "La aplicación anota las habilidades, el valor y los atributos de todos los jugadores más o menos una vez por semana del juego, cada vez que lee los datos del juego. Sigue jugando, vuelve a leer los datos y aquí verás cómo progresa este jugador.",
+    offTitle: "No hay registros para esta partida",
+    offText:
+      "La aplicación guarda registros en las partidas en las que controlas a un entrenador y en las versiones del juego cuyos datos superan sus comprobaciones.",
+  },
+
   /** The command palette and the names of the keys in the keyboard shortcuts (see en.ts). */
   palette: {
     button: "Buscar",
@@ -3071,6 +3274,36 @@ export const es: Strings = {
     link: "Novedades",
     command: "Novedades de esta versión",
     versions: {
+      "0.5.4": [
+        {
+          title: "Traspasos en el historial del jugador.",
+          text: "Traspaso, ahora la primera opción al mover a un jugador, deja el traspaso preparado para el día siguiente del juego. El juego lo hace como uno de los suyos: paga el importe y anota el traspaso en el historial de su carrera, con los partidos de esta temporada en su antiguo club en una fila aparte. Mover ahora sigue moviéndolo al instante.",
+        },
+        {
+          title: "Equipo al máximo, y por los suelos.",
+          text: "En la pestaña Plantilla de un club, un solo clic cura, motiva y recupera a todo el equipo y lleva su cohesión y su táctica al máximo; Equipo por los suelos, tras una pregunta, hace lo contrario. Un solo Deshacer revierte cualquiera de los dos, y las acciones sueltas están en Más acciones.",
+        },
+        {
+          title: "Características del lote.",
+          text: "En la pestaña Plantilla de un club, dentro de Más acciones, Características del lote da a todos los jugadores del equipo las características que elijas, o se las quita, y deja las demás como están. Un solo Deshacer lo revierte.",
+        },
+        {
+          title: "Traspasar a todo el personal.",
+          text: "La pestaña Personal de un club traspasa a todo su personal a otro club de una vez, cada uno en el mismo puesto, y un solo Deshacer los trae a todos de vuelta.",
+        },
+        {
+          title: "Selecciones.",
+          text: "La plantilla absoluta de una selección tiene Curar a todos, Motivar a todos y Recuperar a todos, y su tabla muestra la energía, el ritmo de competición y la moral.",
+        },
+        {
+          title: "Patrocinios.",
+          text: "Las finanzas de un club muestran sus patrocinios, solo para consultar: lo que paga cada uno por temporada y en total, su duración y lo que cambia con un descenso. Por ahora en Game Pass 0.9.2524.0.",
+        },
+        {
+          title: "Corrección.",
+          text: "En algunas partidas la comprobación del personal fallaba aunque el personal se leía bien, lo que lo dejaba en solo lectura e impedía curar, Máxima cohesión y Táctica al máximo. Ahora pasa.",
+        },
+      ],
       "0.5.3": [
         {
           title: "La actualización de FM27 del 17 de noviembre.",

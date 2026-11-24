@@ -771,7 +771,7 @@ function ChangeRow({ change, field, failure, undoing, onUndo, inBatch }: ChangeR
           {change.entity === "staff" ? profileText.id : profileText.uid} {change.uid}
         </div>
       </td>
-      <td>{label}</td>
+      <td className="col-field">{label}</td>
       <td className="change-value" title={storedNote}>
         {words.text}
         {words.notes.map((note) => (

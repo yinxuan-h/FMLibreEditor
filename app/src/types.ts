@@ -387,6 +387,109 @@ export interface StagePrizes {
   loss: number;
 }
 
+/** Why the Competitions tab shows no squad rules on this version of the game (`competition_rules`). */
+export type RuleUnavailable = "build" | "unreadable";
+
+/** Which season's list a squad rule is in. */
+export type RuleSeason = "current" | "next";
+
+/** One rule a competition's squads are registered and picked under, as a season's list holds it. */
+export interface SquadRule {
+  /** The game's number for the kind of rule, and its name for it (`all_foreign_players_in_squad`) where it has one. */
+  kind: number;
+  name: string | null;
+  /** Which way the value limits: -1 at most, 1 at least. */
+  compare: number;
+  value: number;
+  /** The key of the rule's condition, four characters (`tfrd`, `1yol`); null for a rule with none. */
+  condition: string | null;
+  /** For a rule about the teams of a division (`tfrd`): the UID of that division's competition. */
+  conditionCompetition: number | null;
+  /**
+   * The rule in the nation's rules a save keeps, which the game makes the list from when it loads one; null where they
+   * hold no such rule, which the editor then leaves alone.
+   */
+  source: { value: number; fromYear: number | null; toYear: number | null } | null;
+  /**
+   * Whether the game keeps the rule in no record at all: its competition is no nation's (UEFA's Champions League), and
+   * the game makes its rules itself whenever it loads a save. The editor changes such a rule in the running game and
+   * holds it (see `HeldRule`).
+   */
+  unsaved: boolean;
+}
+
+/**
+ * A squad rule the editor holds: of a competition whose rules the game keeps in no record. The editor gave it `value`
+ * and writes that again whenever it reads the game anew; `original` is the game's own count.
+ */
+export interface HeldRule {
+  /** The competition of the lowest UID among those played under the same lists: the rule is theirs all. */
+  competition: number;
+  season: RuleSeason;
+  kind: number;
+  compare: number;
+  condition: string | null;
+  conditionCompetition: number | null;
+  value: number;
+  original: number;
+}
+
+/** The squad rules of a competition, this season and the next (`competition_rules`). */
+export interface CompetitionRules {
+  uid: number;
+  /** In the game's language. */
+  name: string;
+  shortName: string | null;
+  /** The nation whose competition it is; none for a continent's. */
+  nationUid: number | null;
+  nation: string | null;
+  /** The level of the division in its nation, 0 for the top one; null for a competition that says none. */
+  level: number | null;
+  /** The year this season began in, as the nation's rules count seasons; null where the in-game date is not known. */
+  season: number | null;
+  /** The day of the year the nation's seasons turn on; null for a competition of no nation, or where none is given. */
+  seasonTurn: { month: number; day: number } | null;
+  current: SquadRule[];
+  /** Null where the game holds no rules for the next season. */
+  next: SquadRule[] | null;
+  /** The other competitions played under the same lists, by UID: a change of a rule is theirs too. */
+  sharedWith: number[];
+  /** Whether the game keeps its rules in no record (see `SquadRule.unsaved`). */
+  unsaved: boolean;
+  /**
+   * The days its squads are registered by this season, where the game keeps such days for it (UEFA's): how many, and
+   * the most players a squad may register by each (null where they differ). A change of the squad's size is theirs too.
+   */
+  registration: { days: number; most: number | null } | null;
+}
+
+/** The competitions' squad rules, or why this version of the game shows none (`competition_rules`). */
+export interface CompetitionRulesRead {
+  unavailable: RuleUnavailable | null;
+  /** The competitions with a squad rule this season or the next. */
+  competitions: CompetitionRules[];
+  /** The rules the editor holds in this save. */
+  held: HeldRule[];
+}
+
+/** A squad rule to set (`set_competition_rules`): the rule at a place of a season's list, as it was shown, to a count. */
+export interface RuleInput {
+  season: RuleSeason;
+  /** The rule's place in the season's list, from 0. */
+  rule: number;
+  /** What the list showed there: the kind of rule, and its count. */
+  kind: number;
+  from: number;
+  value: number;
+}
+
+/** The changes `set_competition_rules` logged, and the competitions' rules now. */
+export interface CompetitionRulesSet {
+  changes: LoggedChange[];
+  competitions: CompetitionRules[];
+  held: HeldRule[];
+}
+
 export interface ClubPage {
   total: number;
   rows: ClubSummary[];
@@ -521,6 +624,32 @@ export interface FmDate {
   year: number;
   month: number;
   day: number;
+}
+
+/**
+ * How a player's abilities, value and attributes went, from the records the app keeps of a career: one every week or
+ * so of the game's time it read the game.
+ */
+export interface PlayerProgress {
+  /**
+   * The dates of the records since the first that holds him, the oldest first, and the game's date as the last: what
+   * he is now. Only that one while there is no record of him before today; none where the game's date is not known.
+   */
+  dates: FmDate[];
+  /**
+   * For each field that has a value ("current_ability", "potential_ability", "value" in pounds, and the attributes
+   * by key, 1–20), its value on each of the dates; null before the first record that holds one.
+   */
+  series: Record<string, (number | null)[]>;
+  /** Whether the app keeps records of this career. */
+  recording: boolean;
+}
+
+/** A player's current ability at the record he is compared with, and the date of that record. */
+export interface EarlierAbility {
+  uid: number;
+  date: FmDate;
+  currentAbility: number;
 }
 
 export interface PlayerSummary {
@@ -855,8 +984,11 @@ export interface Ban {
 /** What an edit is for. */
 export type Entity = "player" | "staff" | "club";
 
-/** What a change can be made to: the lists' entities, and a nation's national team (its senior team's reputation). */
-export type EditEntity = Entity | "nationalTeam";
+/**
+ * What a change can be made to: the lists' entities, a nation's national team (its senior team's reputation) and a
+ * competition (its squad rules, which the Competitions tab changes; it has no fields of its own).
+ */
+export type EditEntity = Entity | "nationalTeam" | "competition";
 
 /** A value of a player, member of staff or club that the editor can change, from `edit_fields`. */
 export interface EditField {
@@ -961,6 +1093,26 @@ export interface LoggedChange {
    * `prize.draw` or `prize.loss` in pounds: the league, and how many of its settings were changed alike.
    */
   prize?: { league: string; leagueUid: number; settings: number };
+  /**
+   * For a squad rule of a competition, logged as a change of the competition's `rule.current.N` or `rule.next.N` (N the
+   * game's name for the kind of rule, or `kindK` by its number) from one count of players to the other: the rule.
+   */
+  rule?: {
+    /** Whether the editor holds the rule from then on: no record keeps it (see `HeldRule`). */
+    held: boolean;
+    season: RuleSeason;
+    /** The year that season began in; null where the in-game date was not known. */
+    year: number | null;
+    kind: number;
+    kindName: string | null;
+    compare: number;
+    condition: string | null;
+    /** For a rule about the teams of a division: that division's name, where it was known. */
+    conditionCompetition: string | null;
+    nation: string | null;
+    /** How many other competitions are played under the same lists. */
+    shared: number;
+  };
   // Healing (`heal_player`) is logged as a change of the player's field "injuries" from how many he had to 0, and
   // lifting his bans (`lift_bans`) as a change of his field "bans", and keeping him from retiring (`keep_playing`) as
   // a change of his field "retirement" from the date he was to retire on (a number like 20270630; 0 for none) to 0.
@@ -1064,6 +1216,8 @@ export interface ClubTeam {
   /** UIDs of the captain and the vice-captain; null when the team has none. */
   captain: number | null;
   viceCaptain: number | null;
+  /** Whether a manager of the user's runs the club: Destroy's question then says it is the user's own. */
+  humanClub: boolean;
   players: SquadPlayer[];
 }
 
@@ -1114,7 +1268,9 @@ export type CaptainRole = "captain" | "viceCaptain";
  * "liftBans" lifts every ban, "inspire" sets morale to 20, "refresh" sets energy and match sharpness to 100%,
  * "maxCohesion" sets cohesion with the club to 100 for those who have one, "maxTactics" has the players know the
  * tactic the team plays at its best, and "atItsBest" does Heal all, Inspire all, Refresh all, Max cohesion and Max
- * tactics in that order, as one batch.
+ * tactics in that order, as one batch. "destroy" does the other way, as one batch too and never making a value better:
+ * "demoralize" (morale 1, happiness and happiness with playing time -100), "exhaust" (energy 0%, match sharpness 35%,
+ * jadedness 1000), "minCohesion" (cohesion 1) and "minTactics" (the tactic known at its least, where a human picks it).
  */
 export type TeamAction =
   | "heal"
@@ -1124,7 +1280,12 @@ export type TeamAction =
   | "maxAttributes"
   | "maxCohesion"
   | "maxTactics"
-  | "atItsBest";
+  | "atItsBest"
+  | "demoralize"
+  | "exhaust"
+  | "minCohesion"
+  | "minTactics"
+  | "destroy";
 
 /** The actions a national team's senior team has: Heal all, Inspire all and Refresh all. */
 export type NationalTeamAction = Extract<TeamAction, "heal" | "inspire" | "refresh">;

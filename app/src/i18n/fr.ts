@@ -1427,6 +1427,138 @@ export const fr: Strings = {
     unavailableBuild: "Personne n'a encore vérifié où cette version du jeu garde les contrats de sponsoring ; l'éditeur n'en montre donc aucun plutôt que de lire la mauvaise mémoire.",
     unavailableUnreadable: "L'éditeur a cherché les contrats de sponsoring là où il les attend dans cette version du jeu, mais ce qu'il a trouvé ne ressemble pas aux données du jeu ; il n'en montre donc aucun.",
   },
+
+  competitions: {
+    nav: "Compétitions",
+    search: "Rechercher des compétitions par nom, pays ou UID",
+    summary: (total, shown) =>
+      total > shown ? `${format(shown)} compétitions sur ${format(total)}` : `${format(total)} compétitions`,
+    empty: (query, filtered) => {
+      if (query === "") {
+        return filtered ? "Aucune compétition de ce pays n'a de règles d'effectif." : "Aucune compétition avec des règles d'effectif trouvée.";
+      }
+      return filtered ? `Aucune compétition de ce pays ne correspond à « ${query} ».` : `Aucune compétition ne correspond à « ${query} ».`;
+    },
+    reading: "Lecture des règles d'effectif des compétitions dans le jeu… Cela prend quelques secondes.",
+    readAgain: "Relire",
+    readAgainTitle: "Relire les règles dans le jeu",
+    listNote: "Les compétitions sans règles d'effectif ne sont pas listées.",
+    unavailableTitle: "Aucune règle d'effectif à afficher",
+    unavailableBuild: "Personne n'a encore vérifié où cette version du jeu garde les règles d'effectif des compétitions : l'éditeur n'en montre donc aucune plutôt que de lire la mauvaise mémoire.",
+    unavailableUnreadable: "L'éditeur a cherché les règles d'effectif là où il les attend dans cette version du jeu, mais ce qu'il a trouvé ne ressemble pas aux données du jeu : il n'en montre donc aucune.",
+    columns: {
+      name: "Compétition",
+      nation: "Pays",
+      level: "Niveau",
+      rules: "Règles",
+      uid: "UID",
+    },
+    level: (level) => format(level),
+    rulesCount: (current, next) =>
+      next === null || next === current ? format(current) : `${format(current)} · ${format(next)}`,
+    rulesCountTitle: "Règles d'effectif cette saison, et la saison prochaine si leur nombre diffère",
+    international: "International",
+    filters: {
+      nation: "Pays",
+      allNations: "Tous les pays",
+    },
+    title: "Règles d'effectif",
+    intro: "Combien de joueurs d'un type un effectif peut inscrire, ou une équipe aligner pour un match, dans cette compétition. Qui compte comme étranger ou comme formé localement, c'est le jeu qui en décide.",
+    seasons: { current: "Cette saison", next: "Saison prochaine" },
+    began: (year) => `a commencé en ${year}`,
+    begins: (year) => `commence en ${year}`,
+    noRules: "Aucune règle d'effectif.",
+    noNext: "Le jeu ne contient aucune règle pour la saison prochaine.",
+    ruleColumns: {
+      rule: "Règle",
+      where: "Compté dans",
+      limit: "Limite",
+      value: "Joueurs",
+    },
+    atMost: "Au plus",
+    atLeast: "Au moins",
+    scopes: {
+      squad: "Effectif",
+      matchSquad: "Groupe du match",
+      eleven: "Onze",
+      startingEleven: "Onze de départ",
+      bench: "Banc",
+    },
+    who: {
+      squadSize: "Joueurs dans l'effectif",
+      foreign: "Joueurs étrangers",
+      foreignExceptAsian: "Joueurs étrangers, hors Asiatiques",
+      foreignGoalkeepers: "Gardiens de but étrangers",
+      nonEu: "Joueurs hors UE",
+      domestic: "Joueurs nationaux",
+      domesticGoalkeepers: "Gardiens de but nationaux",
+      goalkeepers: "Gardiens de but",
+      outfield: "Joueurs de champ",
+      nonHomegrown: "Joueurs non formés localement",
+      youthContract: "Joueurs sous contrat jeune",
+      fullTime: "Joueurs sous contrat à plein temps",
+      amateur: "Joueurs amateurs",
+      youthOrAmateur: "Joueurs jeunes ou amateurs",
+      trialists: "Joueurs à l'essai",
+      loans: "Joueurs prêtés",
+      internationals: "Joueurs internationaux",
+      otherTeam: "Joueurs inscrits dans une autre équipe",
+      firstTeam: "Joueurs inscrits dans l'équipe première",
+      over: (age) => `Joueurs de plus de ${format(age)} ans`,
+      under: (age) => `Joueurs de moins de ${format(age)} ans`,
+      domesticUnder: (age) => `Joueurs nationaux de moins de ${format(age)} ans`,
+      foreignOver: (age) => `Joueurs étrangers de plus de ${format(age)} ans`,
+      goalkeepersOver: (age) => `Gardiens de but de plus de ${format(age)} ans`,
+      outfieldOver: (age) => `Joueurs de champ de plus de ${format(age)} ans`,
+      homegrown: (from, fromAge, toAge) => {
+        const ages = `formés entre ${format(fromAge)} et ${format(toAge)} ans`;
+        if (from === "club") {
+          return `Formés au club (${ages})`;
+        }
+        return from === "nation" ? `Formés dans le pays (${ages})` : `Formés au club ou dans le pays (${ages})`;
+      },
+      homegrownUnder: (age, fromAge, toAge) =>
+        `Joueurs de moins de ${format(age)} ans formés dans le pays (formés entre ${format(fromAge)} et ${format(toAge)} ans)`,
+    },
+    unnamedKind: (kind) => `Règle de type ${format(kind)}`,
+    gameKey: (key) => `Nom de cette règle dans le jeu : ${key}`,
+    teamsFrom: (competition) => `Équipes de ${competition}`,
+    teamsFromUnknown: "Équipes d'une autre division",
+    condition: (code) => `Conditionnelle (${code})`,
+    conditionTitle: "Le jeu applique cette règle sous une condition qui lui est propre, que l'éditeur n'explique pas encore.",
+    years: (from, to) => {
+      if (from !== null && to !== null) {
+        return from === to ? `${from}` : `${from}–${to}`;
+      }
+      return from !== null ? `à partir de ${from}` : `jusqu'en ${to}`;
+    },
+    yearsTitle: "Les saisons pour lesquelles les règles du pays donnent cette règle, d'après l'année où une saison commence",
+    leftAlone: "Laissée telle quelle",
+    notSavedTitle: "Les règles du pays telles qu'une sauvegarde les garde ne contiennent pas cette règle : une modification disparaîtrait au chargement de la sauvegarde. L'éditeur la laisse telle quelle.",
+    notACountTitle: "Un montant d'argent, pas un nombre de joueurs : l'éditeur le laisse tel quel.",
+    noneChangeable: "Ces règles ne peuvent pas encore être modifiées, à aucune date\u00a0: l'éditeur ne modifie une règle que s'il la trouve aussi dans les règles que la sauvegarde conserve, pour que la modification soit encore là au chargement de la sauvegarde, et il n'y a pas trouvé celles de cette compétition. Pour l'instant, c'est le cas des championnats féminins, de la Major League Soccer et de quelques coupes.",
+    unsavedNote: "Le jeu ne garde les règles de cette compétition dans aucune sauvegarde\u00a0: il les crée lui-même à chaque chargement, et de nouveau à chaque saison. L'éditeur maintient donc une modification ici\u00a0: il l'écrit dans le jeu en cours, la retient pour cette carrière et la réécrit chaque fois qu'il se connecte ou relit les données. Après avoir chargé une sauvegarde, connectez l'éditeur (ou cliquez sur Recharger les données) une fois pour que la modification revienne. Annuler dans Modifications la relâche.",
+    heldTag: "Maintenue",
+    heldTitle: (original) => `L'éditeur maintient ce nombre et le réécrit chaque fois qu'il lit le jeu. Celui du jeu est ${format(original)}.`,
+    savedDiffers: (value) => `Les règles de la sauvegarde indiquent ${format(value)}`,
+    savedDiffersTitle: "Le jeu suit la liste et la refait à partir des règles de la sauvegarde quand il la charge. Enregistrer une modification ici change les deux.",
+    edit: "Modifier les règles",
+    editTitle: "Modifier les nombres des règles d'effectif de cette compétition",
+    save: "Enregistrer les règles",
+    saving: "Enregistrement…",
+    cancel: "Annuler",
+    invalid: (most) => `Saisissez un nombre entier de 0 à ${format(most)}.`,
+    shared: (names) => `Ces règles sont aussi celles de ${names} : une modification vaut aussi pour elles.`,
+    currentNote: (turn) =>
+      `Une modification ici vaut pour le reste de cette saison${turn === null ? "" : `, qui change le ${turn}`}. Le jeu compte les effectifs avec elle tout de suite ; ses propres écrans la montrent une fois un jour passé.`,
+    nextNote: (turn) =>
+      `Une modification ici devient la règle de cette saison au changement de saison${turn === null ? "" : ` (le ${turn})`} et reste pour les saisons suivantes, sauf si le jeu a ses propres règles pour une saison ultérieure. La page Saison prochaine du jeu la montre tout de suite.`,
+    lasts: "Une modification est écrite dans la liste que le jeu suit et dans les règles du pays que la sauvegarde garde ; elle est donc de nouveau là au chargement de la sauvegarde. Une modification d'une règle de cette saison prend fin au changement de saison : les règles de la saison prochaine prennent sa place. Annuler dans Modifications remet l'ancien nombre.",
+    infoLabel: "Comment une modification d'une règle d'effectif dure",
+    ruleField: (season, rule) => `Règle d'effectif, ${season.toLowerCase()} : ${rule}`,
+    alsoFor: (count) =>
+      count === 1 ? "Aussi pour 1 autre compétition aux mêmes règles" : `Aussi pour ${format(count)} autres compétitions aux mêmes règles`,
+  },
   app: {
     stage: "bêta",
     settingsLabel: "Paramètres",
@@ -1703,7 +1835,7 @@ export const fr: Strings = {
       change: "Modification",
       status: "Statut",
     },
-    kinds: { player: "Joueur", staff: "Staff", club: "Club", nationalTeam: "Sélection" },
+    kinds: { player: "Joueur", staff: "Staff", club: "Club", nationalTeam: "Sélection", competition: "Compétition" },
     stored: (change) => `valeur brute ${change}`,
     undone: (time) => `Annulée à ${time}`,
     undo: "Annuler",
@@ -2367,6 +2499,23 @@ export const fr: Strings = {
     cancel: "Annuler",
   },
 
+  batchTraits: {
+    title: "Caractéristiques de l'équipe",
+    addMode: "+ Ajouter à l'équipe",
+    removeMode: "- Retirer de l'équipe",
+    addHint: "Applique les caractéristiques sélectionnées aux joueurs de cette équipe qui ne les ont pas. Les caractéristiques existantes sont conservées.",
+    removeHint: "Retire les caractéristiques sélectionnées aux joueurs de cette équipe qui les possèdent. Les autres caractéristiques restent inchangées.",
+    noneSelected: "Aucune caractéristique sélectionnée dans ce mode",
+    selectedCount: (count: number) => (count === 1 ? "1 caractéristique sélectionnée" : `${format(count)} caractéristiques sélectionnées`),
+    deselectAll: "Tout désélectionner",
+    oppositeModeNote: "Sélectionnée dans l'autre mode",
+    applyNote: (players: number) => `S'applique à ${format(players)} joueurs · Peut être annulé en 1 clic`,
+    emptySquad: (players: number) => `Effectif de ${format(players)} joueurs`,
+    cancel: "Annuler",
+    apply: "Appliquer",
+    applying: "Application en cours…",
+  },
+
   squad: {
     teamsLabel: "Équipe",
     teams: {
@@ -2425,6 +2574,8 @@ export const fr: Strings = {
     refreshAllTitle:
       "Porter l'énergie et la forme physique de chaque joueur de cette équipe à 100\u00a0%, et le reposer complètement " +
       "(fatigue -500)",
+    batchTraits: "Caractéristiques du groupe",
+    batchTraitsTitle: "Ajouter ou retirer des gestes préférés pour les joueurs de cette équipe",
     maxAll: "Attributs au maximum",
     maxAllTitle:
       "Porter chaque attribut de chaque joueur de cette équipe à son meilleur niveau\u00a0: 20, et 1 pour la tendance à " +
@@ -2439,6 +2590,34 @@ export const fr: Strings = {
       "autre tactique demande un autre clic. Le jeu affiche les modifications une fois qu'il avance\u00a0: appuyez " +
       "sur Continuer dans le jeu",
     atItsBestSkipped: (step, reason) => `Étape «\u00a0${step}\u00a0» sautée\u00a0: ${reason}`,
+    destroy: "Équipe au plus bas",
+    destroyTitle:
+      "Amener chaque joueur de cette équipe à son plus bas\u00a0: moral et état d'esprit, énergie, forme physique et " +
+      "fatigue, cohésion avec le club et, si vous choisissez la tactique de l'équipe, sa connaissance de celle-ci. " +
+      "Aucune valeur n'est améliorée\u00a0; les attributs, les blessures et les suspensions ne changent pas. Une " +
+      "question est posée d'abord, et tout se défait d'un seul coup",
+    destroySteps: {
+      demoralize: "Moral et état d'esprit",
+      exhaust: "Énergie et forme",
+      minCohesion: "Cohésion",
+      minTactics: "Tactique",
+    },
+    moreActions: "Plus d'actions",
+    moreActionsTitle: "Les actions sur toute l'équipe, une par une",
+    destroyDialog: {
+      title: "Mettre l'équipe au plus bas\u00a0?",
+      doesHeading: "Pour chaque joueur de la liste, y compris ceux prêtés ailleurs",
+      does: [
+        "Moral à 1, le minimum\u00a0; état d'esprit et satisfaction temps de jeu à -100",
+        "Énergie à 0\u00a0%, forme physique à 35\u00a0% et fatigue à 1000",
+        "Cohésion avec le club à 1, pour ceux qui en ont une",
+        "Connaissance de la tactique au minimum, si vous choisissez la tactique de l'équipe",
+      ],
+      keeps: "Aucune valeur n'est améliorée. Les attributs, les blessures et les suspensions restent tels quels.",
+      ownClub: "C'est une équipe de votre propre club.",
+      hint: "Tout se défait d'un seul coup, avant que le jeu n'avance.",
+      cancel: "Annuler",
+    },
     hint:
       "Les actions concernent chaque joueur de la liste, y compris ceux prêtés ailleurs. L'annulation se trouve aussi " +
       "dans la vue Modifications.",
@@ -3116,6 +3295,31 @@ export const fr: Strings = {
     },
   },
 
+  /** A player's development: the Development tab of his profile, the note under his abilities, the squad's arrows (see en.ts). */
+  progress: {
+    tabsLabel: "Sections du profil du joueur",
+    tabs: { overview: "Profil", progress: "Progression" },
+    lockedWhileEdited: "Terminez la modification pour ouvrir cet onglet",
+    openTab: "Ouvrir l'onglet Progression",
+    loading: "Lecture des relevés…",
+    failed: (reason: string) => `Impossible de lire les relevés\u00a0: ${reason}`,
+    since: (date: string) => `depuis le ${date}`,
+    change: (from: string, to: string, date: string) => `${from} → ${to} depuis le ${date}`,
+    rangeLabel: "Période",
+    ranges: { quarter: "3 mois", year: "1 an", all: "Tout" },
+    recorded: (count: number, first: string) => `Relevés\u00a0: ${count} · le premier le ${first}`,
+    abilityTitle: "Niveau",
+    valueTitle: "Valeur",
+    attributesTitle: "Attributs qui ont changé",
+    noAttributeChanges: (date: string) => `Aucun attribut n'a changé depuis le ${date}.`,
+    emptyTitle: "Rien à comparer pour l'instant",
+    emptyText:
+      "L'application note le niveau, la valeur et les attributs de tous les joueurs environ une fois par semaine du jeu, chaque fois qu'elle lit les données du jeu. Continuez à jouer, relisez les données, et la progression de ce joueur s'affichera ici.",
+    offTitle: "Aucun relevé pour cette sauvegarde",
+    offText:
+      "L'application tient des relevés pour une sauvegarde où vous dirigez un entraîneur, sur une version du jeu dont les données passent ses contrôles.",
+  },
+
   /** The command palette and the names of the keys in the keyboard shortcuts (see en.ts). */
   palette: {
     button: "Rechercher",
@@ -3184,6 +3388,36 @@ export const fr: Strings = {
     link: "Nouveautés",
     command: "Nouveautés de cette version",
     versions: {
+      "0.5.4": [
+        {
+          title: "Les transferts dans l'historique du joueur.",
+          text: "Transfert, désormais le premier choix quand vous déplacez un joueur, prépare le transfert pour le lendemain dans le jeu. Le jeu le réalise comme l'un des siens, paie l'indemnité et inscrit le transfert dans l'historique de sa carrière, où les matchs de cette saison avec son ancien club gardent leur propre ligne. Déplacer maintenant le déplace toujours sur-le-champ.",
+        },
+        {
+          title: "Équipe au maximum, et au plus bas.",
+          text: "Dans l'onglet Effectif d'un club, un seul clic soigne, inspire et régénère toute l'équipe et porte sa cohésion et sa tactique au maximum. Équipe au plus bas, après une question, fait l'inverse. Un seul Annuler défait l'un comme l'autre, et les actions une par une sont dans Plus d'actions.",
+        },
+        {
+          title: "Caractéristiques du groupe.",
+          text: "Dans l'onglet Effectif d'un club, sous Plus d'actions, Caractéristiques du groupe donne à tous les joueurs de l'équipe les caractéristiques que vous choisissez, ou les leur retire, et laisse les autres telles quelles. Un seul Annuler revient en arrière.",
+        },
+        {
+          title: "Transférer tout le staff.",
+          text: "L'onglet Staff d'un club transfère tout son staff vers un autre club en une fois, chacun au même poste, et un seul Annuler les fait tous revenir.",
+        },
+        {
+          title: "Sélections.",
+          text: "L'effectif de l'équipe A d'une sélection gagne Tout soigner, Inspirer l'équipe et Tout régénérer, et son tableau montre l'énergie, la forme physique et le moral.",
+        },
+        {
+          title: "Contrats de sponsoring.",
+          text: "Les finances d'un club listent ses contrats de sponsoring, en lecture seule, avec ce que chacun paie par saison et au total, sa durée et ce que change une relégation. Pour l'instant sous Game Pass 0.9.2524.0.",
+        },
+        {
+          title: "Correction.",
+          text: "Dans certaines carrières, la vérification du staff échouait alors que le staff était bien lu. Le staff restait alors en lecture seule, et soigner, Cohésion maximale et Tactique au maximum étaient refusés. Elle passe désormais.",
+        },
+      ],
       "0.5.3": [
         {
           title: "La mise à jour de FM27 du 17 novembre.",

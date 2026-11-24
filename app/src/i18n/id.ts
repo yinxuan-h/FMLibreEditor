@@ -1278,6 +1278,138 @@ export const id: Strings = {
     unavailableBuild: "Belum ada yang memeriksa di mana versi game ini menyimpan kesepakatan sponsor, jadi editor tidak menampilkannya daripada membaca memori yang salah.",
     unavailableUnreadable: "Editor mencari kesepakatan sponsor di tempat yang diduganya pada versi game ini, tetapi yang ditemukan tidak terbaca seperti data game, jadi tidak ditampilkan.",
   },
+
+  competitions: {
+    nav: "Kompetisi",
+    search: "Cari kompetisi berdasarkan nama, negara, atau UID",
+    summary: (total: number, shown: number) =>
+      total > shown ? `${format(shown)} dari ${format(total)} kompetisi` : `${format(total)} kompetisi`,
+    empty: (query: string, filtered: boolean) => {
+      if (query === "") {
+        return filtered ? "Tidak ada kompetisi di negara ini yang punya aturan skuad." : "Tidak ada kompetisi dengan aturan skuad.";
+      }
+      return filtered ? `Tidak ada kompetisi di negara ini yang cocok dengan “${query}”.` : `Tidak ada kompetisi yang cocok dengan “${query}”.`;
+    },
+    reading: "Membaca aturan skuad kompetisi dari game… Ini butuh beberapa detik.",
+    readAgain: "Baca ulang",
+    readAgainTitle: "Baca ulang aturan dari game",
+    listNote: "Kompetisi tanpa aturan skuad tidak ditampilkan.",
+    unavailableTitle: "Tidak ada aturan skuad untuk ditampilkan",
+    unavailableBuild: "Belum ada yang memeriksa di mana versi game ini menyimpan aturan skuad kompetisi, jadi editor tidak menampilkannya daripada membaca memori yang salah.",
+    unavailableUnreadable: "Editor mencari aturan skuad di tempat yang diharapkan pada versi game ini, tetapi yang ditemukan tidak terbaca seperti data game, jadi tidak ditampilkan.",
+    columns: {
+      name: "Kompetisi",
+      nation: "Negara",
+      level: "Tingkat",
+      rules: "Aturan",
+      uid: "UID",
+    },
+    level: (level: number) => format(level),
+    rulesCount: (current: number, next: number | null) =>
+      next === null || next === current ? format(current) : `${format(current)} · ${format(next)}`,
+    rulesCountTitle: "Aturan skuad musim ini, dan musim depan jika jumlahnya berbeda",
+    international: "Internasional",
+    filters: {
+      nation: "Negara",
+      allNations: "Semua negara",
+    },
+    title: "Aturan skuad",
+    intro: "Berapa banyak pemain dari satu jenis yang boleh didaftarkan sebuah skuad, atau dipilih sebuah tim untuk satu pertandingan, di kompetisi ini. Siapa yang dihitung sebagai pemain asing atau binaan sendiri ditentukan oleh game sendiri.",
+    seasons: { current: "Musim ini", next: "Musim depan" },
+    began: (year: number) => `dimulai tahun ${year}`,
+    begins: (year: number) => `akan dimulai tahun ${year}`,
+    noRules: "Tidak ada aturan skuad.",
+    noNext: "Game tidak menyimpan aturan untuk musim depan.",
+    ruleColumns: {
+      rule: "Aturan",
+      where: "Dihitung di",
+      limit: "Batas",
+      value: "Pemain",
+    },
+    atMost: "Maksimal",
+    atLeast: "Minimal",
+    scopes: {
+      squad: "Skuad",
+      matchSquad: "Skuad pertandingan",
+      eleven: "Sebelas pemain",
+      startingEleven: "Susunan pemain inti",
+      bench: "Bangku cadangan",
+    },
+    who: {
+      squadSize: "Pemain di skuad",
+      foreign: "Pemain asing",
+      foreignExceptAsian: "Pemain asing, kecuali pemain Asia",
+      foreignGoalkeepers: "Kiper asing",
+      nonEu: "Pemain non-UE",
+      domestic: "Pemain lokal",
+      domesticGoalkeepers: "Kiper lokal",
+      goalkeepers: "Kiper",
+      outfield: "Pemain lapangan",
+      nonHomegrown: "Pemain yang bukan binaan sendiri",
+      youthContract: "Pemain berkontrak junior",
+      fullTime: "Pemain berkontrak penuh waktu",
+      amateur: "Pemain amatir",
+      youthOrAmateur: "Pemain junior atau amatir",
+      trialists: "Pemain uji coba",
+      loans: "Pemain pinjaman",
+      internationals: "Pemain internasional",
+      otherTeam: "Pemain yang didaftarkan untuk tim lain",
+      firstTeam: "Pemain yang didaftarkan untuk tim utama",
+      over: (age: number) => `Pemain di atas ${format(age)} tahun`,
+      under: (age: number) => `Pemain di bawah ${format(age)} tahun`,
+      domesticUnder: (age: number) => `Pemain lokal di bawah ${format(age)} tahun`,
+      foreignOver: (age: number) => `Pemain asing di atas ${format(age)} tahun`,
+      goalkeepersOver: (age: number) => `Kiper di atas ${format(age)} tahun`,
+      outfieldOver: (age: number) => `Pemain lapangan di atas ${format(age)} tahun`,
+      homegrown: (from: "club" | "nation" | "clubOrNation", fromAge: number, toAge: number) => {
+        const ages = `dibina pada usia ${format(fromAge)}–${format(toAge)}`;
+        if (from === "club") {
+          return `Binaan klub (${ages})`;
+        }
+        return from === "nation" ? `Binaan negara (${ages})` : `Binaan klub atau negara (${ages})`;
+      },
+      homegrownUnder: (age: number, fromAge: number, toAge: number) =>
+        `Pemain binaan negara di bawah ${format(age)} tahun (dibina pada usia ${format(fromAge)}–${format(toAge)})`,
+    },
+    unnamedKind: (kind: number) => `Aturan jenis ${format(kind)}`,
+    gameKey: (key: string) => `Nama aturan ini di game: ${key}`,
+    teamsFrom: (competition: string) => `Tim dari ${competition}`,
+    teamsFromUnknown: "Tim dari divisi lain",
+    condition: (code: string) => `Bersyarat (${code})`,
+    conditionTitle: "Game menerapkan aturan ini dengan syarat miliknya sendiri, yang belum dijelaskan editor.",
+    years: (from: number | null, to: number | null) => {
+      if (from !== null && to !== null) {
+        return from === to ? `${from}` : `${from}–${to}`;
+      }
+      return from !== null ? `mulai ${from}` : `hingga ${to}`;
+    },
+    yearsTitle: "Musim-musim yang diberi aturan ini oleh aturan negara, menurut tahun dimulainya musim",
+    leftAlone: "Tidak diubah",
+    notSavedTitle: "Aturan negara sebagaimana disimpan dalam save tidak memuat aturan seperti itu, jadi perubahan akan hilang saat save dimuat: editor tidak mengubahnya.",
+    notACountTitle: "Ini jumlah uang, bukan jumlah pemain: editor tidak mengubahnya.",
+    noneChangeable: "Aturan ini belum bisa diubah, pada tanggal berapa pun: editor hanya mengubah aturan jika menemukannya juga di aturan yang disimpan dalam save, agar perubahan tetap ada saat save dimuat, dan aturan kompetisi ini belum ditemukan di sana. Sejauh ini hal itu berlaku untuk liga wanita, Major League Soccer, dan beberapa piala.",
+    unsavedNote: "Game tidak menyimpan aturan kompetisi ini di save mana pun: game membuatnya sendiri setiap kali memuat save, dan sekali lagi untuk setiap musim baru. Karena itu editor menahan perubahan di sini: menulisnya ke game yang sedang berjalan, mengingatnya untuk karier ini, dan menulisnya lagi setiap kali tersambung atau membaca data lagi. Setelah memuat save, sambungkan editor (atau tekan Muat ulang data) sekali agar perubahan kembali. Urungkan di Perubahan melepaskannya.",
+    heldTag: "Ditahan",
+    heldTitle: (original: number) => `Editor menahan jumlah ini dan menulisnya lagi setiap kali membaca game. Jumlah dari game sendiri adalah ${format(original)}.`,
+    savedDiffers: (value: number) => `Aturan di save berisi ${format(value)}`,
+    savedDiffersTitle: "Game berjalan menurut daftar, dan membuat daftar itu dari aturan di save saat memuatnya. Menyimpan perubahan di sini mengatur keduanya.",
+    edit: "Ubah aturan",
+    editTitle: "Ubah jumlah pada aturan skuad kompetisi ini",
+    save: "Simpan aturan",
+    saving: "Menyimpan…",
+    cancel: "Batal",
+    invalid: (most: number) => `Masukkan bilangan bulat dari 0 sampai ${format(most)}.`,
+    shared: (names: string) => `Aturan ini juga milik ${names}: perubahan berlaku juga untuk mereka.`,
+    currentNote: (turn: string | null) =>
+      `Perubahan di sini berlaku sampai akhir musim ini${turn === null ? "" : `; musim berganti pada ${turn}`}. Game langsung menghitung skuad dengan perubahan itu; layar game sendiri baru menampilkannya setelah satu hari berlalu.`,
+    nextNote: (turn: string | null) =>
+      `Perubahan di sini menjadi aturan musim ini saat musim berganti${turn === null ? "" : ` (${turn})`}, dan tetap berlaku pada musim-musim berikutnya kecuali game punya aturan sendiri untuk musim yang lebih jauh. Halaman Musim Depan di game langsung menampilkannya.`,
+    lasts: "Perubahan ditulis ke daftar yang dipakai game dan ke aturan negara yang disimpan save, jadi tetap ada saat save dimuat lagi. Perubahan pada aturan musim ini berakhir saat musim berganti: aturan musim depan menggantikannya. Urungkan di Perubahan mengembalikan jumlah lama.",
+    infoLabel: "Bagaimana perubahan aturan skuad bertahan",
+    ruleField: (season: string, rule: string) => `Aturan skuad, ${season.toLowerCase()}: ${rule}`,
+    alsoFor: (count: number) =>
+      count === 1 ? "Juga untuk 1 kompetisi lain dengan aturan yang sama" : `Juga untuk ${format(count)} kompetisi lain dengan aturan yang sama`,
+  },
   app: {
     stage: "beta",
     settingsLabel: "Pengaturan",
@@ -1531,7 +1663,7 @@ export const id: Strings = {
       change: "Perubahan",
       status: "Status",
     },
-    kinds: { player: "Pemain", staff: "Staf", club: "Klub", nationalTeam: "Tim nasional" },
+    kinds: { player: "Pemain", staff: "Staf", club: "Klub", nationalTeam: "Tim nasional", competition: "Kompetisi" },
     stored: (change: string) => `tersimpan ${change}`,
     undone: (time: string) => `Diurungkan pada ${time}`,
     undo: "Urungkan",
@@ -2148,6 +2280,23 @@ export const id: Strings = {
     cancel: "Batal",
   },
 
+  batchTraits: {
+    title: "Karakteristik tim",
+    addMode: "+ Tambah ke skuad",
+    removeMode: "- Hapus dari skuad",
+    addHint: "Menerapkan karakteristik yang dipilih ke pemain tim ini yang belum memilikinya. Karakteristik yang ada tetap dipertahankan.",
+    removeHint: "Menghapus karakteristik yang dipilih dari pemain tim ini yang memilikinya. Karakteristik lain tidak disentuh.",
+    noneSelected: "Tidak ada karakteristik yang dipilih dalam mode ini",
+    selectedCount: (count: number) => `${format(count)} karakteristik dipilih`,
+    deselectAll: "Hapus semua pilihan",
+    oppositeModeNote: "Dipilih dalam mode sebaliknya",
+    applyNote: (players: number) => `Berlaku untuk ${format(players)} pemain · Dapat dibatalkan dalam 1 klik`,
+    emptySquad: (players: number) => `Skuad berisi ${format(players)} pemain`,
+    cancel: "Batal",
+    apply: "Terapkan",
+    applying: "Menerapkan…",
+  },
+
   squad: {
     teamsLabel: "Tim",
     teams: {
@@ -2191,6 +2340,8 @@ export const id: Strings = {
     refreshAll: "Segarkan semua",
     refreshAllTitle:
       "Atur energi dan ketajaman bertanding setiap pemain di tim ini ke 100%, dan istirahatkan sepenuhnya (keletihan -500)",
+    batchTraits: "Karakteristik skuad",
+    batchTraitsTitle: "Tambah atau hapus gerakan favorit pemain di tim ini",
     maxAll: "Maksimalkan atribut",
     maxAllTitle:
       "Atur setiap atribut setiap pemain di tim ini ke nilai terbaiknya: 20, dan 1 untuk kerentanan cedera dan kekasaran",
@@ -2203,6 +2354,34 @@ export const id: Strings = {
       "enam minggu, dan taktik lain perlu ditekan sekali lagi. Game menampilkan perubahan setelah waktu berjalan: " +
       "tekan Lanjutkan di game",
     atItsBestSkipped: (step, reason) => `“${step}” dilewati: ${reason}`,
+    destroy: "Tim dalam kondisi terburuk",
+    destroyTitle:
+      "Buat setiap pemain di tim ini dalam kondisi terburuknya: moral dan kebahagiaan, energi, ketajaman bertanding " +
+      "dan keletihan, kekompakan dengan klub, serta pemahaman taktik jika Anda yang memilih taktik tim. Tidak ada " +
+      "nilai yang dibuat lebih baik; atribut, cedera, dan larangan bermain tetap. Ditanyakan dulu, dan satu " +
+      "“Urungkan” membatalkan semuanya",
+    destroySteps: {
+      demoralize: "Moral dan kebahagiaan",
+      exhaust: "Energi dan ketajaman",
+      minCohesion: "Kekompakan",
+      minTactics: "Taktik",
+    },
+    moreActions: "Tindakan lain",
+    moreActionsTitle: "Tindakan untuk seluruh tim, satu per satu",
+    destroyDialog: {
+      title: "Buat tim dalam kondisi terburuk?",
+      doesHeading: "Untuk setiap pemain di daftar, termasuk yang sedang dipinjamkan",
+      does: [
+        "Moral ke 1, yang terendah; kebahagiaan dan kebahagiaan waktu bermain ke -100",
+        "Energi ke 0%, ketajaman bertanding ke 35%, dan keletihan ke 1000",
+        "Kekompakan dengan klub ke 1, bagi yang memilikinya",
+        "Pemahaman taktik ke yang terendah, jika Anda yang memilih taktik tim",
+      ],
+      keeps: "Tidak ada nilai yang dibuat lebih baik. Atribut, cedera, dan larangan bermain tetap seperti semula.",
+      ownClub: "Ini tim dari klub Anda sendiri.",
+      hint: "Satu “Urungkan” membatalkan semuanya, sebelum game berjalan.",
+      cancel: "Batal",
+    },
     hint: "Tindakan ini mencakup setiap pemain di daftar, termasuk yang sedang dipinjamkan. Urungkan juga ada di tampilan Perubahan.",
 
     freezeLabel: "Bekukan seluruh tim",
@@ -2850,6 +3029,31 @@ export const id: Strings = {
     } as Record<string, (value: string) => string>,
   },
 
+  /** A player's development: the Development tab of his profile, the note under his abilities, the squad's arrows (see en.ts). */
+  progress: {
+    tabsLabel: "Bagian profil pemain",
+    tabs: { overview: "Profil", progress: "Perkembangan" },
+    lockedWhileEdited: "Selesaikan pengeditan untuk membuka tab ini",
+    openTab: "Buka tab Perkembangan",
+    loading: "Membaca catatan…",
+    failed: (reason: string) => `Catatan tidak dapat dibaca: ${reason}`,
+    since: (date: string) => `sejak ${date}`,
+    change: (from: string, to: string, date: string) => `${from} → ${to} sejak ${date}`,
+    rangeLabel: "Periode",
+    ranges: { quarter: "3 bulan", year: "1 tahun", all: "Semua" },
+    recorded: (count: number, first: string) => `Catatan: ${count} · pertama pada ${first}`,
+    abilityTitle: "Kemampuan",
+    valueTitle: "Nilai",
+    attributesTitle: "Atribut yang berubah",
+    noAttributeChanges: (date: string) => `Tidak ada atribut yang berubah sejak ${date}.`,
+    emptyTitle: "Belum ada yang bisa dibandingkan",
+    emptyText:
+      "Aplikasi mencatat kemampuan, nilai, dan atribut semua pemain kira-kira sekali seminggu waktu permainan, setiap kali membaca data permainan. Lanjutkan bermain, baca ulang datanya, dan perkembangan pemain ini akan tampil di sini.",
+    offTitle: "Tidak ada catatan untuk simpanan ini",
+    offText:
+      "Aplikasi menyimpan catatan untuk simpanan yang memiliki manajer Anda, pada versi permainan yang datanya lolos pemeriksaan aplikasi.",
+  },
+
   /** The command palette and the names of the keys in the keyboard shortcuts (see en.ts). */
   palette: {
     button: "Cari",
@@ -2917,6 +3121,36 @@ export const id: Strings = {
     link: "Yang baru",
     command: "Yang baru di versi ini",
     versions: {
+      "0.5.4": [
+        {
+          title: "Transfer di riwayat pemain.",
+          text: "Transfer, kini pilihan pertama saat kamu memindahkan pemain, mengatur kepindahan untuk hari berikutnya di game. Game menjalankannya seperti transfernya sendiri: membayar biaya transfer dan mencatat kepindahan itu di riwayat kariernya, dengan pertandingan musim ini di klub lamanya tetap di baris tersendiri. Pindah sekarang tetap memindahkannya saat itu juga.",
+        },
+        {
+          title: "Tim dalam kondisi prima, dan terburuk.",
+          text: "Di tab Skuad sebuah klub, satu klik menyembuhkan, menginspirasi, dan menyegarkan seluruh tim serta membawa kekompakan dan taktiknya ke puncak; Tim dalam kondisi terburuk, setelah sebuah pertanyaan, melakukan kebalikannya. Satu Urungkan membatalkan keduanya, dan tindakan satu per satu ada di Tindakan lain.",
+        },
+        {
+          title: "Karakteristik skuad.",
+          text: "Di tab Skuad sebuah klub, di menu Tindakan lain, Karakteristik skuad memberi semua pemain tim sifat yang kamu pilih, atau menghapusnya, dan membiarkan sifat lainnya apa adanya. Satu Urungkan membatalkannya.",
+        },
+        {
+          title: "Pindahkan semua staf.",
+          text: "Tab Staf sebuah klub memindahkan seluruh stafnya ke klub lain sekaligus, masing-masing di jabatan yang sama, dan satu Urungkan mengembalikan mereka semua.",
+        },
+        {
+          title: "Tim nasional.",
+          text: "Skuad senior tim nasional kini punya Sembuhkan semua, Inspirasi semua, dan Segarkan semua, dan tabelnya menampilkan energi, ketajaman bertanding, dan moral.",
+        },
+        {
+          title: "Kesepakatan sponsor.",
+          text: "Keuangan sebuah klub menampilkan kesepakatan sponsornya, hanya untuk dibaca: berapa yang dibayar masing-masing per musim dan secara total, masa berlakunya, dan apa yang berubah jika terdegradasi. Sejauh ini di Game Pass 0.9.2524.0.",
+        },
+        {
+          title: "Perbaikan.",
+          text: "Di beberapa karier, pemeriksaan staf gagal padahal staf terbaca dengan benar, sehingga staf hanya bisa dibaca dan penyembuhan, Kekompakan maksimal, serta Maksimalkan taktik ditolak. Sekarang lolos.",
+        },
+      ],
       "0.5.3": [
         {
           title: "Pembaruan FM27 tanggal 17 November.",

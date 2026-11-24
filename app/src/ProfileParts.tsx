@@ -76,6 +76,8 @@ interface ProfileFrameProps {
   /** The abilities of a person, under the close button; inputs where they are while the person is edited. */
   currentAbility?: number;
   potentialAbility?: number;
+  /** Under the abilities while the person is not edited: how the current ability moved (see `AbilityTrend`). */
+  abilityNote?: ReactNode;
   /** Under the close button instead of the abilities, e.g. the reputation of a club. */
   side?: ReactNode;
   /** Buttons before Edit in the header, e.g. the player's Compare button. */
@@ -107,7 +109,7 @@ interface ProfileFrameProps {
  */
 export function ProfileFrame(props: ProfileFrameProps) {
   const { picture, name, fullName, badge, meta, vitals, currentAbility, potentialAbility } = props;
-  const { side, actions, tabs, wide, modal = false, loaded, onClose, editing, children } = props;
+  const { side, actions, tabs, wide, modal = false, loaded, onClose, editing, children, abilityNote } = props;
   const closeProfile = editing ? () => editing.guardClose(onClose) : onClose;
   const onEscape = editing ? () => editing.escape(onClose) : onClose;
   const panelWidth = usePanelWidth(wide ? "wide" : "profile");
@@ -197,6 +199,7 @@ export function ProfileFrame(props: ProfileFrameProps) {
                   </EditableValue>
                 </div>
               ))}
+            {editing?.stage !== "edit" && abilityNote}
           </div>
         </header>
 
@@ -244,6 +247,8 @@ export interface RatingRow {
   title?: string;
   /** A low value is the good one, so the colours run the other way. */
   lowerIsBetter?: boolean;
+  /** How the value moved lately, shown as a small arrow before it: up or down, and whether that is for the better. */
+  trend?: { up: boolean; good: boolean; title: string };
 }
 
 /** Ratings where a low value is the good one. */
@@ -314,6 +319,11 @@ function RatingItem({ row }: { row: RatingRow }) {
         </dd>
       ) : (
         <dd className={row.value === undefined ? "value" : `value ${tierClass(row.value, row.lowerIsBetter)}`}>
+          {row.trend && (
+            <span className={`trend ${row.trend.good ? "good" : "bad"}`} title={row.trend.title} aria-label={row.trend.title}>
+              {row.trend.up ? "▲" : "▼"}
+            </span>
+          )}
           {row.value ?? profileText.none}
         </dd>
       )}

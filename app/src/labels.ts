@@ -13,6 +13,7 @@
 import { formatNumber } from "./format";
 import { intlLocale, strings } from "./i18n";
 import type { Strings } from "./i18n/en";
+import { ruleFieldLabel } from "./squadRules";
 import type { CaptainRole, City, EditEntity, Nation } from "./types";
 
 export const ATTRIBUTE_LABELS = strings.attributes;
@@ -137,6 +138,8 @@ export const leaguePrizesText = strings.leaguePrizes;
 export const sponsorshipsText = strings.sponsorships;
 /** The Clubs tab's national teams: the list, the profile of a national team and why there may be none. */
 export const nationalText = strings.national;
+/** The Competitions tab: the competitions with squad rules, and the rules of the one picked, season by season. */
+export const competitionsText = strings.competitions;
 
 /**
  * The app around the lists: the sidebar (and the note at its foot, which depends on the connection, see
@@ -211,6 +214,9 @@ export function nationalTeamLabel(kind: number): string {
 
 /** A club's squad: the tab of its profile with its teams' players, the actions on a team and the captains. */
 export const squadText = strings.squad;
+
+/** Batch traits dialog: the dialog that adds or removes preferred moves for a squad. */
+export const batchTraitsText = strings.batchTraits;
 
 /** The kind of team the game calls a B team (see `ClubTeam.kind`). */
 const B_TEAM_KIND = 3;
@@ -290,6 +296,9 @@ export function fieldLabel(entity: EditEntity, key: string): string {
       const place = Number(key.split(".")[2]);
       return name === "place" && Number.isInteger(place) ? strings.leaguePrizes.placeField(place) : key;
     }
+    case "rule":
+      // A competition's squad rule: `rule.current.all_foreign_players_in_squad`.
+      return entity === "competition" ? ruleFieldLabel(key) : key;
     case "team": {
       // A national team's other teams: "team.10.reputation" is the reputation of its under-21s.
       const kind = Number(name);
@@ -306,6 +315,9 @@ export const scoutingText = strings.scouting;
 
 /** "My club", the page the app opens on (see `MyClub`). */
 export const homeText = strings.home;
+
+/** A player's development: the Development tab of his profile, the note under his abilities, a squad's changes. */
+export const progressText = strings.progress;
 
 /** The command palette and the keyboard shortcuts (see `CommandPalette` and `shortcuts.ts`). */
 export const paletteText = strings.palette;

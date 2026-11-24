@@ -99,6 +99,16 @@ before trusting them.
   exports folder: the time, the name and UID, the field, the old and new values as stored and as shown, the mass edit,
   when it was undone, and whether it is from an earlier session and in the game. That file is for people and
   spreadsheets: it is not the edit package below, which has to be read back.
+- [x] How a career's players develop: a record of every player's abilities, transfer value and attributes, added
+  to a file per career whenever the app reads the game and a week of the game's time has passed since the last
+  (only what changed; the lists already hold it, so the game is read no more for it). A player's profile has a
+  Development tab beside the profile itself: his abilities and value over time, a period to look back over, and the
+  attributes that changed. Under his abilities a note says how far the current ability moved over the last year,
+  the attributes that moved have an arrow, and a squad's table has the change before each current ability. No new
+  page: the records show where the values they are about already are. Checked on Game Pass 0.9.2524.0 with the
+  `progress` smoke test, whose second record is one it dates back itself (50,417 players: a first record of 3.4 MB,
+  a later one of a few hundred bytes where one player changed); not yet over weeks played in the game, nor on Steam
+  or macOS. A member of staff's development, and a view of who gained the most across the whole game, are not done.
 - [ ] Edit packages: the changes of the history written to a file, and read into another save of the same database,
   with a preview as a mass edit has (people found by UID and birth date, nations and cities by name), applied as one
   batch.
@@ -131,9 +141,9 @@ before trusting them.
   - `fmlibre-probe health` shows what the checks find, and Copy diagnostics in the app copies it for a bug report,
     with how close a list that was not found came;
   - the in-game date and the retirement manager found without a profile too: the date among the values in the
-    plugin's writable data that read as dates, by the contracts and the current injuries, and told from the value the
-    game keeps for the day before by where other builds keep it or by how well each fits; the manager's static from
-    where other builds keep it or from its class name;
+    plugin's writable data that read as dates, by the contracts and the current injuries, and told from the values the
+    game keeps for the day before or the day after by where other builds keep it, by how well each fits or by how
+    many places hold each; the manager's static from where other builds keep it or from its class name;
   - `fmlibre-probe profile` writes the profile of a new build and compares it with a built-in one, and
     `FMLIBRE_IGNORE_PROFILES=1` rehearses an update on a build the editor knows;
   - smoke tests in `tools/smoke` that drive the built app against the running game, the same on every storefront.
@@ -216,6 +226,15 @@ before trusting them.
   team action and one batch, undone with one Undo; attributes and bans stay. A step that cannot run (nobody
   injured, a lock, a build where Max tactics is off) is skipped and named, and the others still run (#227).
 - [ ] Team at its best for one player, in his profile.
+- [x] Destroy in the squad tab, the other way: morale 1, happiness and playing time happiness -100, no energy,
+  35% match sharpness, jadedness 1000, cohesion 1 and the tactic known at its least (where a human picks it), as
+  one team action and one batch after a question, undone with one Undo. No value is made better than it was (a
+  youth intake's lower sharpness stays); attributes, injuries and bans stay. The game itself held each of those
+  values on the Game Pass save of 0.9.2524.0 (energy down to 0.01%, jadedness up to 605). Team at its best,
+  a More actions menu with the single actions and Destroy now share the row, which fits every language.
+- [ ] Destroy for a rival's tactic: the editor reads no familiarity where no human picks the tactic, and the game
+  shows it nowhere, so whether the record alone counts there is not known.
+- [ ] A freeze that holds a team at its worst: Freeze energy and sharpness only keeps them from going down.
 
 ## Phase 7: what FMRTE, FM Live Editor and FM27€0 users reach for (in progress)
 
@@ -435,4 +454,20 @@ changes many at once, and undo.
     The competition bonuses (`+0x80`) are not named or edited yet.
   - [x] Keep a player from retiring (see Wave 2 above).
   - [x] Team cohesion and tactical familiarity (see Phase 6).
+  - [ ] A competition's squad rules: how many foreign players a squad may register, how many goalkeepers, how many
+    players in all. They are data the game keeps with the nation and makes its lists from, one for this season and
+    one for the next; the probe's `rules` reads both and changes a rule in the list and in the record a save keeps
+    (Game Pass 0.9.2524.0: the Süper Lig's limit on foreign players, seen in the game's Competition Stages and
+    Registration screens and kept by a save; on the Mac, Steam build 26620374 for Apple silicon, the Premier League's
+    squad size). The app has them in its Competitions tab, an area for each season, where a rule's count can be
+    changed and undone, on the builds whose profile says `squad_rules = true`: those two. Played over a turn of the
+    season on Game Pass: a change of this season's rule lasts the season, a change of next season's becomes this
+    season's at the turn and stays while the same rule file is in force (England has another from 2028). The rules
+    of UEFA's Champions, Europa and Conference League are kept in no record (the game makes them itself whenever it
+    loads a save), so the app holds a change of them: it writes it to the running game and again each time it
+    connects or reads the data again. The other continents' competitions are held the same way for now, though their
+    rules are in records of their continent, found and not read yet. Steam for Windows and the Intel half of the Mac
+    build are not checked; the rules of the women's leagues, MLS and a few cups are shown but not found in the
+    nation's rules, so they are left alone; adding a rule or taking one away is not done. See the
+    [league rules notes](recon/fm27-league-rules.md).
   - [ ] Epic.

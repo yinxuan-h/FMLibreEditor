@@ -1,13 +1,24 @@
 // The Squad tab of a club's profile: the players of each of its teams with the values a squad screen shows, the actions
-// on a whole team (heal everyone, lift every ban, give everyone the best morale, rest everyone), the boxes that freeze
-// the whole team, and the captains. What it writes is logged like any change, and undone from the Changes view, or at
-// once from the line under the buttons. A player's name opens his profile over the squad, which stays as it was behind
-// it.
+// on a whole team (Team at its best, Destroy after a question, and the single actions in a menu: heal everyone, lift
+// every ban, give everyone the best morale, rest everyone and more), the boxes that freeze the whole team, and the
+// captains. What it writes is logged like any change, and undone from the Changes view, or at once from the line under
+// the buttons. A player's name opens his profile over the squad, which stays as it was behind it.
 
 import { useContext, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { Ability } from "./Ability";
+import { BatchTraitsDialog } from "./BatchTraitsDialog";
 import { CaptainMenu } from "./CaptainMenu";
-import { changeLog, clubSquads, freezeTeam, setCaptain, teamAction, undoBatch, undoChange } from "./editing";
+import { DestroyDialog } from "./DestroyDialog";
+import {
+  batchTraitsTeam,
+  changeLog,
+  clubSquads,
+  freezeTeam,
+  setCaptain,
+  teamAction,
+  undoBatch,
+  undoChange,
+} from "./editing";
 import { describeError, formatNumber } from "./format";
 import { intlLocale } from "./i18n";
 import { InfoTip } from "./InfoTip";
@@ -24,12 +35,15 @@ import {
 import { undoFailureLines } from "./massDraft";
 import { percentText } from "./MedicalGroup";
 import { PlayerDialog } from "./PlayerProfile";
+import { AbilityChange, useEarlierAbilities } from "./PlayerProgress";
 import type { Loaded, PanelIds } from "./ProfileParts";
 import { SortHeader } from "./SortHeader";
+import { TeamActionMenu, type MenuAction, type MenuItemAction } from "./TeamActionMenu";
 import type {
   BatchUndo,
   CaptainRole,
   ClubTeam,
+  EarlierAbility,
   FreezeKind,
   LoggedChange,
   MassReport,
@@ -135,6 +149,12 @@ function sorted(players: readonly SquadPlayer[], { by, ascending }: SquadOrder):
   });
 }
 
+/** What Team at its best and Destroy do, in order, as the app's `AT_ITS_BEST` and `DESTROY`. */
+const STEPS: Partial<Record<TeamAction, readonly TeamAction[]>> = {
+  atItsBest: ["heal", "inspire", "refresh", "maxCohesion", "maxTactics"],
+  destroy: ["demoralize", "exhaust", "minCohesion", "minTactics"],
+};
+
 /** The role the player holds in the team, if any. */
 function roleOf(team: ClubTeam, uid: number): CaptainRole | null {
   return team.captain === uid ? "captain" : team.viceCaptain === uid ? "viceCaptain" : null;
@@ -179,6 +199,8 @@ function captainMessage(role: CaptainRole, player: string, captaincy: LoggedChan
 
 interface SquadTabProps {
   clubUid: number;
+  /** The club's name, which Destroy's question names. */
+  clubName: string;
   /** Changes when the game data is read again, so the squad is too. */
   version: number;
   /** The tab it is the panel of, in a club's profile. Without one it is a part of a page, named by `label`. */
@@ -192,9 +214,17 @@ interface SquadTabProps {
 }
 
 /** The squad of the club `clubUid`: a switch between its teams, the team's summary and actions, and its table. */
-export function SquadTab({ clubUid, version, panel, label, overview }: SquadTabProps) {
+export function SquadTab({ clubUid, clubName, version, panel, label, overview }: SquadTabProps) {
   const { editable, onEdited } = useContext(EditorContext);
   const loaded = useSquads(clubUid, version);
+  // The team Destroy's question is up for, and the button that asked it, which takes focus back.
+  const [destroying, setDestroying] = useState<ClubTeam | null>(null);
+  const destroyButton = useRef<HTMLButtonElement>(null);
+  const wasDestroying = useRef(false);
+  // Whether the Batch traits dialog is up, and the More actions button whose menu opens it, which takes focus back.
+  const [batchTraitsOpen, setBatchTraitsOpen] = useState(false);
+  const batchTraitsButton = useRef<HTMLButtonElement>(null);
+  const wasBatchTraitsOpen = useRef(false);
   // The team that is shown, by its place in the club's list.
   const [teamIndex, setTeamIndex] = useState(0);
   const [order, setOrder] = useState(DEFAULT_ORDER);
@@ -214,6 +244,8 @@ export function SquadTab({ clubUid, version, panel, label, overview }: SquadTabP
   // A team that is no longer there (the game changed) gives way to the first one.
   const team = teams?.find((candidate) => candidate.index === teamIndex) ?? teams?.[0];
   const players = useMemo(() => (team ? sorted(team.players, order) : []), [team, order]);
+  // What each of them was at the record the app compares with, where it keeps records of the career.
+  const earlier = useEarlierAbilities(team?.players.map((player) => player.uid) ?? [], version);
   const shownResult = result !== null && result.team === team?.index ? result : null;
 
   useEffect(() => {
@@ -237,6 +269,22 @@ export function SquadTab({ clubUid, version, panel, label, overview }: SquadTabP
     }
     wasShown.current = shown !== null;
   }, [shown]);
+
+  // So does Destroy's question, to its button, whichever the answer.
+  useEffect(() => {
+    if (wasDestroying.current && destroying === null) {
+      destroyButton.current?.focus();
+    }
+    wasDestroying.current = destroying !== null;
+  }, [destroying]);
+
+  // And so does the Batch traits dialog, to More actions, whether it applied or was closed.
+  useEffect(() => {
+    if (wasBatchTraitsOpen.current && !batchTraitsOpen) {
+      batchTraitsButton.current?.focus();
+    }
+    wasBatchTraitsOpen.current = batchTraitsOpen;
+  }, [batchTraitsOpen]);
 
   // A write can take the button that had focus out of play: Heal all once nobody is injured, Undo once it is done.
   // Focus then goes to the line under the buttons, so that someone using the keyboard stays in the tab.
@@ -276,15 +324,20 @@ export function SquadTab({ clubUid, version, panel, label, overview }: SquadTabP
   const act = (target: ClubTeam, action: TeamAction) =>
     write(target.index, async () => {
       const report = await teamAction(clubUid, target.index, action);
-      // Whether the step `step` ran: the action itself, or a step of Team at its best that was not skipped.
+      // Whether the step `step` ran: the action itself, or a step of Team at its best or Destroy that was not skipped.
       const ran = (step: TeamAction) =>
-        action === step || (action === "atItsBest" && !report.skipped.some((skipped) => skipped.action === step));
-      // Max cohesion leaves out the players who have no entry for the club yet, and Max tactics the history of those
-      // who do not train; each says how many.
-      const without = ran("maxCohesion") ? target.players.filter((player) => player.cohesion === null).length : 0;
-      const untrained = ran("maxTactics")
-        ? target.players.filter((player) => player.tactics !== null && !player.trains).length
-        : 0;
+        action === step ||
+        (STEPS[action]?.includes(step) === true && !report.skipped.some((skipped) => skipped.action === step));
+      // Cohesion leaves out the players who have no entry for the club yet, and tactics the history of those who do
+      // not train; each says how many.
+      const without =
+        ran("maxCohesion") || ran("minCohesion")
+          ? target.players.filter((player) => player.cohesion === null).length
+          : 0;
+      const untrained =
+        ran("maxTactics") || ran("minTactics")
+          ? target.players.filter((player) => player.tactics !== null && !player.trains).length
+          : 0;
       const skipped = report.skipped.map((step) => text.atItsBestSkipped(stepName(step.action), describeError(step.reason)));
       const notes = [
         text.written(report.applied),
@@ -297,6 +350,18 @@ export function SquadTab({ clubUid, version, panel, label, overview }: SquadTabP
         failed: false,
         problems: [...skipped, ...refusalLines(report.failed)],
         // An action that wrote nothing has nothing to take back.
+        undo: report.applied > 0 ? () => undoBatch(report.batch) : null,
+      };
+    });
+
+  const batchTraits = (target: ClubTeam, addTraits: number[], removeTraits: number[]) =>
+    write(target.index, async () => {
+      const report = await batchTraitsTeam(clubUid, target.index, addTraits, removeTraits);
+      return {
+        team: target.index,
+        message: text.written(report.applied),
+        failed: false,
+        problems: refusalLines(report.failed),
         undo: report.applied > 0 ? () => undoBatch(report.batch) : null,
       };
     });
@@ -399,7 +464,16 @@ export function SquadTab({ clubUid, version, panel, label, overview }: SquadTabP
           })}
 
           <div className="squad-actions">
-            <TeamActions team={team} editable={editable} busy={busy} onAction={(action) => void act(team, action)} />
+            <TeamActions
+              team={team}
+              editable={editable}
+              busy={busy}
+              onAction={(action) => void act(team, action)}
+              onDestroy={() => setDestroying(team)}
+              destroyRef={destroyButton}
+              onBatchTraits={() => setBatchTraitsOpen(true)}
+              batchTraitsRef={batchTraitsButton}
+            />
             <p className="note squad-hint">{text.hint}</p>
           </div>
 
@@ -453,6 +527,7 @@ export function SquadTab({ clubUid, version, panel, label, overview }: SquadTabP
                       opener.current = from;
                       setShown(player);
                     }}
+                    earlier={earlier.get(player.uid)}
                   />
                 ))}
               </tbody>
@@ -463,6 +538,29 @@ export function SquadTab({ clubUid, version, panel, label, overview }: SquadTabP
       )}
 
       {shown && <PlayerDialog player={shown} version={version} onClose={() => setShown(null)} />}
+      {destroying && (
+        <DestroyDialog
+          club={clubName}
+          team={destroying}
+          onConfirm={() => {
+            setDestroying(null);
+            void act(destroying, "destroy");
+          }}
+          onClose={() => setDestroying(null)}
+        />
+      )}
+
+      {batchTraitsOpen && team && (
+        <BatchTraitsDialog
+          team={team}
+          busy={busy}
+          onApply={async (addTraits, removeTraits) => {
+            await batchTraits(team, addTraits, removeTraits);
+            setBatchTraitsOpen(false);
+          }}
+          onClose={() => setBatchTraitsOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -509,7 +607,7 @@ function TeamSummary({ teams, team, onTeam }: TeamSummaryProps) {
   );
 }
 
-/** The name of the button of a step of Team at its best. */
+/** The name of a step of Team at its best or Destroy, for one it left out: its button's, or Destroy's for it. */
 function stepName(action: TeamAction): string {
   switch (action) {
     case "heal":
@@ -522,6 +620,11 @@ function stepName(action: TeamAction): string {
       return text.maxCohesion;
     case "maxTactics":
       return text.maxTactics;
+    case "demoralize":
+    case "exhaust":
+    case "minCohesion":
+    case "minTactics":
+      return text.destroySteps[action];
     default:
       return action;
   }
@@ -534,16 +637,34 @@ interface TeamActionsProps {
   /** Whether a write is under way. */
   busy: boolean;
   onAction: (action: TeamAction) => void;
+  /** Destroy asks first: this opens its question. */
+  onDestroy: () => void;
+  /** The Destroy button, which takes focus back once the question is answered. */
+  destroyRef: Ref<HTMLButtonElement>;
+  /** Opens the batch traits dialog for the shown team. */
+  onBatchTraits: () => void;
+  /** The More actions button, whose menu opens Batch traits, which takes focus back once its dialog is closed. */
+  batchTraitsRef: Ref<HTMLButtonElement>;
 }
 
 /**
- * Heal all, Lift bans, Inspire all, Refresh all, Max attributes, Max cohesion, Max tactics and Team at its best (the
- * five that leave attributes and bans alone, in one go) for the shown team. Heal
- * all and Lift bans say how many players are injured or banned and wait until somebody is, Max cohesion until
- * somebody's cohesion can be read and Max tactics until somebody's familiarity with the tactic can; every one waits
- * while the game cannot be written to, and says why.
+ * Team at its best (Heal all, Inspire all, Refresh all, Max cohesion and Max tactics in one go), the More actions menu
+ * with each action on its own (those five, Lift bans and Max attributes) and Batch traits, which opens its dialog, and
+ * Destroy in red, for the shown team: three buttons, which fit one line in every language. Heal all and Lift bans say
+ * how many players are injured or banned and wait until somebody is, Max cohesion until somebody's cohesion can be read
+ * and Max tactics until somebody's familiarity with the tactic can; every one waits while the game cannot be written
+ * to, and says why.
  */
-function TeamActions({ team, editable, busy, onAction }: TeamActionsProps) {
+function TeamActions({
+  team,
+  editable,
+  busy,
+  onAction,
+  onDestroy,
+  destroyRef,
+  onBatchTraits,
+  batchTraitsRef,
+}: TeamActionsProps) {
   const { readOnlyNote } = useContext(EditorContext);
   const injured = team.players.filter((player) => player.injuries > 0).length;
   const banned = team.players.filter((player) => player.bans > 0).length;
@@ -554,64 +675,48 @@ function TeamActions({ team, editable, busy, onAction }: TeamActionsProps) {
   const empty = team.players.length === 0;
   // What a button's hover text says: why it waits, or else what it does.
   const hover = (does: string, waiting: string | null) => (!editable ? readOnlyNote : (waiting ?? does));
+  const single = (action: MenuItemAction, label: string, does: string, waiting: string | null): MenuAction => ({
+    action,
+    label,
+    title: hover(does, waiting),
+    waiting: !editable || waiting !== null,
+  });
+  const singles = [
+    single("heal", text.healAll(injured), text.healAllTitle, injured === 0 ? text.healNone : null),
+    single("liftBans", text.liftAll(banned), text.liftAllTitle, banned === 0 ? text.liftNone : null),
+    single("inspire", text.inspireAll, text.inspireAllTitle, empty ? text.empty : null),
+    single("refresh", text.refreshAll, text.refreshAllTitle, empty ? text.empty : null),
+    single("maxAttributes", text.maxAll, text.maxAllTitle, empty ? text.empty : null),
+    single("maxCohesion", text.maxCohesion, text.maxCohesionTitle, cohesive === 0 ? text.cohesionNone : null),
+    single("maxTactics", text.maxTactics, text.maxTacticsTitle, tactical === 0 ? text.tacticsNone : null),
+    { ...single("batchTraits", text.batchTraits, text.batchTraitsTitle, empty ? text.empty : null), dialog: true },
+  ];
 
   return (
     <div className="squad-buttons" role="group" aria-label={text.actionsLabel}>
-      <ActionButton
-        label={text.healAll(injured)}
-        title={hover(text.healAllTitle, injured === 0 ? text.healNone : null)}
-        waiting={!editable || injured === 0}
-        busy={busy}
-        onPress={() => onAction("heal")}
-      />
-      <ActionButton
-        label={text.liftAll(banned)}
-        title={hover(text.liftAllTitle, banned === 0 ? text.liftNone : null)}
-        waiting={!editable || banned === 0}
-        busy={busy}
-        onPress={() => onAction("liftBans")}
-      />
-      <ActionButton
-        label={text.inspireAll}
-        title={hover(text.inspireAllTitle, empty ? text.empty : null)}
-        waiting={!editable || empty}
-        busy={busy}
-        onPress={() => onAction("inspire")}
-      />
-      <ActionButton
-        label={text.refreshAll}
-        title={hover(text.refreshAllTitle, empty ? text.empty : null)}
-        waiting={!editable || empty}
-        busy={busy}
-        onPress={() => onAction("refresh")}
-      />
-      <ActionButton
-        label={text.maxAll}
-        title={hover(text.maxAllTitle, empty ? text.empty : null)}
-        waiting={!editable || empty}
-        busy={busy}
-        onPress={() => onAction("maxAttributes")}
-      />
-      <ActionButton
-        label={text.maxCohesion}
-        title={hover(text.maxCohesionTitle, cohesive === 0 ? text.cohesionNone : null)}
-        waiting={!editable || cohesive === 0}
-        busy={busy}
-        onPress={() => onAction("maxCohesion")}
-      />
-      <ActionButton
-        label={text.maxTactics}
-        title={hover(text.maxTacticsTitle, tactical === 0 ? text.tacticsNone : null)}
-        waiting={!editable || tactical === 0}
-        busy={busy}
-        onPress={() => onAction("maxTactics")}
-      />
       <ActionButton
         label={text.atItsBest}
         title={hover(text.atItsBestTitle, empty ? text.empty : null)}
         waiting={!editable || empty}
         busy={busy}
         onPress={() => onAction("atItsBest")}
+      />
+      <TeamActionMenu
+        actions={singles}
+        editable={editable}
+        busy={busy}
+        onPick={(action) => (action === "batchTraits" ? onBatchTraits() : onAction(action))}
+        buttonRef={batchTraitsRef}
+      />
+      <ActionButton
+        ref={destroyRef}
+        className="destroy"
+        dialog
+        label={text.destroy}
+        title={hover(text.destroyTitle, empty ? text.empty : null)}
+        waiting={!editable || empty}
+        busy={busy}
+        onPress={onDestroy}
       />
     </div>
   );
@@ -725,17 +830,24 @@ interface ActionButtonProps {
   /** Whether a write is under way. */
   busy: boolean;
   onPress: () => void;
+  /** Another class for the button besides `squad-action`, such as Destroy's `destroy`. */
+  className?: string;
+  /** Whether it opens a dialog that asks first. */
+  dialog?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }
 
 /**
  * One of the actions on the team. While a write is under way it is only dimmed (aria-disabled): a disabled button loses
  * focus.
  */
-export function ActionButton({ label, title, waiting, busy, onPress }: ActionButtonProps) {
+export function ActionButton({ label, title, waiting, busy, onPress, className, dialog, ref }: ActionButtonProps) {
   return (
     <button
+      ref={ref}
       type="button"
-      className="squad-action"
+      className={className ? `squad-action ${className}` : "squad-action"}
+      aria-haspopup={dialog ? "dialog" : undefined}
       disabled={waiting}
       aria-disabled={busy || undefined}
       aria-busy={busy || undefined}
@@ -801,13 +913,15 @@ interface SquadRowProps {
   onCaptain: (role: CaptainRole) => void;
   /** Opens his profile over the squad; `from` is the name, which takes focus back once it is closed. */
   onOpen: (from: HTMLButtonElement) => void;
+  /** What his current ability was at the record he is compared with, where the app has one (see `AbilityChange`). */
+  earlier: EarlierAbility | undefined;
 }
 
 /**
  * One player: his name, which opens his profile over the squad, with his tags and badge by it, his values, and the menu
  * that makes him captain.
  */
-function SquadRow({ player, role, editable, busy, onCaptain, onOpen }: SquadRowProps) {
+function SquadRow({ player, role, editable, busy, onCaptain, onOpen, earlier }: SquadRowProps) {
   const positions = player.positions.map(positionLabel);
   const fullName = player.fullName !== null && player.fullName !== player.name ? player.fullName : null;
   return (
@@ -838,6 +952,7 @@ function SquadRow({ player, role, editable, busy, onCaptain, onOpen }: SquadRowP
       </td>
       <td className="num">{player.age ?? profileText.none}</td>
       <td className="num">
+        <AbilityChange now={player.currentAbility} earlier={earlier} />
         <Ability value={player.currentAbility} />
       </td>
       <td className="num">

@@ -10,19 +10,20 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use fmlibre_core::{
-    Arranged, ArrangedPlan, ArraySource, Buyer, COHESION_RANGE, CaptainRole, CaptainSet, Change, ChangeRow, Clause,
-    ClauseSet, ClubDetails, ClubFilter, ClubIndex, ClubMove, ClubSummary, Coded, CohesionSet, CompetitionPrizes,
-    DIRECTOR_OF_FOOTBALL, EditError, Entity, EntityArrays, ExportFormat, ExportHeader, Exported, FeePlan, Field,
-    FmDate, GAME_EXE, GAME_PLUGIN, GameInfo, GraphicsCounts, GraphicsIndex, HOMEGROWN_RULES, Healed, Health, Kind,
-    LOAN_EXPIRES, LOAN_OPTION_FEE, Lifted, Listed, Loan, Lock, MANAGER, MoveError, MovePlan, MoveTerms, NameChange,
-    NameKind, Nation, NationalIndex, NationalSide, NationalTeamSummary, NationalUnavailable, NewContract,
-    NewStaffContract, Operation, Paid, People, PersonNames, Picture, Planned, PlayerDetails, PlayerFilter, PlayerIndex,
-    PlayerOrder, PlayerSummary, PrizeAmount, PrizeChange, PrizeError, PrizeMoney, PrizeReadError, PrizeUnavailable,
-    ROLES, RelationSet, RetirementSet, Role, SCOUT_POSITIONS, SENIOR_KIND, ScoutError, ScoutPosition, ScoutRequest,
-    Scouted, SearchIndex, Session, SessionError, Skipped, Sponsorship, SponsorshipReadError, SponsorshipUnavailable,
-    SquadMember, SquadReport, StadiumName, StadiumRename, StaffChange, StaffDetails, StaffFilter, StaffIndex,
-    StaffOrder, StaffPlan, StaffSummary, TacticsSet, Target, Tie, TieTarget, competition_prizes, diagnostics_report,
-    find_game, nations, sort_players, sort_staff,
+    Arranged, ArrangedPlan, ArraySource, Buyer, COHESION_RANGE, CaptainRole, CaptainSet, Change, ChangeRow, Check,
+    Clause, ClauseSet, ClubDetails, ClubFilter, ClubIndex, ClubMove, ClubSummary, Coded, CohesionSet,
+    CompetitionPrizes, CompetitionRules, DIRECTOR_OF_FOOTBALL, Earlier, EditError, Entity, EntityArrays, ExportFormat,
+    ExportHeader, Exported, FeePlan, Field, FmDate, GAME_EXE, GAME_PLUGIN, GameInfo, GraphicsCounts, GraphicsIndex,
+    HOMEGROWN_RULES, Healed, Health, Kind, LOAN_EXPIRES, LOAN_OPTION_FEE, Lifted, Listed, Loan, Lock, MANAGER,
+    MoveError, MovePlan, MoveTerms, NameChange, NameKind, Nation, NationalIndex, NationalSide, NationalTeamSummary,
+    NationalUnavailable, NewContract, NewStaffContract, Operation, Paid, People, PersonNames, Picture, Planned,
+    PlayerDetails, PlayerFilter, PlayerIndex, PlayerOrder, PlayerSummary, PrizeAmount, PrizeChange, PrizeError,
+    PrizeMoney, PrizeReadError, PrizeUnavailable, Progress, ROLES, RelationSet, RetirementSet, Role, RuleChange,
+    RuleError, RuleReadError, RuleUnavailable, SCOUT_POSITIONS, SENIOR_KIND, ScoutError, ScoutPosition, ScoutRequest,
+    Scouted, SearchIndex, Season, Session, SessionError, Skipped, Sponsorship, SponsorshipReadError,
+    SponsorshipUnavailable, SquadMember, SquadReport, SquadRule, StadiumName, StadiumRename, StaffChange, StaffDetails,
+    StaffFilter, StaffIndex, StaffOrder, StaffPlan, StaffSummary, TacticsSet, Target, Tie, TieTarget, Timeline,
+    competition_prizes, diagnostics_report, find_game, nations, sort_players, sort_staff, timeline_values,
 };
 use fmlibre_mem::{Process, find_processes, is_current_process_elevated, list_modules};
 use serde::{Deserialize, Serialize};
@@ -35,7 +36,7 @@ const GRAPHICS_FOLDER: &str = "FMLIBRE_GRAPHICS";
 
 /// The environment variable that names the folder the app keeps its own files in, instead of its data folder
 /// (`%APPDATA%\io.github.tozmoz.fmlibreeditor` on Windows): what was frozen in each save, and the history of the
-/// changes written to each career.
+/// changes written to each career, and the records of how its players develop.
 const DATA_FOLDER: &str = "FMLIBRE_DATA";
 
 /// The file in that folder that remembers what was frozen in each save (see `Remembered`).
@@ -43,6 +44,12 @@ const FROZEN_FILE: &str = "frozen.json";
 
 /// The folder in that folder that keeps the history of the changes written to each career (see `History`).
 const HISTORY_FOLDER: &str = "history";
+
+/// The folder in that folder that keeps the records of how each career's players develop (see `Records`).
+const TIMELINE_FOLDER: &str = "timeline";
+
+/// How far back a player is compared with what he is now, in days of the game's time: a year.
+const PROGRESS_DAYS: i64 = 365;
 
 /// The environment variable that names the folder exports are written to, instead of `FMLibreEditor\Exports` in the
 /// documents folder.
@@ -63,6 +70,8 @@ struct Connection {
     log: Vec<LoggedChange>,
     /// Where the log is kept for the next connection to this career.
     history: History,
+    /// How the career's players developed, as recorded each week or so of the game's time the app read them.
+    records: Records,
     /// The mass edit last previewed, until it is applied or replaced.
     mass: Option<PendingMass>,
     /// The next id for a mass-edit preview or batch.
@@ -77,6 +86,9 @@ struct Connection {
     /// Every league's settings and what they pay, read the first time a club's finances show its league's prize
     /// money (see `league_prizes`), and kept up to date as the editor changes them.
     prizes: Option<Vec<PrizeMoney>>,
+    /// The squad rules of every competition the game is playing, read the first time the Competitions tab shows them
+    /// (see `competition_rules`), and kept up to date as the editor changes them.
+    rules: Option<Vec<CompetitionRules>>,
 }
 
 /// How often the balances of frozen clubs, the attributes, energy and sharpness of frozen players, the attributes of
@@ -140,6 +152,54 @@ struct Frozen {
     /// The stadiums renamed in the editor, by the UID of a club that plays there: the game gives a stadium its own
     /// name back whenever it loads the save, as it keeps no stadium names in it, and the app gives it the new one again.
     stadiums: BTreeMap<u32, HeldName>,
+    /// The squad rules the editor holds: of competitions whose rules the game keeps in no record and makes again
+    /// itself whenever it loads a save (UEFA's), which the app then gives the count the editor gave them again.
+    rules: Vec<HeldRule>,
+}
+
+/// Which squad rule: of which competition (the one of the lowest UID among those played under the same lists, as the
+/// rule is theirs all), in which season's list, and what it limits.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RuleKey {
+    competition: u32,
+    season: Season,
+    kind: u16,
+    compare: i8,
+    condition: Option<String>,
+    condition_competition: Option<u32>,
+}
+
+impl RuleKey {
+    /// The rule `rule` of `season`'s list of `rules`.
+    fn of(rules: &CompetitionRules, season: Season, rule: &SquadRule) -> Self {
+        let competition = rules.shared_with.iter().copied().fold(rules.competition.uid, u32::min);
+        Self {
+            competition,
+            season,
+            kind: rule.kind,
+            compare: rule.compare,
+            condition: rule.condition.clone(),
+            condition_competition: rule.condition_competition,
+        }
+    }
+
+    /// Whether `rule` limits what this one does.
+    fn names(&self, rule: &SquadRule) -> bool {
+        (self.kind, self.compare) == (rule.kind, rule.compare)
+            && self.condition == rule.condition
+            && self.condition_competition == rule.condition_competition
+    }
+}
+
+/// A squad rule's count as the editor gave it, and the game's own, which an undo back to it lets go of.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HeldRule {
+    #[serde(flatten)]
+    rule: RuleKey,
+    value: i32,
+    original: i32,
 }
 
 /// A stadium's name as the editor gave it, and the game's own, which an undo back to it lets go of.
@@ -166,6 +226,7 @@ impl Frozen {
             && self.fitness.is_empty()
             && self.positions.is_empty()
             && self.stadiums.is_empty()
+            && self.rules.is_empty()
     }
 
     /// The players frozen in the way `kind` names, with what they are held at.
@@ -225,6 +286,9 @@ struct RememberedSave {
     /// it.
     #[serde(default)]
     stadiums: BTreeMap<u32, HeldName>,
+    /// The squad rules the editor holds (see `Frozen::rules`); not in the files of versions before it.
+    #[serde(default)]
+    rules: Vec<HeldRule>,
 }
 
 impl RememberedSave {
@@ -235,6 +299,7 @@ impl RememberedSave {
             && self.fitness.is_empty()
             && self.positions.is_empty()
             && self.stadiums.is_empty()
+            && self.rules.is_empty()
     }
 
     /// The players frozen in the way `kind` names.
@@ -426,6 +491,8 @@ struct StoredChange {
     objects: Option<ObjectNames>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     prize: Option<PrizeNote>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rule: Option<RuleNote>,
 }
 
 impl StoredChange {
@@ -454,6 +521,7 @@ impl StoredChange {
             person_name: logged.person_name.clone(),
             objects: logged.objects.clone(),
             prize: logged.prize.clone(),
+            rule: logged.rule.clone(),
         }
     }
 
@@ -479,21 +547,81 @@ impl StoredChange {
             person_name: self.person_name,
             objects: self.objects,
             prize: self.prize,
+            rule: self.rule,
             stored: Some(StoredKey { session: self.session, id: self.id }),
             undo: self.option.map(Undo::Recall),
         }
     }
 }
 
-/// What a reload keeps of the connection before while the game has the same career: its change log and its history.
+/// The records of how the players of one career develop (see `fmlibre_core::Timeline`), in a file of its own, named
+/// as the career's history is. A record is added to its end when one is due, as the lists are read: the file is never
+/// written whole.
+struct Records {
+    /// The file; none without a data folder or a known career, and then nothing is recorded.
+    path: Option<PathBuf>,
+    timeline: Timeline,
+}
+
+impl Records {
+    /// The records of the career `save` in `folder`. A record cut short at the end of the file, by a crash say, is
+    /// cut off, so that the next one follows the last whole one.
+    fn open(folder: Option<&Path>, save: Option<&str>) -> Self {
+        let path = folder.zip(save).map(|(folder, save)| folder.join(timeline_file_name(save)));
+        let Some(bytes) = path.as_deref().and_then(|path| std::fs::read(path).ok()) else {
+            return Self { path, timeline: Timeline::new() };
+        };
+        let (timeline, taken) = Timeline::read(&bytes);
+        if taken < bytes.len()
+            && let Some(file) = path.as_deref().and_then(|path| OpenOptions::new().write(true).open(path).ok())
+        {
+            let _ = file.set_len(taken as u64);
+        }
+        Self { path, timeline }
+    }
+
+    /// Takes the record of `date`, the game's date, when one is due (see `Timeline::record`), from `players` as the
+    /// lists have them (their UIDs and `timeline_values`), and adds it to the file. A file that cannot be written only
+    /// means that it lacks the record.
+    fn take(&mut self, date: FmDate, players: impl IntoIterator<Item = (u32, Vec<Option<i32>>)>) {
+        let Some(path) = &self.path else {
+            return;
+        };
+        let Some(record) = self.timeline.record(date, now_ms(), players) else {
+            return;
+        };
+        if let Some(folder) = path.parent() {
+            let _ = std::fs::create_dir_all(folder);
+        }
+        // The whole record in one write, added to the end of the file.
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
+            let _ = file.write_all(&record);
+        }
+    }
+}
+
+/// The name of the file of the records of the career `save`, such as `Steam-12345.jsonl.gz`: the name of its history
+/// (see `history_file_name`), and what the file is, lines of JSON, each compressed on its own.
+fn timeline_file_name(save: &str) -> String {
+    format!("{}.gz", history_file_name(save))
+}
+
+/// What a reload keeps of the connection before while the game has the same career: its change log, its history and
+/// the records of its players.
 struct Kept {
     save: Option<String>,
     log: Vec<LoggedChange>,
     history: History,
+    records: Records,
 }
 
-/// Where the app keeps the history of each career's changes (see `History`); none when it has no data folder.
-struct HistoryFolder(Option<PathBuf>);
+/// Where the app keeps the history of each career's changes (see `History`) and the records of how its players
+/// develop (see `Records`); none when it has no data folder.
+#[derive(Clone)]
+struct DataFolders {
+    history: Option<PathBuf>,
+    timeline: Option<PathBuf>,
+}
 
 /// Where the app remembers what was frozen in each save; none when it has no data folder.
 struct FrozenFile(Option<PathBuf>);
@@ -632,8 +760,8 @@ impl Connection {
     /// Reads every list. The change log is the one `kept` by a reload while the game has the same career, or else the
     /// one the history of the career in `folder` lists (see `History`), checked against the game (see
     /// `check_earlier`). A mass edit previewed before is dropped, since its people may have moved. Nothing is frozen
-    /// yet.
-    fn load(session: Session, folder: Option<&Path>, kept: Option<Kept>) -> Result<Self, Failure> {
+    /// yet. A record of the players is taken when one is due (see `take_record`).
+    fn load(session: Session, folders: &DataFolders, kept: Option<Kept>) -> Result<Self, Failure> {
         // The game may have loaded a save or moved on since the checks last ran; the date the lists' ages are worked
         // out from is one of them.
         session.recheck();
@@ -646,9 +774,12 @@ impl Connection {
         let staff = StaffIndex::new(staff);
         let clubs = ClubIndex::new(session.clubs()?);
         let nationals = session.national_teams().map(NationalIndex::new);
-        let (history, log) = match kept {
-            Some(kept) if kept.save == save => (kept.history, kept.log),
-            _ => History::open(folder, save.as_deref()),
+        let (history, log, records) = match kept {
+            Some(kept) if kept.save == save => (kept.history, kept.log, kept.records),
+            _ => {
+                let (history, log) = History::open(folders.history.as_deref(), save.as_deref());
+                (history, log, Records::open(folders.timeline.as_deref(), save.as_deref()))
+            }
         };
         let next_id = log.iter().filter_map(|logged| logged.batch).max().unwrap_or(0) + 1;
         let frozen = Frozen::default();
@@ -669,6 +800,7 @@ impl Connection {
             human_clubs,
             log,
             history,
+            records,
             mass: None,
             next_id,
             frozen,
@@ -676,9 +808,29 @@ impl Connection {
             clubs_seen,
             people,
             prizes: None,
+            rules: None,
         };
         connection.check_earlier();
+        connection.take_record();
         Ok(connection)
+    }
+
+    /// Whether the players as the lists have them are recorded: the app has a file for the career, the game's date is
+    /// known, and the checks of the players' own values and of their attributes pass. On a build whose layout does
+    /// not check out nothing is recorded, as nothing is written there.
+    fn records_players(&self) -> bool {
+        let health = self.session.health();
+        self.records.path.is_some()
+            && self.session.game_date().is_some()
+            && health.passed(Check::Players)
+            && health.passed(Check::Attributes)
+    }
+
+    /// Takes the record of the players for the game's date, when one is due (see `Records::take`).
+    fn take_record(&mut self) {
+        if let Some(date) = self.session.game_date().filter(|_| self.records_players()) {
+            self.records.take(date, self.players.iter().map(|player| (player.uid, timeline_values(player))));
+        }
     }
 
     /// For each change listed from before this connection: whether Undo may take it back, and, unless it is undone,
@@ -833,6 +985,7 @@ impl Connection {
         let (players, staff) = (entry.players.clone(), entry.staff.clone());
         let (clubs, fitness, positions) = (entry.clubs.clone(), entry.fitness.clone(), entry.positions.clone());
         let stadiums = entry.stadiums.clone();
+        let rules = entry.rules.clone();
         if players.len() + staff.len() + clubs.len() + fitness.len() + positions.len() + stadiums.len() < count {
             remembered.saves.retain(|_, save| !save.is_empty());
             let _ = remembered.write(path);
@@ -876,7 +1029,65 @@ impl Connection {
                 refrozen.waiting += 1;
             }
         }
+        // The squad rules held in this save are held again, and written again where the game has its own counts back.
+        if safe {
+            self.frozen.rules = rules;
+            self.give_held_rules();
+        } else {
+            refrozen.waiting += rules.len();
+        }
         refrozen
+    }
+
+    /// Gives each squad rule the editor holds its count again where the game has made the rule's list anew with its
+    /// own, as it does whenever it loads a save: for the competitions whose rules it keeps in no record. The
+    /// competitions' rules are read first, one pass over the game's memory, so only when a rule is held. Not logged:
+    /// the change that chose the count was. A rule that holds neither the game's own count nor the editor's is left
+    /// alone: something else changed it. How many were written.
+    fn give_held_rules(&mut self) -> usize {
+        if self.frozen.rules.is_empty() || self.session.structure_lock().is_some() {
+            return 0;
+        }
+        let Ok(found) = self.session.checked_squad_rules() else {
+            return 0;
+        };
+        self.rules = Some(found);
+        let mut given = 0;
+        for held in self.frozen.rules.clone() {
+            let Some(read) = self.rules_of(held.rule.competition).cloned() else {
+                continue;
+            };
+            let list = read.rules(held.rule.season).unwrap_or_default();
+            let Some(at) = list.iter().position(|rule| held.rule.names(rule)) else {
+                continue;
+            };
+            if !list[at].unsaved || list[at].value != held.original {
+                continue;
+            }
+            let written = (self.session.plan_rule_change(&read, &[(held.rule.season, at, held.value)]))
+                .and_then(|plan| self.session.apply_rule_change(&plan));
+            if let (Ok(done), Some(found)) = (written, &mut self.rules) {
+                done.note(found, false);
+                given += 1;
+            }
+        }
+        given
+    }
+
+    /// Holds and remembers `value`, the count the editor just gave the rule `rule`, by a change or an undo: the game
+    /// had `before` there. A rule given back the game's own count is let go of; an undo (`only_held`) of a rule that
+    /// is not held holds nothing.
+    fn hold_rule(&mut self, path: Option<&Path>, rule: RuleKey, value: i32, before: i32, only_held: bool) {
+        let at = self.frozen.rules.iter().position(|held| held.rule == rule);
+        if at.is_none() && only_held {
+            return;
+        }
+        let original = at.map_or(before, |at| self.frozen.rules.remove(at).original);
+        if value != original {
+            self.frozen.rules.push(HeldRule { rule, value, original });
+        }
+        let rules = self.frozen.rules.clone();
+        self.remember(path, |save| save.rules = rules);
     }
 
     /// Gives the stadium of the club `uid` the name `name`, unless it has it already: whether it has it now. Not
@@ -1185,8 +1396,9 @@ impl Connection {
                 let hits = self.clubs.search(query).into_iter().filter(|c| filter.matches(c));
                 hits.map(|c| (c.target(), c.name.clone())).collect()
             }
-            // National teams have no mass edit: the reputation of one team at a time.
-            Entity::NationalTeam => Vec::new(),
+            // National teams have no mass edit: the reputation of one team at a time. Nor have competitions: their
+            // squad rules are changed one competition at a time (see `set_competition_rules`).
+            Entity::NationalTeam | Entity::Competition => Vec::new(),
         }
     }
 
@@ -1217,6 +1429,7 @@ impl Connection {
             person_name: None,
             objects: None,
             prize: None,
+            rule: None,
             stored: None,
             undo: None,
         }
@@ -1328,8 +1541,8 @@ impl Connection {
         self.push_log(LoggedChange { undo: Some(Undo::Cohesion(done)), ..entry })
     }
 
-    /// Logs Max tactics just written, as a change of how well the player knows the tactic (`tactics`, 0..100) from what
-    /// it was to what it is.
+    /// Logs Max or Min tactics just written, as a change of how well the player knows the tactic (`tactics`, 0..100)
+    /// from what it was to what it is.
     fn log_tactics(&mut self, done: TacticsSet, batch: Option<u32>) -> LoggedChange {
         let change = Change {
             entity: Entity::Player,
@@ -1792,6 +2005,124 @@ impl Connection {
         self.clubs.get(uid).map_or_else(|| uid.to_string(), |club| club.name.clone())
     }
 
+    /// The squad rules of the competition `uid`, as read last (see `competition_rules`); none when they were not read,
+    /// or the game is not playing it.
+    fn rules_of(&self, uid: u32) -> Option<&CompetitionRules> {
+        self.rules.as_deref()?.iter().find(|rules| rules.competition.uid == uid)
+    }
+
+    /// The competitions with a squad rule to show, this season or the next, as read last: the others, about a
+    /// quarter of those the game plays, register their squads under none.
+    fn ruled_competitions(&self) -> Vec<CompetitionRules> {
+        let ruled = |rules: &&CompetitionRules| {
+            !rules.current.is_empty() || rules.next.as_ref().is_some_and(|next| !next.is_empty())
+        };
+        self.rules.iter().flatten().filter(ruled).cloned().collect()
+    }
+
+    /// Sets squad rules of the competition `uid`: each the rule at a place of a season's list, as `competition_rules`
+    /// listed it, to a new count of players. Each rule changed is logged as a change of the competition, in one batch
+    /// when there are more. Only on the builds whose profile says the squad rules were checked there, and while the
+    /// game may be written to; each rule must still be the one the window showed, at the value it showed. A count
+    /// that is what it was already is left out.
+    ///
+    /// A rule of a competition whose rules the game keeps in no record (UEFA's) is written to its list alone, and is
+    /// held from then on (see `hold_rule`): what `path` remembers of this save is written to the list again whenever
+    /// the app reads the game anew.
+    fn set_competition_rules(
+        &mut self,
+        path: Option<&Path>,
+        uid: u32,
+        changes: &[RuleInput],
+    ) -> Result<Vec<LoggedChange>, Failure> {
+        if !self.session.profile.as_ref().is_some_and(|profile| profile.squad_rules) {
+            return Err(Failure::new("rule.unavailable", RuleUnavailable::Build.to_string()));
+        }
+        if let Some(lock) = self.session.structure_lock() {
+            return Err(MoveError::Locked(lock).into());
+        }
+        let not_read =
+            || Failure::new("rule.notRead", "The competition's squad rules have not been read: read them again.");
+        // All of them first, as read: none is written when one of them cannot be.
+        let read = self.rules_of(uid).ok_or_else(not_read)?;
+        for change in changes {
+            let shown = read.rules(change.season).and_then(|list| list.get(change.rule));
+            if shown.is_some_and(|rule| (rule.kind, rule.value) != (change.kind, change.from)) {
+                return Err(data_changed());
+            }
+        }
+        let wanted: Vec<(Season, usize, i32)> = changes.iter().map(|c| (c.season, c.rule, c.value)).collect();
+        self.session.plan_rule_change(read, &wanted)?;
+
+        let names: HashMap<u32, String> = (self.rules.iter().flatten())
+            .map(|rules| (rules.competition.uid, rules.competition.name.clone()))
+            .collect();
+        let batch = (changes.len() > 1).then(|| self.fresh_id());
+        let mut logged = Vec::new();
+        for &(season, at, to) in &wanted {
+            // As the changes before left them.
+            let read = self.rules_of(uid).ok_or_else(not_read)?.clone();
+            let plan = self.session.plan_rule_change(&read, &[(season, at, to)])?;
+            let (Some(edit), Some(rule)) = (plan.edits.first().cloned(), read.rules(season).and_then(|l| l.get(at)))
+            else {
+                continue;
+            };
+            if edit.from == edit.to {
+                continue;
+            }
+            let done = self.session.apply_rule_change(&plan)?;
+            if let Some(found) = &mut self.rules {
+                done.note(found, false);
+            }
+            // A rule no record keeps lasts only until the game makes its list again: the editor holds it.
+            let held = (edit.list_only && rule.unsaved).then(|| RuleKey::of(&read, season, rule));
+            if let Some(key) = &held {
+                self.hold_rule(path, key.clone(), edit.to, edit.from, false);
+            }
+            let note = RuleNote {
+                held: held.is_some(),
+                season,
+                year: read.season.map(|year| if season == Season::Next { year + 1 } else { year }),
+                kind: rule.kind,
+                kind_name: rule.name.clone(),
+                compare: rule.compare,
+                condition: rule.condition.clone(),
+                condition_competition: rule.condition_competition.and_then(|uid| names.get(&uid).cloned()),
+                nation: read.competition.nation.clone(),
+                shared: read.shared_with.len(),
+            };
+            let change = Change {
+                entity: Entity::Competition,
+                uid,
+                field: rule_field(season, rule),
+                old: i64::from(edit.from),
+                new: i64::from(edit.to),
+            };
+            let entry = self.entry(change, read.competition.name.clone(), batch);
+            logged.push(self.push_log(LoggedChange { rule: Some(note), undo: Some(Undo::Rule(done, held)), ..entry }));
+        }
+        Ok(logged)
+    }
+
+    /// Changes a held rule back to what it was before the change `done`, once putting back what that wrote is no
+    /// longer possible: the game has made the rule's list anew since, and the editor gave the rule its count there
+    /// again. As a new change would be made, and only while the list holds the count `done` wrote.
+    fn undo_held_rule(&mut self, key: &RuleKey, done: &RuleChange) -> Result<(), Failure> {
+        let edit = done.edits.first().ok_or_else(data_changed)?;
+        let read = self.rules_of(key.competition).cloned().ok_or_else(data_changed)?;
+        let list = read.rules(key.season).unwrap_or_default();
+        let at = list.iter().position(|rule| key.names(rule)).ok_or_else(data_changed)?;
+        if list[at].value != edit.to {
+            return Err(data_changed());
+        }
+        let plan = self.session.plan_rule_change(&read, &[(key.season, at, edit.from)])?;
+        let back = self.session.apply_rule_change(&plan)?;
+        if let Some(found) = &mut self.rules {
+            back.note(found, false);
+        }
+        Ok(())
+    }
+
     /// Logs a move just written, as a change of the player's `club` from one club UID to the
     /// other; a swap is one change too, which names the player who went the other way, and so
     /// is a move that released a player of the new club, which names him.
@@ -1961,6 +2292,16 @@ impl Connection {
                     done.note(found, true);
                 }
             }
+            Some(Undo::Rule(done, held)) => match (self.session.undo_rule_change(&done), &held) {
+                (Ok(()), _) => {
+                    if let Some(found) = &mut self.rules {
+                        done.note(found, true);
+                    }
+                }
+                // A held rule whose list the game has made anew since: changed back as a new change would be.
+                (Err(err), Some(key)) => self.undo_held_rule(key, &done).map_err(|_| Failure::from(err))?,
+                (Err(err), None) => return Err(err.into()),
+            },
             None => {
                 let (target, _) = self.target(entry.change.entity, entry.change.uid)?;
                 // A squad number a team-mate has been given since is refused, naming him.
@@ -2035,6 +2376,9 @@ impl Connection {
             Entity::NationalTeam => {
                 self.nationals.as_ref().ok().and_then(|n| n.get(uid)).map(|n| (n.target(), n.name.clone()))
             }
+            // A competition has no fields of its own: its squad rules are found through its own lists (see
+            // `set_competition_rules`).
+            Entity::Competition => None,
         }
         .ok_or_else(|| not_found(entity, uid))
     }
@@ -2168,6 +2512,8 @@ impl Connection {
                 Ok(nationals) => nationals.update(change.uid, |n| n.note_change(&change.field, value)),
                 Err(_) => false,
             },
+            // The rules read keep their own values (see `RuleChange::note`).
+            Entity::Competition => false,
         };
     }
 }
@@ -2230,6 +2576,10 @@ struct LoggedChange {
     /// `prize.win`, `prize.draw` or `prize.loss` in pounds: the league, and how many settings of it were changed.
     #[serde(skip_serializing_if = "Option::is_none")]
     prize: Option<PrizeNote>,
+    /// For a squad rule of a competition, logged as a change of the competition's field `rule.current.N` or
+    /// `rule.next.N` (see `rule_field`) from one count of players to the other: the rule.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rule: Option<RuleNote>,
     /// For an earlier change: what the history file calls it.
     #[serde(skip)]
     stored: Option<StoredKey>,
@@ -2256,6 +2606,46 @@ struct PrizeNote {
     league: String,
     league_uid: u32,
     settings: usize,
+}
+
+/// The squad rule a change set in a competition: which season's list it is in, and what it limits.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RuleNote {
+    /// Whether the editor holds the rule from then on: no record keeps it, and the game makes its list again itself
+    /// whenever it loads a save.
+    #[serde(default)]
+    held: bool,
+    season: Season,
+    /// The year that season began in, as the competition's nation counts its seasons; none where the in-game date
+    /// was not known.
+    year: Option<i32>,
+    /// The game's number for the kind of rule, and its name for it (`all_foreign_players_in_squad`) where it has one.
+    kind: u16,
+    kind_name: Option<String>,
+    /// Which way the value limits: -1 at most, 1 at least.
+    compare: i8,
+    /// The key of the rule's condition (`1yol`, `tfrd`) where it has one; for one about the teams of a division,
+    /// that division's name where the rules read name it.
+    condition: Option<String>,
+    condition_competition: Option<String>,
+    /// The competition's nation, where it has one.
+    nation: Option<String>,
+    /// How many other competitions are played under the same lists, and so by the changed rule too.
+    shared: usize,
+}
+
+/// The field a change of the rule `rule` of `season`'s list is logged under: `rule.current.all_foreign_players_in_squad`
+/// by the game's name for the rule's kind, `rule.next.kind21` by its number where the game names none.
+fn rule_field(season: Season, rule: &SquadRule) -> String {
+    let season = match season {
+        Season::Current => "current",
+        Season::Next => "next",
+    };
+    match &rule.name {
+        Some(name) => format!("rule.{season}.{name}"),
+        None => format!("rule.{season}.kind{}", rule.kind),
+    }
 }
 
 /// A stadium's name before and after a rename.
@@ -2307,6 +2697,9 @@ enum Undo {
     Staff(LoggedStaff),
     /// Prize money a league pays: the amounts it wrote, which the undo writes back.
     Prize(PrizeChange),
+    /// A squad rule of a competition: what it wrote to the season's list and to the nation's rules, which the undo
+    /// writes back; and, for a rule the editor holds from then on (see `Frozen::rules`), which rule that is.
+    Rule(RuleChange, Option<RuleKey>),
 }
 
 /// A member of staff's move, new job or signing as the log keeps it: the writes to undo, and what his list row said
@@ -2369,6 +2762,8 @@ struct TeamView {
     age_limit: Option<u8>,
     captain: Option<u32>,
     vice_captain: Option<u32>,
+    /// Whether a manager of the user's runs the club, as Destroy's question says: never for a national team.
+    human_club: bool,
     players: Vec<SquadRow>,
 }
 
@@ -2441,11 +2836,43 @@ enum TeamAction {
     MaxTactics,
     /// The team at its best in one go: `AT_ITS_BEST`, each step skipped where it cannot run. Attributes and bans stay.
     AtItsBest,
+    /// Morale, happiness and happiness with playing time to the bottom: `DEMORALIZE`, Destroy's first step.
+    Demoralize,
+    /// No energy, the least match sharpness and the most jadedness: `EXHAUST`, Destroy's second step.
+    Exhaust,
+    /// Cohesion with the club to the bottom, for those who have an entry for it.
+    MinCohesion,
+    /// The tactic the human manager plays with the team known at its least (see `familiarity.rs`).
+    MinTactics,
+    /// The team at its worst in one go: `DESTROY`, each step skipped where it cannot run. No value is made better than
+    /// it was; attributes, injuries and bans stay.
+    Destroy,
 }
 
 /// What Team at its best does, in order.
 const AT_ITS_BEST: [TeamAction; 5] =
     [TeamAction::Heal, TeamAction::Inspire, TeamAction::Refresh, TeamAction::MaxCohesion, TeamAction::MaxTactics];
+
+/// What Destroy does, in order.
+const DESTROY: [TeamAction; 4] =
+    [TeamAction::Demoralize, TeamAction::Exhaust, TeamAction::MinCohesion, TeamAction::MinTactics];
+
+/// Destroy's morale, happiness and happiness with playing time: the least the editor writes, as the game itself holds
+/// them (1, -100 and -100 on the Game Pass save of 0.9.2524.0, November 2026). Lower values stay as they are.
+const DEMORALIZE: [(&str, Operation); 3] = [
+    ("morale", Operation::AtMost { value: 1 }),
+    ("contract.happiness", Operation::AtMost { value: -100 }),
+    ("contract.playing_time_happiness", Operation::AtMost { value: -100 }),
+];
+
+/// Destroy's energy, match sharpness and jadedness: no energy, the least sharpness the editor writes and the most
+/// jadedness, each kept where it is worse already, as a youth intake's sharpness below 35%. On the same save the game
+/// itself held energy down to 0.01% (players long injured), nobody's sharpness below 35%, and jadedness up to 605.
+const EXHAUST: [(&str, Operation); 3] = [
+    ("condition", Operation::AtMost { value: 0 }),
+    ("match_sharpness", Operation::AtMost { value: 3_500 }),
+    ("jadedness", Operation::AtLeast { value: 1_000 }),
+];
 
 #[derive(Clone, Serialize, Deserialize)]
 struct MovedClubs {
@@ -2591,7 +3018,7 @@ impl From<MassReport> for TeamReport {
     }
 }
 
-/// A step of Team at its best that did not run, and why.
+/// A step of Team at its best or Destroy that did not run, and why.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SkippedStep {
@@ -2854,7 +3281,7 @@ macro_rules! coded_failures {
     )*};
 }
 
-coded_failures!(EditError, MoveError, PrizeError, ScoutError, SessionError, fmlibre_mem::Error);
+coded_failures!(EditError, MoveError, PrizeError, RuleError, ScoutError, SessionError, fmlibre_mem::Error);
 
 impl<T> From<std::sync::PoisonError<T>> for Failure {
     fn from(err: std::sync::PoisonError<T>) -> Self {
@@ -2911,16 +3338,16 @@ fn inspect(pid: u32) -> DetectedGame {
 async fn connect(
     state: State<'_, AppState>,
     file: State<'_, FrozenFile>,
-    history: State<'_, HistoryFolder>,
+    folders: State<'_, DataFolders>,
 ) -> Result<ConnectionInfo, Failure> {
     let started = Instant::now();
     let path = file.0.clone();
-    let folder = history.0.clone();
+    let folders = DataFolders::clone(&folders);
     let (connection, refrozen) = tauri::async_runtime::spawn_blocking(move || -> Result<_, Failure> {
         let pid = find_game(None)?;
         let process = Process::open_read_write(pid).or_else(|_| Process::open_read(pid))?;
         let session = Session::connect(process, ArraySource::ProfileFirst)?;
-        let mut connection = Connection::load(session, folder.as_deref(), None)?;
+        let mut connection = Connection::load(session, &folders, None)?;
         let refrozen = connection.restore_frozen(path.as_deref());
         Ok((connection, refrozen))
     })
@@ -2968,20 +3395,22 @@ fn save_changed(state: State<'_, AppState>) -> Result<bool, Failure> {
 async fn reload(
     state: State<'_, AppState>,
     file: State<'_, FrozenFile>,
-    history: State<'_, HistoryFolder>,
+    folders: State<'_, DataFolders>,
 ) -> Result<ReloadInfo, Failure> {
     let old = state.0.lock()?.take().ok_or_else(not_connected)?;
     let path = file.0.clone();
-    let folder = history.0.clone();
+    let folders = DataFolders::clone(&folders);
     let (connection, refrozen) = tauri::async_runtime::spawn_blocking(move || -> Result<_, Failure> {
-        let Connection { mut session, save, frozen, log, history, .. } = old;
+        let Connection { mut session, save, frozen, log, history, records, .. } = old;
         session.find_missing_arrays();
-        let kept = Kept { save: save.clone(), log, history };
-        let mut connection = Connection::load(session, folder.as_deref(), Some(kept))?;
+        let kept = Kept { save: save.clone(), log, history, records };
+        let mut connection = Connection::load(session, &folders, Some(kept))?;
         if connection.save == save {
             connection.frozen = frozen;
-            // A save loaded again has its stadiums' own names back: the ones the editor gave are given again now.
+            // A save loaded again has its stadiums' own names back: the ones the editor gave are given again now. So
+            // are the counts of the squad rules it holds, which the game makes anew whenever it loads a save.
             connection.give_stadium_names();
+            connection.give_held_rules();
             return Ok((connection, None));
         }
         let refrozen = connection.restore_frozen(path.as_deref());
@@ -3216,6 +3645,97 @@ fn set_league_prizes(
 struct LeaguePrizesSet {
     changes: Vec<LoggedChange>,
     league: Option<CompetitionPrizes>,
+}
+
+/// The squad rules of every competition that has some, this season's and next season's: how many foreign players a
+/// squad may register, how many goalkeepers, how many players in all; or why this version of the game shows none. The
+/// first time, and with `again`, read from the game: off the window's thread, as it reads all of the game's memory
+/// once, which takes a few seconds. After that, as read then, with the changes the editor made since. Only reads.
+#[tauri::command]
+async fn competition_rules(app: tauri::AppHandle, again: bool) -> Result<CompetitionRulesRead, Failure> {
+    tauri::async_runtime::spawn_blocking(move || -> Result<CompetitionRulesRead, Failure> {
+        let state = app.state::<AppState>();
+        let mut guard = state.0.lock()?;
+        let connection = guard.as_mut().ok_or_else(not_connected)?;
+        if again || connection.rules.is_none() {
+            connection.rules = match connection.session.checked_squad_rules() {
+                Ok(found) => Some(found),
+                Err(RuleReadError::Unavailable(reason)) => {
+                    let (competitions, held) = (Vec::new(), Vec::new());
+                    return Ok(CompetitionRulesRead { unavailable: Some(reason), competitions, held });
+                }
+                Err(RuleReadError::Memory(err)) => return Err(err.into()),
+            };
+        }
+        Ok(CompetitionRulesRead {
+            unavailable: None,
+            competitions: connection.ruled_competitions(),
+            held: connection.frozen.rules.clone(),
+        })
+    })
+    .await?
+}
+
+/// The competitions' squad rules, or why the app shows none on this version of the game.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CompetitionRulesRead {
+    /// "build": nobody has checked the squad rules on this build yet; "unreadable": it was checked, but what the
+    /// editor found does not read as the game's.
+    unavailable: Option<RuleUnavailable>,
+    competitions: Vec<CompetitionRules>,
+    /// The rules the editor holds in this save: of competitions whose rules the game keeps in no record, each with
+    /// the count the editor gave it and the game's own.
+    held: Vec<HeldRule>,
+}
+
+/// A squad rule to set: the rule at the place `rule` (from 0) of `season`'s list as `competition_rules` listed it,
+/// of the kind `kind` and at `from` players there, to `value` players.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RuleInput {
+    season: Season,
+    rule: usize,
+    kind: u16,
+    from: i32,
+    value: i32,
+}
+
+/// Sets squad rules of the competition `competition`, as `competition_rules` listed them, and logs each rule changed,
+/// in one batch when there are more; Undo in Changes puts it back. This season's rule goes to this season's list and
+/// to the nation's rules the game makes that list from when it loads a save; next season's to next season's list and
+/// to the rules it makes that one from. The game counts squads against the lists at once; its screens show a change
+/// of this season's once a day has passed.
+///
+/// A competition whose rules the game keeps in no record (UEFA's Champions League) has its rule written to the list
+/// alone, and to the days its squads are registered by where they repeat the squad's size. The game makes that list
+/// again itself whenever it loads a save, so the editor holds such a rule: it remembers the count for this save and
+/// writes it again each time it connects or reads the data again.
+#[tauri::command]
+fn set_competition_rules(
+    state: State<'_, AppState>,
+    file: State<'_, FrozenFile>,
+    competition: u32,
+    changes: Vec<RuleInput>,
+) -> Result<CompetitionRulesSet, Failure> {
+    let mut guard = state.0.lock()?;
+    let connection = guard.as_mut().ok_or_else(not_connected)?;
+    let changes = connection.set_competition_rules(file.0.as_deref(), competition, &changes)?;
+    Ok(CompetitionRulesSet {
+        changes,
+        competitions: connection.ruled_competitions(),
+        held: connection.frozen.rules.clone(),
+    })
+}
+
+/// The changes `set_competition_rules` logged, the competitions' rules now (a rule changed is also that of the other
+/// competitions played under the same lists) and the rules the editor holds.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CompetitionRulesSet {
+    changes: Vec<LoggedChange>,
+    competitions: Vec<CompetitionRules>,
+    held: Vec<HeldRule>,
 }
 
 /// Writes the players `query` and `filter` select, in `order`, to a new file in the exports folder as `format`: what
@@ -3486,6 +4006,7 @@ fn national_squad(state: State<'_, AppState>, uid: u32, kind: Option<u8>) -> Res
         age_limit: squad.age_limit,
         captain: None,
         vice_captain: None,
+        human_club: false,
         players: squad
             .players
             .into_iter()
@@ -3539,6 +4060,46 @@ fn player_details(state: State<'_, AppState>, uid: u32) -> Result<PlayerDetails,
         });
     }
     Ok(details)
+}
+
+/// How a player's abilities, value and attributes went, for his profile.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PlayerProgress {
+    /// The records that hold him and what he is now (see `fmlibre_core::Progress`): what he is now alone, on the
+    /// game's date, while there is no record of him. Nothing where the game's date is not known.
+    #[serde(flatten)]
+    progress: Progress,
+    /// Whether the app keeps records of this career: not without a data folder, a manager of the user's in the save,
+    /// or the checks of the players' values.
+    recording: bool,
+}
+
+/// How the player with `uid` developed, from the records of the career (see `Records`). Reads no memory: what he is
+/// now is what the lists have of him.
+#[tauri::command]
+fn player_progress(state: State<'_, AppState>, uid: u32) -> Result<PlayerProgress, Failure> {
+    let guard = state.0.lock()?;
+    let connection = guard.as_ref().ok_or_else(not_connected)?;
+    let player = connection.players.get(uid).ok_or_else(|| not_found(Entity::Player, uid))?;
+    let progress = match connection.session.game_date() {
+        Some(today) => connection.records.timeline.progress(uid, today, &timeline_values(player)),
+        None => Progress { dates: Vec::new(), series: BTreeMap::new() },
+    };
+    Ok(PlayerProgress { progress, recording: connection.records_players() })
+}
+
+/// For each of the players `uids` the records hold, his current ability at the record to compare him with: the oldest
+/// of the last year of the game's time, or the last one where all are older (see `Timeline::earlier`). None for a
+/// player no record before the game's date holds. Reads no memory.
+#[tauri::command]
+fn squad_progress(state: State<'_, AppState>, uids: Vec<u32>) -> Result<Vec<Earlier>, Failure> {
+    let guard = state.0.lock()?;
+    let connection = guard.as_ref().ok_or_else(not_connected)?;
+    Ok(match connection.session.game_date() {
+        Some(today) => connection.records.timeline.earlier(&uids, today, PROGRESS_DAYS),
+        None => Vec::new(),
+    })
 }
 
 /// The full profile of the member of staff with `uid`. Only reads memory.
@@ -3923,6 +4484,11 @@ fn undo_change(state: State<'_, AppState>, file: State<'_, FrozenFile>, id: usiz
     let logged = connection.undo(id)?;
     if let Some(names) = &logged.stadium {
         connection.hold_stadium_name(file.0.as_deref(), logged.change.uid, &names.from, &names.to);
+    }
+    // A held squad rule is held from then on at what the undo left it: back at the game's own count, it is let go of.
+    if let Some(Undo::Rule(_, Some(key))) = &logged.undo {
+        let (now, before) = (logged.change.old as i32, logged.change.new as i32);
+        connection.hold_rule(file.0.as_deref(), key.clone(), now, before, true);
     }
     Ok(logged)
 }
@@ -4768,8 +5334,8 @@ fn club_squads(state: State<'_, AppState>, uid: u32) -> Result<Vec<TeamView>, Fa
     let teams = connection.session.club_teams(club, &connection.players)?;
     // Cohesion is shown only where the lists checked out: a build that moved them would read other bytes. So is how
     // well the players know the tactic.
-    let cohesion_read = connection.session.health().passed(fmlibre_core::Check::Cohesion);
-    let tactics_read = connection.session.health().passed(fmlibre_core::Check::Tactics);
+    let cohesion_read = connection.session.health().passed(Check::Cohesion);
+    let tactics_read = connection.session.health().passed(Check::Tactics);
     // Who the club's players hold reasons to be unhappy about, across its teams.
     let members: BTreeSet<u32> = teams.iter().flat_map(|team| team.players.iter().map(|member| member.uid)).collect();
     let members: Vec<&PlayerSummary> = members.iter().filter_map(|&uid| connection.players.get(uid)).collect();
@@ -4787,6 +5353,7 @@ fn club_squads(state: State<'_, AppState>, uid: u32) -> Result<Vec<TeamView>, Fa
                 age_limit: team.age_limit,
                 captain: team.captain,
                 vice_captain: team.vice_captain,
+                human_club: connection.human_clubs.contains(&uid),
                 players: team
                     .players
                     .into_iter()
@@ -4874,44 +5441,52 @@ fn team_action(state: State<'_, AppState>, club: u32, team: usize, action: TeamA
         .players;
     let batch = connection.fresh_id();
     match action {
-        TeamAction::MaxCohesion => Ok(max_cohesion(connection, &summary, &members, batch).0.into()),
-        TeamAction::MaxTactics => {
-            let report = max_tactics(connection, &summary, team, batch)?;
+        TeamAction::MaxCohesion | TeamAction::MinCohesion => {
+            Ok(set_cohesion(connection, &summary, &members, batch, action == TeamAction::MaxCohesion).0.into())
+        }
+        TeamAction::MaxTactics | TeamAction::MinTactics => {
+            let report = set_tactics(connection, &summary, team, batch, action == TeamAction::MaxTactics)?;
             Ok(report.unwrap_or(MassReport { batch, applied: 0, failed: Vec::new() }).into())
         }
-        TeamAction::AtItsBest => Ok(at_its_best(connection, &summary, team, &members, batch)),
+        TeamAction::AtItsBest => Ok(run_steps(connection, &summary, team, &members, batch, &AT_ITS_BEST)),
+        TeamAction::Destroy => Ok(run_steps(connection, &summary, team, &members, batch, &DESTROY)),
         _ => act_on_players(connection, &members, action, batch).map(TeamReport::from),
     }
 }
 
-/// Team at its best: every step of `AT_ITS_BEST` under the one batch `batch`, so one Undo takes them all back. A step
-/// that cannot run (nobody injured, a lock, a part of the game this version has not been checked for) is left out and
-/// named, and the others still run.
-fn at_its_best(
+/// Team at its best or Destroy: every one of `steps` under the one batch `batch`, so one Undo takes them all back. A
+/// step that cannot run (nobody injured, a lock, a part of the game this version has not been checked for, a team whose
+/// tactic no human picks) is left out and named, and the others still run.
+fn run_steps(
     connection: &mut Connection,
     summary: &ClubSummary,
     team: usize,
     members: &[SquadMember],
     batch: u32,
+    steps: &[TeamAction],
 ) -> TeamReport {
     let mut done = TeamReport::from(MassReport { batch, applied: 0, failed: Vec::new() });
-    for action in AT_ITS_BEST {
+    for &action in steps {
         let ran = match action {
             TeamAction::Heal if !members.iter().any(|member| member.injuries > 0) => {
                 Err(Failure::new("team.nobodyInjured", "nobody in the team is injured"))
             }
-            TeamAction::MaxCohesion => match max_cohesion(connection, summary, members, batch) {
-                (report, true) => Ok(report),
-                (_, false) => Err(Failure::new(
-                    "team.noCohesion",
-                    "no player of the team has an entry for cohesion with the club that the editor can read",
-                )),
-            },
-            TeamAction::MaxTactics => max_tactics(connection, summary, team, batch).and_then(|report| {
-                report.ok_or_else(|| {
-                    Failure::new("team.noTactics", "the editor cannot read how well the team knows its tactic")
+            TeamAction::MaxCohesion | TeamAction::MinCohesion => {
+                match set_cohesion(connection, summary, members, batch, action == TeamAction::MaxCohesion) {
+                    (report, true) => Ok(report),
+                    (_, false) => Err(Failure::new(
+                        "team.noCohesion",
+                        "no player of the team has an entry for cohesion with the club that the editor can read",
+                    )),
+                }
+            }
+            TeamAction::MaxTactics | TeamAction::MinTactics => {
+                set_tactics(connection, summary, team, batch, action == TeamAction::MaxTactics).and_then(|report| {
+                    report.ok_or_else(|| {
+                        Failure::new("team.noTactics", "the editor cannot read how well the team knows its tactic")
+                    })
                 })
-            }),
+            }
             _ => act_on_players(connection, members, action, batch),
         };
         match ran {
@@ -4925,17 +5500,19 @@ fn at_its_best(
     done
 }
 
-/// Cohesion with the club at its best for every one of `members`, logged under `batch`, as FM27 Editor saw FMRTE's
-/// Improve Team Cohesion set it, for those who have an entry for the club: one is added nowhere, and the app counts
-/// those without one. The game shows the team's cohesion on its Dynamics page once it moves on. Also says whether any
-/// of them has an entry the editor could read.
-fn max_cohesion(
+/// Cohesion with the club at its best, 100, or with `best` false at its least, 1, for every one of `members` who has an
+/// entry for the club, logged under `batch`: one is added nowhere, and the app counts those without one. One there
+/// already, or past it, is left as it is. The game shows the team's cohesion on its Dynamics page once it moves on.
+/// Also says whether any of them has an entry the editor could read.
+fn set_cohesion(
     connection: &mut Connection,
     summary: &ClubSummary,
     members: &[SquadMember],
     batch: u32,
+    best: bool,
 ) -> (MassReport, bool) {
-    let (_, best) = COHESION_RANGE;
+    let (least, most) = COHESION_RANGE;
+    let value = if best { most } else { least };
     let mut report = MassReport { batch, applied: 0, failed: Vec::new() };
     let mut read = false;
     for member in members {
@@ -4943,10 +5520,10 @@ fn max_cohesion(
             continue;
         };
         let name = player.name.clone();
-        let planned = connection.session.plan_cohesion(player, summary, best);
+        let planned = connection.session.plan_cohesion(player, summary, value);
         read |= matches!(planned, Ok(Some(_)));
         let set = match planned {
-            Ok(Some(plan)) if plan.before == best => continue,
+            Ok(Some(plan)) if (best && plan.before >= value) || (!best && plan.before <= value) => continue,
             Ok(Some(plan)) => connection.session.apply_cohesion(&plan),
             Ok(None) => continue,
             Err(err) => Err(err),
@@ -4967,19 +5544,27 @@ fn max_cohesion(
     (report, read)
 }
 
-/// The tactic the human manager plays with the team at `team` of the club known at its best, logged under `batch`:
-/// each player's record and history of training (see `familiarity.rs`). One the game keeps no history for has his
-/// record written; the app counts them. None where the editor cannot read the team's familiarity with its tactic.
-fn max_tactics(
+/// The tactic the human manager plays with the team at `team` of the club known at its best, or with `best` false at
+/// its least, logged under `batch`: each player's record and history of training (see `familiarity.rs`). One the game
+/// keeps no history for has his record written; the app counts them. None where the editor cannot read the team's
+/// familiarity with its tactic, as for a team whose tactic no human picks.
+fn set_tactics(
     connection: &mut Connection,
     summary: &ClubSummary,
     team: usize,
     batch: u32,
+    best: bool,
 ) -> Result<Option<MassReport>, Failure> {
     if let Some(lock) = connection.session.tactics_lock().or_else(|| connection.session.structure_lock()) {
         return Err(MoveError::Locked(lock).into());
     }
-    let Some(plans) = connection.session.plan_max_tactics(summary, team, &connection.players)? else {
+    let (session, players) = (&connection.session, &connection.players);
+    let planned = if best {
+        session.plan_max_tactics(summary, team, players)?
+    } else {
+        session.plan_min_tactics(summary, team, players)?
+    };
+    let Some(plans) = planned else {
         return Ok(None);
     };
     let mut report = MassReport { batch, applied: 0, failed: Vec::new() };
@@ -5002,7 +5587,7 @@ fn max_tactics(
 }
 
 /// Does `action` to `members`, the players of one team, logged under `batch`: the actions a club's team and a national
-/// team share. Max cohesion, Max tactics and Team at its best need the club, and are `team_action`'s own.
+/// team share. Cohesion, tactics, Team at its best and Destroy need the club, and are `team_action`'s own.
 fn act_on_players(
     connection: &mut Connection,
     members: &[SquadMember],
@@ -5015,7 +5600,7 @@ fn act_on_players(
     {
         return Err(MoveError::Locked(lock).into());
     }
-    let values: &[(&str, i64)] = match action {
+    let values: &[(&str, Operation)] = match action {
         TeamAction::Heal => {
             let mut report = MassReport { batch, applied: 0, failed: Vec::new() };
             for member in members.iter().filter(|member| member.injuries > 0) {
@@ -5065,12 +5650,25 @@ fn act_on_players(
             }
             return Ok(report);
         }
-        // Morale at its best, and the reasons to be unhappy gone, as FMRTE's Inspire does.
-        TeamAction::Inspire => &[("morale", 20), ("contract.unhappiness", 0)],
+        // Morale at its best, and the reasons to be unhappy gone.
+        TeamAction::Inspire => {
+            &[("morale", Operation::Set { value: 20 }), ("contract.unhappiness", Operation::Set { value: 0 })]
+        }
         // Rested as the game rests a player: full energy and sharpness, and jadedness at its least.
-        TeamAction::Refresh => &[("condition", 10_000), ("match_sharpness", 10_000), ("jadedness", -500)],
+        TeamAction::Refresh => &[
+            ("condition", Operation::Set { value: 10_000 }),
+            ("match_sharpness", Operation::Set { value: 10_000 }),
+            ("jadedness", Operation::Set { value: -500 }),
+        ],
+        TeamAction::Demoralize => &DEMORALIZE,
+        TeamAction::Exhaust => &EXHAUST,
         TeamAction::MaxAttributes => &[],
-        TeamAction::MaxCohesion | TeamAction::MaxTactics | TeamAction::AtItsBest => {
+        TeamAction::MaxCohesion
+        | TeamAction::MaxTactics
+        | TeamAction::AtItsBest
+        | TeamAction::MinCohesion
+        | TeamAction::MinTactics
+        | TeamAction::Destroy => {
             return Err(Failure::new("team.action", "This action needs the club the team belongs to."));
         }
     };
@@ -5084,10 +5682,62 @@ fn act_on_players(
     } else {
         values
             .iter()
-            .map(|&(key, value)| Ok((connection.session.field(Entity::Player, key)?, Operation::Set { value })))
+            .map(|&(key, operation)| Ok((connection.session.field(Entity::Player, key)?, operation)))
             .collect::<Result<Vec<_>, EditError>>()?
     };
     let plan = connection.session.plan_mass_edit(&targets, &operations)?;
+    Ok(connection.write_planned(Entity::Player, plan.planned, batch))
+}
+
+/// Adds and/or removes traits for all players in a team of a club.
+/// Traits in `add_traits` are set to 1 (if not already 1).
+/// Traits in `remove_traits` are set to 0 (if not already 0).
+#[tauri::command]
+fn batch_traits_team(
+    state: State<'_, AppState>,
+    club: u32,
+    team: usize,
+    add_traits: Vec<u8>,
+    remove_traits: Vec<u8>,
+) -> Result<MassReport, Failure> {
+    let mut guard = state.0.lock()?;
+    let connection = guard.as_mut().ok_or_else(not_connected)?;
+    if let Some(lock) = connection.session.structure_lock() {
+        return Err(MoveError::Locked(lock).into());
+    }
+    let summary = connection.clubs.get(club).ok_or_else(|| not_found(Entity::Club, club))?.clone();
+    let members = connection
+        .session
+        .club_teams(&summary, &connection.players)?
+        .into_iter()
+        .find(|found| found.index == team)
+        .ok_or(MoveError::NoTeam { index: team })?
+        .players;
+
+    let targets: Vec<(Target, String)> = members
+        .iter()
+        .filter_map(|member| connection.players.get(member.uid))
+        .map(|player| (player.target(), player.name.clone()))
+        .collect();
+
+    let mut operations = Vec::new();
+    for bit in add_traits {
+        let field_key = format!("trait.{bit}");
+        let field = connection.session.field(Entity::Player, &field_key)?;
+        operations.push((field, Operation::Set { value: 1 }));
+    }
+    for bit in remove_traits {
+        let field_key = format!("trait.{bit}");
+        let field = connection.session.field(Entity::Player, &field_key)?;
+        operations.push((field, Operation::Set { value: 0 }));
+    }
+
+    if operations.is_empty() {
+        return Ok(MassReport { batch: connection.fresh_id(), applied: 0, failed: Vec::new() });
+    }
+
+    let plan = connection.session.plan_mass_edit(&targets, &operations)?;
+    let batch = connection.fresh_id();
     Ok(connection.write_planned(Entity::Player, plan.planned, batch))
 }
 
@@ -5241,7 +5891,10 @@ pub fn run() {
                 None => user_data.ok().map(|folder| GraphicsIndex::default_root(&folder, 27)),
             };
             let data = std::env::var_os(DATA_FOLDER).map(PathBuf::from).or_else(|| app.path().app_data_dir().ok());
-            app.manage(HistoryFolder(data.as_ref().map(|folder| folder.join(HISTORY_FOLDER))));
+            app.manage(DataFolders {
+                history: data.as_ref().map(|folder| folder.join(HISTORY_FOLDER)),
+                timeline: data.as_ref().map(|folder| folder.join(TIMELINE_FOLDER)),
+            });
             app.manage(FrozenFile(data.map(|folder| folder.join(FROZEN_FILE))));
             let exports = std::env::var_os(EXPORTS_FOLDER)
                 .map(PathBuf::from)
@@ -5291,6 +5944,8 @@ pub fn run() {
             league_prizes,
             club_sponsorships,
             set_league_prizes,
+            competition_rules,
+            set_competition_rules,
             national_status,
             search_national_teams,
             national_squad,
@@ -5301,6 +5956,8 @@ pub fn run() {
             open_export,
             show_export,
             player_details,
+            player_progress,
+            squad_progress,
             staff_details,
             club_details,
             list_nations,
@@ -5373,6 +6030,7 @@ pub fn run() {
             set_captain,
             team_action,
             national_team_action,
+            batch_traits_team,
             max_attributes,
             graphics_info,
             self_update::can_self_update,
@@ -5513,6 +6171,7 @@ mod tests {
             person_name: None,
             objects: None,
             prize: None,
+            rule: None,
             stored: None,
             undo: None,
         }
@@ -5528,6 +6187,48 @@ mod tests {
         let folder = std::env::temp_dir().join(format!("fmlibre-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&folder);
         folder
+    }
+
+    #[test]
+    fn the_records_of_a_career_are_added_to_its_file_and_read_again() {
+        let folder = test_folder("timeline");
+        let career = Some("Steam:1");
+        let date = |day| FmDate { year: 2026, month: 7, day };
+        let player = |ability| [(7, vec![Some(ability), Some(160)])];
+        assert_eq!(timeline_file_name("Steam:1"), "Steam-1.jsonl.gz");
+
+        let mut records = Records::open(Some(&folder), career);
+        assert!(records.timeline.is_empty());
+        records.take(date(1), player(100));
+        // Within a week nothing is due, and nothing is added.
+        records.take(date(3), player(101));
+        let path = folder.join("Steam-1.jsonl.gz");
+        let first = std::fs::metadata(&path).expect("the file of the records").len();
+        records.take(date(8), player(102));
+        assert!(std::fs::metadata(&path).expect("the file").len() > first);
+
+        // Another connection reads both, and its record follows them.
+        let mut again = Records::open(Some(&folder), career);
+        assert_eq!((again.timeline.len(), again.timeline.last_date()), (2, Some(date(8))));
+        again.take(date(15), player(103));
+        let whole = std::fs::metadata(&path).expect("the file").len();
+
+        // A record cut short at the end is cut off, and the next one follows the last whole one.
+        let mut file = OpenOptions::new().append(true).open(&path).expect("the file");
+        file.write_all(&[0x1F, 0x8B, 8, 0, 0]).expect("written");
+        drop(file);
+        let mut repaired = Records::open(Some(&folder), career);
+        assert_eq!(repaired.timeline.len(), 3);
+        assert_eq!(std::fs::metadata(&path).expect("the file").len(), whole);
+        repaired.take(date(22), player(104));
+        assert_eq!(Records::open(Some(&folder), career).timeline.len(), 4);
+
+        // Another career has its own file; without a folder or a career nothing is kept.
+        assert!(Records::open(Some(&folder), Some("Steam:2")).timeline.is_empty());
+        let mut nowhere = Records::open(None, career);
+        nowhere.take(date(1), player(100));
+        assert!(nowhere.timeline.is_empty());
+        let _ = std::fs::remove_dir_all(&folder);
     }
 
     #[test]

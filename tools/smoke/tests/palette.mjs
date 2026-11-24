@@ -1,5 +1,5 @@
 // The command palette and the keyboard shortcuts: Ctrl+K opens the palette, which finds a player, a member of staff and
-// a club and opens each in its own list; Ctrl+1 to 6 show the tabs, Ctrl+F goes to the list's search, Ctrl+E starts
+// a club and opens each in its own list; Ctrl+1 to 7 show the tabs, Ctrl+F goes to the list's search, Ctrl+E starts
 // and ends the editing of the open profile, Ctrl+R reads the game again without loading the page again; under a dialog
 // the shortcuts wait. Writes nothing.
 import { SHOWN, VIS, sleep } from "../lib/app.mjs";

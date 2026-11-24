@@ -1327,6 +1327,138 @@ export const ko: Strings = {
     unavailableBuild: "이 게임 버전이 스폰서 계약을 어디에 보관하는지 아직 확인되지 않아, 엉뚱한 메모리를 읽지 않도록 표시하지 않습니다.",
     unavailableUnreadable: "편집기는 이 게임 버전에서 예상되는 위치에서 스폰서 계약을 찾았지만, 찾은 내용이 게임의 데이터로 읽히지 않아 표시하지 않습니다.",
   },
+
+  competitions: {
+    nav: "대회",
+    search: "이름, 국가 또는 UID로 대회 검색",
+    summary: (total, shown) =>
+      total > shown ? `대회 ${format(total)}개 중 ${format(shown)}개` : `대회 ${format(total)}개`,
+    empty: (query, filtered) => {
+      if (query === "") {
+        return filtered ? "이 국가에는 스쿼드 규칙이 있는 대회가 없습니다." : "스쿼드 규칙이 있는 대회를 찾지 못했습니다.";
+      }
+      return filtered ? `이 국가에서 “${query}”에 맞는 대회가 없습니다.` : `“${query}”에 맞는 대회가 없습니다.`;
+    },
+    reading: "게임에서 대회의 스쿼드 규칙을 읽는 중… 몇 초 걸립니다.",
+    readAgain: "다시 읽기",
+    readAgainTitle: "게임에서 규칙을 다시 읽습니다",
+    listNote: "스쿼드 규칙이 없는 대회는 표시되지 않습니다.",
+    unavailableTitle: "표시할 스쿼드 규칙이 없습니다",
+    unavailableBuild: "이 게임 버전이 대회의 스쿼드 규칙을 어디에 보관하는지 아직 확인되지 않아, 엉뚱한 메모리를 읽지 않도록 표시하지 않습니다.",
+    unavailableUnreadable: "에디터가 이 게임 버전에서 스쿼드 규칙이 있을 것으로 예상한 곳을 살펴봤지만, 찾은 내용이 게임의 데이터로 읽히지 않아 아무것도 표시하지 않습니다.",
+    columns: {
+      name: "대회",
+      nation: "국가",
+      level: "레벨",
+      rules: "규칙",
+      uid: "UID",
+    },
+    level: (level) => format(level),
+    rulesCount: (current, next) =>
+      next === null || next === current ? format(current) : `${format(current)} · ${format(next)}`,
+    rulesCountTitle: "이번 시즌의 스쿼드 규칙 수. 다음 시즌의 수가 다르면 함께 표시됩니다",
+    international: "국제",
+    filters: {
+      nation: "국가",
+      allNations: "모든 국가",
+    },
+    title: "스쿼드 규칙",
+    intro: "이 대회에서 스쿼드에 등록하거나 팀이 한 경기에 선택할 수 있는 특정 종류의 선수 수입니다. 누가 외국인 또는 홈그로운으로 인정되는지는 게임이 직접 정합니다.",
+    seasons: { current: "이번 시즌", next: "다음 시즌" },
+    began: (year) => `${year}년에 시작`,
+    begins: (year) => `${year}년에 시작 예정`,
+    noRules: "스쿼드 규칙이 없습니다.",
+    noNext: "게임에 다음 시즌 규칙이 없습니다.",
+    ruleColumns: {
+      rule: "규칙",
+      where: "집계 대상",
+      limit: "한도",
+      value: "선수",
+    },
+    atMost: "최대",
+    atLeast: "최소",
+    scopes: {
+      squad: "스쿼드",
+      matchSquad: "경기 엔트리",
+      eleven: "출전 11명",
+      startingEleven: "선발 11명",
+      bench: "벤치",
+    },
+    who: {
+      squadSize: "스쿼드 선수",
+      foreign: "외국인 선수",
+      foreignExceptAsian: "외국인 선수(아시아 선수 제외)",
+      foreignGoalkeepers: "외국인 골키퍼",
+      nonEu: "비EU 선수",
+      domestic: "자국 선수",
+      domesticGoalkeepers: "자국 골키퍼",
+      goalkeepers: "골키퍼",
+      outfield: "필드 플레이어",
+      nonHomegrown: "홈그로운이 아닌 선수",
+      youthContract: "유스 계약 선수",
+      fullTime: "풀타임 계약 선수",
+      amateur: "아마추어 선수",
+      youthOrAmateur: "유스 또는 아마추어 선수",
+      trialists: "테스트 선수",
+      loans: "임대 선수",
+      internationals: "국가대표 선수",
+      otherTeam: "다른 팀에 등록된 선수",
+      firstTeam: "1군에 등록된 선수",
+      over: (age) => `${format(age)}세 초과 선수`,
+      under: (age) => `${format(age)}세 미만 선수`,
+      domesticUnder: (age) => `${format(age)}세 미만 자국 선수`,
+      foreignOver: (age) => `${format(age)}세 초과 외국인 선수`,
+      goalkeepersOver: (age) => `${format(age)}세 초과 골키퍼`,
+      outfieldOver: (age) => `${format(age)}세 초과 필드 플레이어`,
+      homegrown: (from, fromAge, toAge) => {
+        const ages = `${format(fromAge)}–${format(toAge)}세에 육성`;
+        if (from === "club") {
+          return `구단 육성 선수(${ages})`;
+        }
+        return from === "nation" ? `자국 육성 선수(${ages})` : `구단 또는 자국 육성 선수(${ages})`;
+      },
+      homegrownUnder: (age, fromAge, toAge) =>
+        `${format(age)}세 미만 자국 육성 선수(${format(fromAge)}–${format(toAge)}세에 육성)`,
+    },
+    unnamedKind: (kind) => `종류 ${format(kind)} 규칙`,
+    gameKey: (key) => `게임에서 이 규칙의 이름: ${key}`,
+    teamsFrom: (competition) => `${competition} 소속 팀`,
+    teamsFromUnknown: "다른 디비전의 팀",
+    condition: (code) => `조건부(${code})`,
+    conditionTitle: "게임이 자체 조건에 따라 이 규칙을 적용하지만, 에디터는 아직 그 조건을 설명하지 않습니다.",
+    years: (from, to) => {
+      if (from !== null && to !== null) {
+        return from === to ? `${from}` : `${from}–${to}`;
+      }
+      return from !== null ? `${from}년부터` : `${to}년까지`;
+    },
+    yearsTitle: "국가의 규칙이 이 규칙을 적용하는 시즌, 시즌이 시작되는 연도 기준",
+    leftAlone: "건드리지 않음",
+    notSavedTitle: "저장 파일이 보관하는 국가의 규칙에는 이런 규칙이 없어서, 변경해도 저장 파일을 불러오면 사라집니다. 에디터는 이 규칙을 건드리지 않습니다.",
+    notACountTitle: "선수 수가 아니라 금액입니다. 에디터는 건드리지 않습니다.",
+    noneChangeable: "이 규칙들은 시기와 관계없이 아직 변경할 수 없습니다. 에디터는 저장 파일이 보관하는 규칙에서도 같은 규칙을 찾은 경우에만 변경하는데(저장 파일을 불러와도 변경이 남도록), 이 대회의 규칙은 거기에서 찾지 못했습니다. 현재 여자 리그, 메이저 리그 사커, 일부 컵 대회가 이에 해당합니다.",
+    unsavedNote: "게임은 이 대회의 규칙을 어떤 저장 파일에도 보관하지 않습니다. 저장 파일을 불러올 때마다, 그리고 새 시즌마다 게임이 직접 다시 만듭니다. 그래서 에디터가 여기서 바꾼 내용을 유지합니다. 실행 중인 게임에 기록하고, 이 커리어용으로 기억해 두었다가, 연결하거나 데이터를 다시 불러올 때마다 다시 기록합니다. 저장 파일을 불러온 뒤에는 변경 사항이 돌아오도록 에디터를 한 번 연결하세요(또는 데이터 다시 불러오기를 누르세요). 변경 내역의 되돌리기를 누르면 유지를 해제합니다.",
+    heldTag: "유지 중",
+    heldTitle: (original) => `에디터가 이 수치를 유지하며 게임을 읽을 때마다 다시 기록합니다. 게임의 원래 값은 ${format(original)}입니다.`,
+    savedDiffers: (value) => `저장 파일의 규칙에는 ${format(value)}`,
+    savedDiffersTitle: "게임은 목록에 따라 진행하며, 저장 파일을 불러올 때 저장 파일의 규칙으로 목록을 만듭니다. 여기서 변경을 저장하면 둘 다 설정됩니다.",
+    edit: "규칙 변경",
+    editTitle: "이 대회의 스쿼드 규칙 수치를 변경합니다",
+    save: "규칙 저장",
+    saving: "저장하는 중…",
+    cancel: "취소",
+    invalid: (most) => `0부터 ${format(most)}까지의 정수를 입력하세요.`,
+    shared: (names) => `이 규칙은 ${names}의 규칙이기도 합니다. 변경은 그쪽에도 적용됩니다.`,
+    currentNote: (turn) =>
+      `여기서 바꾼 내용은 이번 시즌이 끝날 때까지 적용됩니다${turn === null ? "" : ` (시즌은 ${turn}에 바뀝니다)`}. 게임은 변경 사항을 반영해 스쿼드를 바로 집계합니다. 게임 자체 화면에는 하루가 지나야 표시됩니다.`,
+    nextNote: (turn) =>
+      `여기서 바꾼 내용은 시즌이 바뀔 때${turn === null ? "" : `(${turn})`} 이번 시즌의 규칙이 되며, 더 뒤의 시즌에 대해 게임에 별도의 규칙이 없는 한 그 뒤 시즌에도 유지됩니다. 게임의 다음 시즌 페이지에는 바로 표시됩니다.`,
+    lasts: "변경 사항은 게임이 따르는 목록과 저장 파일이 보관하는 국가의 규칙에 모두 기록되므로, 저장 파일을 불러와도 그대로 남아 있습니다. 이번 시즌 규칙의 변경은 시즌이 바뀌면 끝나고, 다음 시즌의 규칙이 그 자리를 대신합니다. 변경 내역의 되돌리기를 누르면 이전 수치로 돌아갑니다.",
+    infoLabel: "스쿼드 규칙 변경이 유지되는 방식",
+    ruleField: (season, rule) => `스쿼드 규칙, ${season}: ${rule}`,
+    alsoFor: (count) =>
+      count === 1 ? "같은 규칙을 쓰는 다른 대회 1곳에도 적용" : `같은 규칙을 쓰는 다른 대회 ${format(count)}곳에도 적용`,
+  },
   app: {
     stage: "베타",
     settingsLabel: "설정",
@@ -1585,7 +1717,7 @@ export const ko: Strings = {
       change: "변경",
       status: "상태",
     },
-    kinds: { player: "선수", staff: "스태프", club: "구단", nationalTeam: "국가대표" },
+    kinds: { player: "선수", staff: "스태프", club: "구단", nationalTeam: "국가대표", competition: "대회" },
     stored: (change) => `저장된 값 ${change}`,
     undone: (time) => `${time}에 되돌림`,
     undo: "되돌리기",
@@ -2206,6 +2338,23 @@ export const ko: Strings = {
     cancel: "취소",
   },
 
+  batchTraits: {
+    title: "선수단 선호 플레이 설정",
+    addMode: "+ 선수단에 추가",
+    removeMode: "- 선수단에서 삭제",
+    addHint: "선택한 선호 플레이를 아직 가지고 있지 않은 선수에게 추가합니다. 기존 선호 플레이는 유지됩니다.",
+    removeHint: "선택한 선호 플레이를 보유한 선수에게서 삭제합니다. 다른 선호 플레이는 변경되지 않습니다.",
+    noneSelected: "선택된 선호 플레이 없음",
+    selectedCount: (count: number) => `${format(count)}개 선택됨`,
+    deselectAll: "모두 선택 해제",
+    oppositeModeNote: "반대 모드에서 선택됨",
+    applyNote: (players: number) => `선수 ${format(players)}명에게 적용 · 한 번의 클릭으로 되돌리기 가능`,
+    emptySquad: (players: number) => `선수 ${format(players)}명으로 구성된 팀`,
+    cancel: "취소",
+    apply: "적용",
+    applying: "적용 중…",
+  },
+
   squad: {
     teamsLabel: "팀",
     teams: {
@@ -2252,6 +2401,8 @@ export const ko: Strings = {
     tacticsUntrained: (count) => `${playerCount(count)}은 훈련하지 않아(부상 등) 훈련 기록이 그대로 남습니다`,
     refreshAll: "모두 회복",
     refreshAllTitle: "이 팀 모든 선수의 컨디션과 경기력을 100%로 설정하고 완전히 쉬게 합니다(피로도 -500)",
+    batchTraits: "선수단 선호 플레이 일괄 설정",
+    batchTraitsTitle: "이 팀 선수의 선호 플레이를 일괄 추가하거나 삭제합니다",
     maxAll: "능력치 최대",
     maxAllTitle: "이 팀 모든 선수의 모든 능력치를 최고로 만듭니다. 20으로, 부상 빈도와 더티 플레이는 1로 설정합니다",
     atItsBest: "팀 최상 상태",
@@ -2260,6 +2411,33 @@ export const ko: Strings = {
       "실행할 수 없는 단계(부상 선수가 없을 때의 '모두 치료' 등)는 건너뛰고 결과에 그 사실을 표시합니다. 전술 영역은 훈련이 오래되면 약 6주 뒤부터 다시 떨어지며, 다른 전술로 바꾸면 다시 " +
       "눌러야 합니다. 게임이 진행된 뒤 화면에 반영됩니다. 게임에서 '진행하기'를 누르세요",
     atItsBestSkipped: (step, reason) => `'${step}' 건너뜀: ${reason}`,
+    destroy: "팀 최악 상태",
+    destroyTitle:
+      "이 팀의 모든 선수를 최악의 상태로 만듭니다: 사기와 만족도, 컨디션, 경기력과 피로도, 구단과의 결속력, " +
+      "그리고 팀 전술을 직접 고르는 경우 전술 숙련도. 어떤 값도 지금보다 좋아지지 않으며, 능력치, 부상, 출장 " +
+      "정지는 그대로입니다. 실행 전에 확인하며, '되돌리기' 한 번으로 모두 취소할 수 있습니다",
+    destroySteps: {
+      demoralize: "사기와 만족도",
+      exhaust: "컨디션과 경기력",
+      minCohesion: "결속력",
+      minTactics: "전술",
+    },
+    moreActions: "다른 작업",
+    moreActionsTitle: "팀 전체 작업을 하나씩",
+    destroyDialog: {
+      title: "팀을 최악의 상태로 만들까요?",
+      doesHeading: "목록의 모든 선수 대상(임대를 떠난 선수 포함)",
+      does: [
+        "사기를 최저인 1로, 만족도와 출전 시간 만족도를 -100으로",
+        "컨디션 0%, 경기력 35%, 피로도 1000으로",
+        "구단과의 결속력을 1로(결속력 기록이 있는 선수)",
+        "전술 숙련도를 최저로(팀 전술을 직접 고르는 경우)",
+      ],
+      keeps: "어떤 값도 지금보다 좋아지지 않습니다. 능력치, 부상, 출장 정지는 그대로입니다.",
+      ownClub: "내 구단의 팀입니다.",
+      hint: "게임이 진행되기 전이라면 '되돌리기' 한 번으로 모두 취소할 수 있습니다.",
+      cancel: "취소",
+    },
     hint: "작업은 목록의 모든 선수에게 적용되며, 임대를 떠난 선수도 포함됩니다. 변경 내역 화면에서도 되돌릴 수 있습니다.",
 
     // Freezing the whole team
@@ -2923,6 +3101,31 @@ export const ko: Strings = {
     },
   },
 
+  /** A player's development: the Development tab of his profile, the note under his abilities, the squad's arrows (see en.ts). */
+  progress: {
+    tabsLabel: "선수 프로필 구역",
+    tabs: { overview: "프로필", progress: "성장" },
+    lockedWhileEdited: "이 탭을 열려면 편집을 마치세요",
+    openTab: "성장 탭 열기",
+    loading: "기록을 읽는 중…",
+    failed: (reason: string) => `기록을 읽지 못했습니다: ${reason}`,
+    since: (date: string) => `${date} 이후`,
+    change: (from: string, to: string, date: string) => `${date} 이후 ${from} → ${to}`,
+    rangeLabel: "기간",
+    ranges: { quarter: "3개월", year: "1년", all: "전체" },
+    recorded: (count: number, first: string) => `기록: ${count}개 · 첫 기록 ${first}`,
+    abilityTitle: "능력",
+    valueTitle: "가치",
+    attributesTitle: "변한 능력치",
+    noAttributeChanges: (date: string) => `${date} 이후 변한 능력치가 없습니다.`,
+    emptyTitle: "아직 비교할 기록이 없습니다",
+    emptyText:
+      "앱은 게임 데이터를 읽을 때마다, 게임 시간으로 약 일주일에 한 번 모든 선수의 능력, 가치, 능력치를 기록합니다. 게임을 진행하고 데이터를 다시 읽으면 이 선수의 성장이 여기에 표시됩니다.",
+    offTitle: "이 저장 파일에는 기록이 없습니다",
+    offText:
+      "앱은 직접 조종하는 감독이 있는 저장 파일에서, 데이터가 앱의 검사를 통과하는 게임 버전일 때 기록을 남깁니다.",
+  },
+
   /** The command palette and the names of the keys in the keyboard shortcuts (see en.ts). */
   palette: {
     button: "검색",
@@ -2990,6 +3193,36 @@ export const ko: Strings = {
     link: "새 기능",
     command: "이 버전의 새 기능",
     versions: {
+      "0.5.4": [
+        {
+          title: "선수 경력에 남는 이적.",
+          text: "선수를 옮길 때 첫 번째 선택지가 된 이적은 게임의 다음 날로 이적을 예약합니다. 게임이 자신의 이적처럼 처리해 이적료를 지급하고 선수의 경력 기록에 남기며, 이번 시즌 이전 구단에서 뛴 경기는 별도의 줄로 남습니다. 바로 이동은 지금처럼 즉시 옮깁니다.",
+        },
+        {
+          title: "팀 최상 상태와 팀 최악 상태.",
+          text: "구단의 선수단 탭에서 한 번 누르면 팀 전체를 치료하고 사기를 높이고 회복시키며 결속력과 전술을 최고로 올립니다. 팀 최악 상태는 확인을 거친 뒤 그 반대로 합니다. 어느 쪽이든 되돌리기 한 번으로 취소되며, 개별 작업은 다른 작업에 있습니다.",
+        },
+        {
+          title: "선수단 선호 플레이 일괄 설정.",
+          text: "구단의 선수단 탭에서 다른 작업 메뉴의 선수단 선호 플레이 일괄 설정으로 고른 특성을 팀 선수 전원에게 추가하거나 삭제합니다. 다른 특성은 그대로 둡니다. 되돌리기 한 번으로 취소됩니다.",
+        },
+        {
+          title: "스태프 전원 이적.",
+          text: "구단의 스태프 탭에서 스태프 전원을 한 번에 다른 구단으로, 각자 같은 직책 그대로 옮깁니다. 되돌리기 한 번이면 모두 돌아옵니다.",
+        },
+        {
+          title: "국가대표.",
+          text: "국가대표 성인 팀 선수단에 모두 치료, 모두 사기 진작, 모두 회복이 생겼고, 선수단 표에 컨디션, 경기력, 사기가 표시됩니다.",
+        },
+        {
+          title: "스폰서 계약.",
+          text: "구단 재정에 스폰서 계약을 읽기 전용으로 보여 줍니다. 각 계약이 시즌마다, 그리고 전체로 지급하는 금액, 기간, 강등 시 달라지는 내용을 볼 수 있습니다. 현재는 Game Pass 0.9.2524.0에서만 됩니다.",
+        },
+        {
+          title: "수정.",
+          text: "일부 커리어에서 스태프를 제대로 읽었는데도 스태프 검사가 실패해 스태프가 읽기 전용이 되고 치료, 결속력 최대, 전술 최대가 거부되었습니다. 이제 통과합니다.",
+        },
+      ],
       "0.5.3": [
         {
           title: "FM27의 11월 17일 업데이트.",

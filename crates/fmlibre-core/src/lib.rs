@@ -35,9 +35,11 @@ mod own_memory;
 mod players;
 mod prize_money;
 mod profile;
+mod records;
 mod relations;
 mod retirement;
 pub mod rtti;
+mod rules;
 mod scan;
 mod scout_lists;
 mod scouting;
@@ -52,6 +54,7 @@ mod staff;
 mod staff_move;
 mod tactical_areas;
 mod text;
+mod timeline;
 mod transfer;
 mod tree;
 mod youth_intake;
@@ -108,6 +111,10 @@ pub use profile::{
 };
 pub use relations::{HOMEGROWN_RULES, Relation, RelationPlan, RelationSet, Tie, TieTarget};
 pub use retirement::{PlannedRetirement, RetirementPlan, RetirementSet};
+pub use rules::{
+    CompetitionRules, MOST_RULE_VALUE, RecordedRule, Registration, RuleChange, RuleEdit, RuleError, RulePlaces,
+    RuleReadError, RuleRecord, RuleSource, RuleUnavailable, Season, SeasonTurn, SquadRule,
+};
 pub use scan::{ArrayCandidate, ScanOptions, VtableCount, scan_object_arrays};
 pub use scout_lists::{
     KIND_MOST, KindCount, OPPORTUNITY_KINDS, Opportunities, Opportunity, OpportunityKind, OpportunityRequest,
@@ -133,6 +140,7 @@ pub use staff_move::{
 };
 pub use tactical_areas::area_options;
 pub use text::{fold, is_name_like, read_fm_string, read_name_entry};
+pub use timeline::{Earlier, Progress, RECORD_EVERY_DAYS, Timeline, timeline_fields, timeline_values};
 pub use transfer::{Amounts, ClubMoney, ClubMove, FeePlan, MAX_FEE, MoveError, MovePlan, MoveTerms, Paid, RoomMaker};
 pub use tree::Tree;
 pub use youth_intake::{City, INTAKE_AGE, Intake, IntakePlayer, IntakeTeam, MADE_BY_GAME, YouthIntakes};

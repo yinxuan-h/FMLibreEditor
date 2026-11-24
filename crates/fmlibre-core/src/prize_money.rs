@@ -444,7 +444,7 @@ impl Session {
         })
     }
 
-    fn read_competition(&self, address: u64, layout: &CompetitionLayout) -> Option<Competition> {
+    pub(crate) fn read_competition(&self, address: u64, layout: &CompetitionLayout) -> Option<Competition> {
         if !is_user_pointer(address) {
             return None;
         }

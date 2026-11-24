@@ -608,3 +608,39 @@ due_number = 0x0C
 player_offer_numbers = 0x2E0 # 0x320 on Windows
 player_entries = 0x2E8       # 0x328 on Windows
 record_size = 0x18           # (begin, end, capacity), in a block of 24 of the game's; 0x28 on Windows
+
+# The rules a competition's squads are registered under (see layout.toml, crates/fmlibre-core/src/rules.rs and
+# docs/recon/fm27-league-rules.md), read on the Mac (Steam build 26620374, Apple silicon, the Arsenal save of 18 July
+# 2027). A competition as it is played starts with a lock, pthread's ('MUTX'), which takes 0x18 bytes more than the
+# Windows one, so the fields after it sit 0x18 further on; a rule group's pointer to its nation's rules sits 0x10
+# further on, and the records in a nation's container 8. The sets of fixture rules, their lists and the rules are laid
+# out as on Windows, and the records read alike, their traits told by the Itanium names of their classes. As on
+# Windows, 550 competitions read as played, 426 with squad rules, and 451 kinds of rule named by the game; the Premier
+# League (England's fixture rules 6) at least 8 players trained in the nation and at most 25 in the squad, in each
+# season.
+[rules]
+competition_class = "sicomps::ACTUAL_COMP"
+competition_db = 0x138        # 0x120 on Windows
+competition_record = 0x50     # 0x38 on Windows
+competition_group = 0x388     # 0x370 on Windows
+db_competition = 0xB0
+group_nation_rules = 0x1F0    # 0x1E0 on Windows
+nation_fixture_rules = 0x60
+fixture_next = 0x68
+fixture_squad_rules = 0x70
+# The days squads are registered by, as on Windows: UEFA's set holds the Champions, Europa and Conference League's six
+# each, 25 players a day, in a table of 74 places, 18 in use.
+fixture_registration = 0x18
+registration_size = 0x40
+registration_competition = 0x14
+registration_key = 0x18
+registration_most = 0x26
+rule_size = 0x20
+rule_condition = 0x00
+rule_competition = 0x04
+rule_value = 0x18
+rule_kind = 0x1C
+rule_compare = 0x1E
+container_rules = 0x578       # 0x570 on Windows
+container_files = 0x590       # 0x588 on Windows
+kind_anchor = "all_foreign_players_in_squad"
