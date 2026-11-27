@@ -191,6 +191,25 @@ export class App {
 
   /** Clicks the element `elementExpression` finds as a person would: scrolled to, and at its middle once at rest. */
   async click(elementExpression, what) {
+    const at = await this.middle(elementExpression, what);
+    await this.clickAt(at.x, at.y);
+  }
+
+  /**
+   * The note of the element `elementExpression` finds (its `data-tip`, see `Tips` in the app), as the app shows it: the
+   * pointer comes from elsewhere and rests on the element, and the text of the box that then shows is returned.
+   */
+  async note(elementExpression, what) {
+    const at = await this.middle(elementExpression, what);
+    await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1 });
+    await this.waitFor(`!document.querySelector(".tip")`, `no note before that of ${what}`);
+    await this.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x, y: at.y });
+    await this.waitFor(`document.querySelector(".tip")`, `the note of ${what}`);
+    return this.js(`document.querySelector(".tip").textContent`);
+  }
+
+  /** Where the middle of the element `elementExpression` finds is, once it is scrolled to and at rest. */
+  async middle(elementExpression, what) {
     const found = await this.js(`(() => {
       document.querySelectorAll("[data-smoke-click]").forEach((e) => e.removeAttribute("data-smoke-click"));
       const el = ${elementExpression};
@@ -200,7 +219,7 @@ export class App {
       if (b.top < 0 || b.bottom > innerHeight) el.scrollIntoView({ block: "center", inline: "nearest" });
       return true;
     })()`);
-    if (!found) throw new Error(`nothing to click: ${what}`);
+    if (!found) throw new Error(`nothing there: ${what}`);
     let at = null;
     for (let i = 0; i < 10; i++) {
       await sleep(120);
@@ -211,7 +230,7 @@ export class App {
       if (at && now.x === at.x && now.y === at.y) break;
       at = now;
     }
-    await this.clickAt(at.x, at.y);
+    return at;
   }
 
   async press(key, shift = false) {

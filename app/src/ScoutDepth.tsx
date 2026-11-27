@@ -168,13 +168,13 @@ function LineRow({
     <tr className="scout-line-card" data-line={line.key} data-status={line.status}>
       <td className="scout-depth-line">{name}</td>
       <td className="scout-depth-status">
-        <span className="scout-status" data-status={line.status} title={text.depth.statusHelp[line.status]}>
+        <span className="scout-status" data-status={line.status} data-tip={text.depth.statusHelp[line.status]}>
           {text.status[line.status]}
         </span>
         {line.weak && <span className="tag scout-flag">{text.depth.weak}</span>}
         {line.ageing && <span className="tag scout-flag">{text.depth.ageing}</span>}
       </td>
-      <td className="num scout-depth-count" title={text.depth.countTitle(line.players.length, line.target)}>
+      <td className="num scout-depth-count" data-tip={text.depth.countTitle(line.players.length, line.target)}>
         <strong>{line.players.length}</strong>
         <span className="muted"> / {line.target}</span>
       </td>

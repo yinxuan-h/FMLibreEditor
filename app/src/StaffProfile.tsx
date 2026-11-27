@@ -270,7 +270,7 @@ function JobChange({ uid, job }: { uid: number; job: number }) {
       <button
         type="button"
         className="job-change"
-        title={profileText.changeJobTitle}
+        data-tip={profileText.changeJobTitle}
         onClick={() => {
           setPicked(job);
           setError(null);

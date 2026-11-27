@@ -9,9 +9,9 @@
 //!   agrees with, which [`crate::health`] works out from contracts and injuries, the values about as far from the
 //!   players' array as another build keeps its date marked as such, and where values for two days fit as well, the
 //!   day more places hold;
-//! - the retirement manager's static and the game object's, each as far from the players' array as another build keeps
-//!   it, or else by searching the plugin's writable data for a pointer to the one object of its class (see
-//!   [`crate::rtti`]).
+//! - the retirement manager's static, the game object's and those of the tactics and the training managers (see
+//!   [`Manager`]), each as far from the players' array as another build keeps it, or else by searching the plugin's
+//!   writable data for a pointer to the one object of its class (see [`crate::rtti`]).
 //!
 //! Only reads memory.
 
@@ -140,22 +140,36 @@ pub fn date_candidates(session: &Session) -> Vec<DatePlace> {
     found
 }
 
+/// Where a static pointer to the one object of a class is: at `placed`, where the build profile puts it, when `holds`
+/// says the 8 bytes there point at the object; else at the first of the `guesses` that does; else at the first of the
+/// places `search` finds, each of which points at an object of the class.
+fn place_of(
+    placed: Option<u64>,
+    guesses: impl FnOnce() -> Vec<u64>,
+    holds: impl Fn(u64) -> bool,
+    search: impl FnOnce() -> Vec<u64>,
+) -> Option<Place> {
+    if let Some(rva) = placed.filter(|&rva| holds(rva)) {
+        return Some(Place { rva, found: Found::Profile });
+    }
+    if let Some(rva) = guesses().into_iter().find(|&rva| holds(rva)) {
+        return Some(Place { rva, found: Found::Guessed });
+    }
+    search().first().map(|&rva| Place { rva, found: Found::Searched })
+}
+
 /// Where the static pointer to the retirement manager is: where the build profile puts it, or as far from the
 /// players' array as another build keeps it, or else wherever the plugin's writable data points at the manager.
 /// `None` when the layout does not place the manager's lists, or nothing checks out.
 pub(crate) fn find_retirement_manager(session: &Session) -> Option<Place> {
     session.layout.retirement.as_ref()?;
-    let profiled = session.placed_retirement_manager();
-    if let Some(rva) = profiled.filter(|&rva| holds_retirement_manager(session, rva)) {
-        return Some(Place { rva, found: Found::Profile });
-    }
-    let guessed = retirement_guesses(session).into_iter().find(|&rva| holds_retirement_manager(session, rva));
-    if let Some(rva) = guessed {
-        return Some(Place { rva, found: Found::Guessed });
-    }
-    let found = search_retirement_manager(session);
-    // Each pointer the search found leads to the manager; there has only ever been one.
-    found.first().map(|&rva| Place { rva, found: Found::Searched })
+    // Each pointer the search finds leads to the manager; there has only ever been one.
+    place_of(
+        session.placed_retirement_manager(),
+        || retirement_guesses(session),
+        |rva| holds_retirement_manager(session, rva),
+        || search_retirement_manager(session),
+    )
 }
 
 /// Where other builds would have the static pointer to the retirement manager: as far from the players' array as each
@@ -170,16 +184,84 @@ pub fn retirement_guesses(session: &Session) -> Vec<u64> {
 /// at the object. `None` when the layout does not place the object's count of saves loaded, or nothing checks out.
 pub(crate) fn find_game_ui(session: &Session) -> Option<Place> {
     session.layout.game.as_ref()?;
-    let profiled = session.placed_game_ui();
-    if let Some(rva) = profiled.filter(|&rva| holds_game_ui(session, rva)) {
-        return Some(Place { rva, found: Found::Profile });
-    }
-    let guessed = game_ui_guesses(session).into_iter().find(|&rva| holds_game_ui(session, rva));
-    if let Some(rva) = guessed {
-        return Some(Place { rva, found: Found::Guessed });
-    }
     // More than one static points at the object (two on Game Pass 0.9.2409.0); each leads to it.
-    search_game_ui(session).first().map(|&rva| Place { rva, found: Found::Searched })
+    place_of(
+        session.placed_game_ui(),
+        || game_ui_guesses(session),
+        |rva| holds_game_ui(session, rva),
+        || search_game_ui(session),
+    )
+}
+
+/// A manager of the game that Max tactics reads, besides the retirement manager: the one object of its class, which a
+/// static pointer in the plugin leads to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Manager {
+    /// `TACTICS_MANAGER`, which keeps the tactics the human managers pick for their teams
+    /// ([`crate::profile::TacticsLayout`]).
+    Tactics,
+    /// `TRAINING_MANAGER`, which keeps the history of training of the human managers' players
+    /// ([`crate::profile::FamiliarityLayout`]).
+    Training,
+}
+
+impl Manager {
+    /// Its class, as written in C++.
+    pub fn class(self) -> &'static str {
+        match self {
+            Manager::Tactics => "TACTICS_MANAGER",
+            Manager::Training => "TRAINING_MANAGER",
+        }
+    }
+
+    /// Where `profile` puts its static pointer.
+    pub fn placed(self, profile: &BuildProfile) -> Option<u64> {
+        match self {
+            Manager::Tactics => profile.tactics_manager,
+            Manager::Training => profile.training_manager,
+        }
+    }
+
+    /// The layout places what it keeps.
+    fn laid_out(self, session: &Session) -> bool {
+        match self {
+            Manager::Tactics => session.layout.tactics.is_some(),
+            Manager::Training => session.layout.familiarity.is_some(),
+        }
+    }
+}
+
+/// Where the static pointer to `manager` is, found as the retirement manager's is: where the build profile puts it, or
+/// as far from the players' array as another build keeps it, or else wherever the plugin's writable data points at the
+/// one object of its class. `None` when the layout does not place what it keeps, or nothing checks out.
+pub(crate) fn find_manager(session: &Session, manager: Manager) -> Option<Place> {
+    if !manager.laid_out(session) {
+        return None;
+    }
+    place_of(
+        session.placed_manager(manager),
+        || manager_guesses(session, manager),
+        |rva| holds_manager(session, manager, rva),
+        || search_manager(session, manager),
+    )
+}
+
+/// Where other builds would have the static pointer to `manager`, as [`retirement_guesses`] works it out.
+pub fn manager_guesses(session: &Session, manager: Manager) -> Vec<u64> {
+    guesses(session, |profile| manager.placed(profile))
+}
+
+/// Whether the 8 bytes at `rva` in the plugin point at `manager`'s object.
+pub fn holds_manager(session: &Session, manager: Manager, rva: u64) -> bool {
+    session
+        .process
+        .read_u64(session.plugin.base + rva)
+        .is_ok_and(|object| is_user_pointer(object) && session.is_manager(manager, object))
+}
+
+/// Every place in the plugin's writable data that points at an object of `manager`'s class, by RVA.
+pub fn search_manager(session: &Session, manager: Manager) -> Vec<u64> {
+    pointers_to(session, manager.class())
 }
 
 /// Where other builds would have the static pointer to the game's own object, as [`retirement_guesses`] works it out.
@@ -227,15 +309,8 @@ fn guesses_from(
     place: impl Fn(&BuildProfile) -> Option<u64>,
 ) -> Vec<u64> {
     let (players, fingerprint, storefront) = this;
-    let same_kind = |profile: &BuildProfile| {
-        matches!(
-            (profile.plugin, fingerprint),
-            (PluginFingerprint::Pe { .. }, PluginFingerprint::Pe { .. })
-                | (PluginFingerprint::MachO { .. }, PluginFingerprint::MachO { .. })
-        )
-    };
     let mut others: Vec<BuildProfile> =
-        profiles.filter(|profile| profile.plugin != fingerprint && same_kind(profile)).collect();
+        profiles.filter(|profile| profile.plugin != fingerprint && profile.plugin.same_kind(fingerprint)).collect();
     others.sort_by_key(|profile| profile.storefront != storefront);
     let mut guesses = Vec::new();
     for profile in others {
@@ -323,11 +398,11 @@ mod tests {
         // before (0x14A0 on Game Pass 0.9.2524.0, 0x1480 on Steam build 26620374): there the search found it, the one
         // date that fits best on a save of 18 January 2028, and the only one but the field beside the arrays on a save
         // of 14 October 2026. On a Game Pass save of 23 October 2026 the day after fitted as well, and the search told
-        // the date by the places that held it, three against one. Their profiles guess the next builds' dates. The
-        // Epic profile of the same update now guesses Steam build 26620374's date, so that one is no longer beyond the
-        // guesses.
+        // the date by the places that held it, three against one. Their profiles guess the next builds' dates: the
+        // Epic profile of the same update guesses Steam build 26620374's, and on the update of 24 November 2026 Game
+        // Pass 0.9.2562.0 kept its date 0x20 from where 0.9.2524.0 keeps it, so each guesses the other's. No build is
+        // beyond the guesses now.
         let kind = |profile: &BuildProfile| std::mem::discriminant(&profile.plugin);
-        let beyond_the_guesses = |profile: &BuildProfile| profile.package_version.as_deref() == Some("0.9.2524.0");
         for profile in profiles.iter().filter(|profile| profile.current_date.is_some()) {
             let date = profile.current_date.expect("a date");
             let siblings = profiles.iter().any(|other| {
@@ -337,8 +412,7 @@ mod tests {
                     && other.current_date.is_some()
             });
             if siblings {
-                let guessed = near(&guesses_for(profile), date);
-                assert_eq!(guessed, !beyond_the_guesses(profile), "{}: {date:#x}", profile.name);
+                assert!(near(&guesses_for(profile), date), "{}: {date:#x}", profile.name);
             }
         }
         // The value the game keeps for the day before, on Game Pass, is far from every guess.

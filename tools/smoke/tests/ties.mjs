@@ -118,6 +118,9 @@ export async function run({ app, report, probe }) {
   const tie = player.ties.find((t) => t.tie === "trainedAtClub");
   const other = clubs.find((club) => !player.ties.some((t) => t.tie === "trainedAtClub" && t.targetUid === club.uid));
   await app.openTab("Players");
+  // Emptied first: an earlier test may have left the same search there, with a row it changed and undid through the
+  // command, which the list is not told of, so that typing it again would not read the list again.
+  await app.setInput(`${VIS}(".search input")`, "");
   await app.setInput(`${VIS}(".search input")`, String(player.uid));
   const rows = `[...document.querySelectorAll("table.grid tbody tr")].filter(${SHOWN})`;
   await app.waitFor(`${rows}.length === 1 && ${rows}[0].textContent.includes(${JSON.stringify(player.name)})`, "his row");

@@ -94,6 +94,8 @@ export interface ConnectionInfo {
    * its transfers, and the editor can take memory of the game's own (Windows).
    */
   arrangesTransfers: boolean;
+  /** Whether a loan can be arranged the same way (`arrange_loan`): the layout places the game's loan offers too. */
+  arrangesLoans: boolean;
   /** What the checks the editor makes before it writes found on this game. */
   health: Health;
   /** Only from `connect`: what it froze again of what was frozen in this save before, when there was any. */
@@ -287,6 +289,29 @@ export interface NationalProfile {
   team: NationalTeamSummary;
   teams: NationalSide[];
   squad: ClubTeam;
+  /** What the profile shows of the nation and its federation; null where this version of the game has it unplaced. */
+  nation: NationDetails | null;
+}
+
+/**
+ * What a national team's profile shows of its nation and federation, as the game's nation page and staff list show it
+ * (see docs/recon/fm27-national-teams.md). The staff are the federation's for the men's or the women's teams.
+ */
+export interface NationDetails {
+  /** The year the federation was founded; null where the game has none. */
+  founded: number | null;
+  /** The continent's name, in the game's language. */
+  continent: string | null;
+  /** Grouped by team, in the order the teams are listed. */
+  staff: FederationMember[];
+}
+
+/** A member of a federation's staff: his job in the national team, and the kind of the team (see `NationalSide`). */
+export interface FederationMember {
+  member: StaffSummary;
+  /** An FM job code, as `StaffSummary.job`; not the job at his club, which `member` has. */
+  job: number | null;
+  teamKind: number | null;
 }
 
 /**
@@ -466,7 +491,7 @@ export interface CompetitionRules {
 /** The competitions' squad rules, or why this version of the game shows none (`competition_rules`). */
 export interface CompetitionRulesRead {
   unavailable: RuleUnavailable | null;
-  /** The competitions with a squad rule this season or the next. */
+  /** Every competition the game is playing: about a quarter have no squad rule this season or the next. */
   competitions: CompetitionRules[];
   /** The rules the editor holds in this save. */
   held: HeldRule[];
@@ -1140,6 +1165,8 @@ export interface LoggedChange {
      * 20261019. The game moves him and pays the fee on that day; until then he is at his club.
      */
     arranged?: number;
+    /** For a loan arranged for the game to make (`arrange_loan`): its last day, as a number like 20280629. */
+    loanUntil?: number;
   };
   /**
    * Set for a change to a player's ties, which is logged as a change of his field `tie.nationality`,
@@ -1202,9 +1229,19 @@ export interface LoggedChange {
   };
 }
 
-/** One of a club's teams as its squad screen shows it, from `club_squads`; the senior team comes first. */
+/**
+ * One of a club's teams as its squad screen shows it, from `club_squads`; the senior team comes first. After the club's
+ * own teams come its linked teams: a B team the game keeps as a club of its own (1. FC Nürnberg II).
+ */
 export interface ClubTeam {
-  /** Where it is in the club's list of teams; 0 is the senior team. */
+  /**
+   * The club the team belongs to, which with `index` is what a write to the team names: the club whose squad this is,
+   * or for a linked team the club the game keeps it as.
+   */
+  clubUid: number;
+  /** For a linked team, the short name of the club it belongs to; null for the club's own teams. */
+  linkedClub: string | null;
+  /** Where it is in the list of teams of the club it belongs to; 0 is the senior team. */
   index: number;
   /**
    * The game's code for the kind of team. Seen on the test save: 0 the first team, 3 a B team (Juventus Next Gen),
@@ -1361,6 +1398,36 @@ export interface ArrangedPreview {
   contract: NewContract;
 }
 
+/** A loan's terms, as the dialog sends them (`plan_arranged_loan`, `arrange_loan`). */
+export interface LoanRequest {
+  /** The loan's last day, as a number like 20280629: he is back at his club the next day. */
+  until: number;
+  /** The part of his wage the club he joins pays, in percent (0 to 100). */
+  wageShare: number;
+  /** Pounds a month the club he joins pays his own club. */
+  monthlyFee: number;
+  /** Pounds for which the club he joins signs him for good when the loan ends; null for none. */
+  optionFee: number | null;
+}
+
+/** A loan the game is to make the next day, as the plan has it (`plan_arranged_loan`). */
+export interface LoanPreview {
+  from: ClubName;
+  to: ClubName;
+  /** The day the game makes the loan, and its last day, as numbers like 20261019. */
+  moveDay: number;
+  until: number;
+  /** Pounds a week of his wage the club he joins pays, and the part of his wage that is, in percent. */
+  wage: number;
+  wageShare: number;
+  /** Pounds a month the club he joins pays his own. */
+  monthlyFee: number;
+  /** Pounds for which the club he joins signs him when the loan ends; absent for none. */
+  optionFee?: number;
+  /** His squad status at the club he joins. */
+  squadStatus: number;
+}
+
 /** The contract the editor makes for a member of staff who has no club, as the plan has it. */
 export interface NewStaffContract {
   /** Pounds per week. */
@@ -1487,6 +1554,53 @@ export interface MassReport {
   applied: number;
   /** Changes not written, e.g. because the game changed the value after the preview. */
   failed: { uid: number; name: string; field: string; error: Failure }[];
+}
+
+/** A recipe there is, from `recipes`: a named set of edits to one player or one club (see `RecipeMenu`). */
+export interface RecipeInfo {
+  /** What its name and its note are filed under: "wonderkid", "richClub". */
+  key: string;
+  entity: "player" | "club";
+  /** The oldest player it is for; null when age does not matter to it. */
+  oldest: number | null;
+}
+
+/** A value a recipe leaves as it is because it is as good already, or better; as stored. */
+export interface KeptValue {
+  field: string;
+  value: number;
+}
+
+/** A step on the game's own lists that a recipe leaves out, and why, as a `Failure` says it. */
+export interface LeftOutStep {
+  step: "heal" | "keepPlaying";
+  reason: string;
+  code: string;
+  params: Record<string, string>;
+}
+
+/** From `plan_recipe`: what applying the recipe would do to one player or club. Nothing is written yet. */
+export interface RecipePreview {
+  /** Pass to `apply_recipe` to write exactly these changes. */
+  id: number;
+  recipe: string;
+  entity: "player" | "club";
+  uid: number;
+  name: string;
+  /** How many changes Apply logs: one for each value, and one for each step on the game's lists. */
+  changes: number;
+  /** The values that change. */
+  rows: PlannedChange[];
+  /** The values that stay, as good already as the recipe would make them. */
+  kept: KeptValue[];
+  /** The values left alone, and why. */
+  skipped: SkippedField[];
+  /** How many injuries it heals; null where it heals none. */
+  heals: number | null;
+  /** Where it keeps him from retiring: the day the game had planned, null where it had planned none. */
+  keepsPlaying: { retires: FmDate | null } | null;
+  /** The steps on the game's lists with nothing to do, or that cannot run. */
+  left: LeftOutStep[];
 }
 
 /** From `team_action`: a mass report, and the steps of Team at its best it left out (none for any other action). */

@@ -30,11 +30,19 @@ export interface EditorState {
   readOnlyNote: string;
   /** Whether the editor can arrange a transfer for the game to make on its next day (see `arrangeTransfer`). */
   arrangesTransfers: boolean;
+  /** Whether it can arrange a loan the same way (see `arrangeLoan`). */
+  arrangesLoans: boolean;
   /** Called after changes were written or undone: the lists, the open profile and the change log read again. */
   onEdited: () => void;
 }
 
-export const EditorContext = createContext<EditorState>({ editable: false, readOnlyNote: "", arrangesTransfers: false, onEdited: () => {} });
+export const EditorContext = createContext<EditorState>({
+  editable: false,
+  readOnlyNote: "",
+  arrangesTransfers: false,
+  arrangesLoans: false,
+  onEdited: () => {},
+});
 
 /** The inputs of the profile being edited (header and body), for the components that draw them. */
 export interface EditSession {

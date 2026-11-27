@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { call } from "./api";
+import { describeError } from "./format";
 import { isRecord, restored, useSnapshot } from "./restore";
 import { askToLeave } from "./useProfileEditing";
 
@@ -159,7 +160,7 @@ export function ListBrowser<Row extends { uid: number }>(props: ListBrowserProps
           }
         } catch (e) {
           if (!cancelled) {
-            setError(String(e));
+            setError(describeError(e));
           }
         }
       },

@@ -6,6 +6,7 @@
 
 use crate::game::GAME_PLUGIN;
 use crate::health::iso;
+use crate::locate::Manager;
 use crate::session::{IGNORE_PROFILES, Session, profiles_ignored};
 
 /// The report on the game `session` is connected to, from FMLibreEditor `version`. The checks are as they last ran,
@@ -16,9 +17,12 @@ pub fn diagnostics_report(session: &Session, version: &str) -> String {
         format!("Game: {}", session.game.name()),
         format!("{GAME_PLUGIN} build: {}", session.fingerprint),
         profile_line(session),
+        format!("Object layout: {}", layout_line(session)),
         writing_line(session),
         format!("In-game date: {}", date_line(session)),
         format!("Retirement manager: {}", retirement_line(session)),
+        format!("Tactics manager: {}", manager_line(session, Manager::Tactics)),
+        format!("Training manager: {}", manager_line(session, Manager::Training)),
         format!("Saves loaded: {}", saves_loaded_line(session)),
     ];
     lines.extend(session.arrays.describe());
@@ -45,6 +49,34 @@ pub fn retirement_line(session: &Session) -> String {
     match session.retirement_place() {
         Some(place) => format!("{GAME_PLUGIN}+{:#x} ({})", place.rva, place.found.describe()),
         None => "not found".to_owned(),
+    }
+}
+
+/// Where the static pointer to `manager` is, and how it was found: looked for now when it was not before.
+pub fn manager_line(session: &Session, manager: Manager) -> String {
+    match session.manager_place(manager) {
+        Some(place) => format!("{GAME_PLUGIN}+{:#x} ({})", place.rva, place.found.describe()),
+        None => "not found".to_owned(),
+    }
+}
+
+/// How the editor reads the game's objects: as the layout file lays them out, with the fields the build's profile says
+/// it lays out otherwise, or for a build without a profile those of the newest build of its kind (see
+/// [`crate::profile::layout_lender`]), which its checks guard.
+pub fn layout_line(session: &Session) -> String {
+    let moved: Vec<String> = session
+        .overrides
+        .0
+        .iter()
+        .flat_map(|(section, fields)| {
+            fields.iter().map(move |(field, offset)| format!("{section}.{field} {offset:#x}"))
+        })
+        .collect();
+    let moved = if moved.is_empty() { String::new() } else { format!(", {}", moved.join(", ")) };
+    match (&session.profile, &session.layout_from) {
+        (Some(_), _) => format!("as the build profile says{moved}"),
+        (None, Some(lender)) => format!("as {lender} lays it out, the newest build of this kind{moved}"),
+        (None, None) => "the layout file's: no build of this kind has a profile".to_owned(),
     }
 }
 

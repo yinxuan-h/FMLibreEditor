@@ -373,6 +373,15 @@ pub enum MoveError {
     NoTransfers,
     /// The player has a move agreed, or an offer the selling club or he has yet to answer.
     DealUnderWay,
+    /// A loan must end after the day he joins, and no later than his contract: between these days, as numbers like
+    /// 20280629.
+    LoanEnd {
+        earliest: i64,
+        latest: i64,
+    },
+    /// The game has no loan of its own whose offer and loan contract one the editor agrees can be modelled on: none it
+    /// made, or none whose player is still on loan.
+    NoLoanModel,
     /// The editor could not take memory of the game's own heap, which what it adds here needs (see `heap.rs`).
     NoGameMemory,
     /// The editor does not make this change to this game: see [`Lock`].
@@ -531,6 +540,14 @@ impl fmt::Display for MoveError {
                 f.write_str("the editor cannot find where the game keeps its transfers in this version of the game")
             }
             MoveError::DealUnderWay => f.write_str("the player already has a move agreed, or an offer not yet answered"),
+            MoveError::LoanEnd { earliest, latest } => write!(
+                f,
+                "the loan must end between {earliest} and {latest}: after the day he joins, and no later than his \
+                 contract does"
+            ),
+            MoveError::NoLoanModel => {
+                f.write_str("the game has no loan of its own under way to model this one on; try again after a day")
+            }
             MoveError::NoGameMemory => f.write_str(
                 "the editor could not take memory in the game for this: the system did not let it run the game's own \
                  functions for it",
@@ -604,6 +621,8 @@ impl Coded for MoveError {
             MoveError::NoDate => "sign.noDate",
             MoveError::NoTransfers => "arrange.unknown",
             MoveError::DealUnderWay => "arrange.underWay",
+            MoveError::LoanEnd { .. } => "loan.end",
+            MoveError::NoLoanModel => "loan.noModel",
             MoveError::NoGameMemory => "arrange.noMemory",
             MoveError::Locked(lock) => lock.code(),
             MoveError::Memory(err) => err.code(),
@@ -648,6 +667,9 @@ impl Coded for MoveError {
             MoveError::NoRelation { index } | MoveError::NoClause { index } => vec![("index", index.to_string())],
             MoveError::NotInClause { field } => vec![("field", (*field).to_owned())],
             MoveError::UnknownRule { rule } => vec![("rule", rule.to_string())],
+            MoveError::LoanEnd { earliest, latest } => {
+                vec![("earliest", earliest.to_string()), ("latest", latest.to_string())]
+            }
             MoveError::Locked(lock) => lock.params(),
             MoveError::Memory(err) => err.params(),
             _ => Vec::new(),

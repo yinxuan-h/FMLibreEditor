@@ -14,12 +14,12 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use fmlibre_core::{
     ATTRIBUTE_GROUPS, ArrayCandidate, ArrayRvas, ArraySource, AttributeBound, BuildProfile, Buyer, CaptainRole,
     ClubIndex, Entity, ExportFormat, ExportHeader, Exported, Field, FmDate, Found, GAME_EXE, GAME_PLUGIN, GameInfo,
-    GraphicsIndex, Kind, Loan, MANAGER, MoveTerms, NameKind, PERSONALITY, POSITIONS, PersonNames, Picture,
-    PlayerFilter, PlayerIndex, PlayerOrder, PlayerSort, PrizeAmount, PrizeMoney, PrizeStage, ProfileNotes, Purpose,
-    STAFF_ATTRIBUTE_GROUPS, SUPPORTER_MIX, SUPPORTER_TRAITS, Scale, ScanOptions, ScoutOrder, ScoutRequest, Season,
-    Session, SessionError, SponsorshipReadError, SquadRule, StaffIndex, Target, Tie, TieTarget, date_line,
-    diagnostics_report, find_game, job_name, nations, profile_text, retirement_line, saves_loaded_line,
-    scan_object_arrays, sort_players,
+    GraphicsIndex, Kind, Loan, LoanDeal, MANAGER, Manager, MoveTerms, NameKind, PERSONALITY, POSITIONS, PersonNames,
+    Picture, PlayerFilter, PlayerIndex, PlayerOrder, PlayerSort, PrizeAmount, PrizeMoney, PrizeStage, ProfileNotes,
+    Purpose, STAFF_ATTRIBUTE_GROUPS, SUPPORTER_MIX, SUPPORTER_TRAITS, Scale, ScanOptions, ScoutOrder, ScoutRequest,
+    Season, Session, SessionError, SponsorshipReadError, SquadRule, StaffIndex, Target, Tie, TieTarget, date_line,
+    diagnostics_report, find_game, job_name, layout_line, manager_line, nations, profile_text, retirement_line,
+    saves_loaded_line, scan_object_arrays, sort_players,
 };
 #[cfg(target_os = "macos")]
 use fmlibre_mem::MachImage;
@@ -137,6 +137,10 @@ enum Command {
         /// Count the kinds of team of every container, with the age limits they have.
         #[arg(long)]
         kinds: bool,
+        /// Print what the profile shows of each one's nation and federation: the year it was founded, the population,
+        /// continent and currency, and the federation's staff; then how many of all the containers have each.
+        #[arg(long)]
+        details: bool,
     },
     /// List clubs, highest reputation first, optionally only those matching TEXT.
     Clubs {
@@ -308,6 +312,35 @@ enum Command {
         /// A new contract end as YYYY-MM-DD; his contract's otherwise.
         #[arg(long)]
         expires: Option<String>,
+        /// Take it back afterwards and check it.
+        #[arg(long)]
+        restore: bool,
+        /// With --restore, how many seconds to wait before taking it back.
+        #[arg(long, default_value_t = 0)]
+        hold: u64,
+    },
+    /// Arrange a loan from the next day in the running game, for the game to make on that day as it makes its own: an
+    /// agreed loan offer with the loan's terms, the loan contract he is to have, and the move due on that day.
+    ArrangeLoan {
+        /// The player's UID.
+        uid: u32,
+        /// The UID of the club he joins on loan.
+        club: u32,
+        /// The loan's last day as YYYY-MM-DD; by default 29 June at the end of the season, or his contract's end.
+        #[arg(long)]
+        until: Option<String>,
+        /// The part of his wage the club he joins pays, in percent.
+        #[arg(long, default_value_t = 100)]
+        share: u8,
+        /// Pounds a month the club he joins pays his own.
+        #[arg(long, default_value_t = 0)]
+        monthly_fee: i64,
+        /// An option to buy: pounds for which the club he joins may sign him for good when the loan ends, if it wants.
+        #[arg(long)]
+        option_fee: Option<i64>,
+        /// Only work it out and say what it would be (or why the editor refuses it): nothing is written.
+        #[arg(long)]
+        plan: bool,
         /// Take it back afterwards and check it.
         #[arg(long)]
         restore: bool,
@@ -703,6 +736,19 @@ enum Command {
         /// The club's UID.
         club: u32,
     },
+    /// Show the teams of other clubs a club runs beside its own (its B team, which the game keeps as a club of its
+    /// own), as the editor reads them from the club's list of linked teams. Without a club, check that list over every
+    /// club: how many hold how many teams, what the entries are, and which the editor leaves out. Only reads memory.
+    LinkedTeams {
+        /// The club's UID.
+        club: Option<u32>,
+        /// Where the club holds the list, for a layout that has not placed it (hexadecimal).
+        #[arg(long, value_name = "HEX")]
+        offset: Option<String>,
+        /// How many clubs to name of each sort.
+        #[arg(long, default_value_t = 8)]
+        show: usize,
+    },
     /// Show a club's youth intakes: the players the game made who began their careers there, by the day they joined.
     Youth {
         /// The club's UID.
@@ -827,11 +873,11 @@ enum Command {
     },
     /// Show the team's tactical familiarity as the Tactical Effectiveness screen works it out: from the history of
     /// training the training manager keeps for each of the human manager's players (the `TRAINING_MANAGER` the build
-    /// profile places, and in it what the layout's `[familiarity]` places: its managers' list, each manager's club and
-    /// his map of players by person id, each player's 12-byte entries in his node). Each entry adds to its area
-    /// a weight for its age (12 in its first week down to 0 after 251 days), times how close its option is to the
-    /// tactic's (1 less 0.1 a step), times three factors for the session and the player; an area holds at most 100.
-    /// With --max, rewrites each player's entries so that every area adds up to 100: this writes.
+    /// profile places, or else the one found, and in it what the layout's `[familiarity]` places: its managers' list,
+    /// each manager's club and his map of players by person id, each player's 12-byte entries in his node). Each entry
+    /// adds to its area a weight for its age (12 in its first week down to 0 after 251 days), times how close its
+    /// option is to the tactic's (1 less 0.1 a step), times three factors for the session and the player; an area
+    /// holds at most 100. With --max, rewrites each player's entries so that every area adds up to 100: this writes.
     TrainingHistory {
         /// The club's UID.
         club: u32,
@@ -1291,6 +1337,7 @@ fn run(cli: Cli) -> Result<()> {
             Command::Set { .. }
                 | Command::Move { .. }
                 | Command::Arrange { .. }
+                | Command::ArrangeLoan { .. }
                 | Command::Permanent { .. }
                 | Command::StadiumName { name: Some(_), .. }
                 | Command::Rename { first: Some(_), .. }
@@ -1379,13 +1426,13 @@ fn run(cli: Cli) -> Result<()> {
         Command::StaffRefs { ids, back, show } => {
             staff_refs(&connect(process, ArraySource::ProfileFirst)?, &ids, parse_hex(&back)?, show.as_deref())
         }
-        Command::NationalTeams { text, limit, squad, kind, teams, kinds } => {
+        Command::NationalTeams { text, limit, squad, kind, teams, kinds, details } => {
             let session = connect(process, ArraySource::ProfileFirst)?;
             national_teams(
                 &session,
                 text.as_deref(),
                 limit,
-                NationalReport { squad: squad.then_some(kind), teams, kinds },
+                NationalReport { squad: squad.then_some(kind), teams, kinds, details },
             )
         }
         Command::Clubs { text, limit, export, semicolon } => {
@@ -1419,6 +1466,12 @@ fn run(cli: Cli) -> Result<()> {
             let expires = expires.as_deref().map(parse_iso_date).transpose()?.map(FmDate::to_number);
             let session = connect(process, ArraySource::ProfileFirst)?;
             arrange_transfer(&session, uid, club, MoveTerms { wage, expires }, fee, restore.then_some(hold))
+        }
+        Command::ArrangeLoan { uid, club, until, share, monthly_fee, option_fee, plan, restore, hold } => {
+            let until = until.as_deref().map(parse_iso_date).transpose()?.map(FmDate::to_number);
+            let session = connect(process, ArraySource::ProfileFirst)?;
+            let terms = (until, share, monthly_fee, option_fee);
+            arrange_loan(&session, uid, club, terms, plan, restore.then_some(hold))
         }
         Command::Permanent { uid, wage, expires, restore, hold } => {
             let expires = expires.as_deref().map(parse_iso_date).transpose()?.map(FmDate::to_number);
@@ -1558,6 +1611,13 @@ fn run(cli: Cli) -> Result<()> {
             scout(&session, club, request, squad, tactics)
         }
         Command::Teams { club } => teams(&connect(process, ArraySource::ProfileFirst)?, club),
+        Command::LinkedTeams { club, offset, show } => {
+            let mut session = connect(process, ArraySource::ProfileFirst)?;
+            if let Some(offset) = offset.as_deref().map(parse_hex).transpose()? {
+                session.layout.club.linked_teams = Some(offset);
+            }
+            linked_teams(&session, club, show)
+        }
         Command::Youth { club } => youth(&connect(process, ArraySource::ProfileFirst)?, club),
         Command::Room { club, max } => room(&connect(process, ArraySource::ProfileFirst)?, club, max),
         Command::Captain { club, uid, vice, team, restore, hold } => {
@@ -3501,6 +3561,11 @@ fn health(session: &Session) -> Result<()> {
         Some(profile) => println!("Build profile: {}", profile.name),
         None => println!("Build profile: none for this build: the editor does not write to it unless allowed"),
     }
+    // Not the fields (`calibrate` lists them): the smoke tests take the first line that names the tactics for the
+    // check's.
+    if let Some(lender) = &session.layout_from {
+        println!("Object layout: as {lender} lays it out");
+    }
     let started = Instant::now();
     let health = session.recheck();
     println!("Checks ({:.0?}):", started.elapsed());
@@ -3521,8 +3586,11 @@ fn calibrate(session: &Session) -> Result<()> {
         Some(profile) => println!("Build profile: {}", profile.name),
         None => println!("Build profile: none for this build"),
     }
+    println!("Object layout: {}", layout_line(session));
     println!("In-game date: {}", date_line(session));
     println!("Retirement manager: {}", retirement_line(session));
+    println!("Tactics manager: {}", manager_line(session, Manager::Tactics));
+    println!("Training manager: {}", manager_line(session, Manager::Training));
     println!("Saves loaded: {}", saves_loaded_line(session));
     print_arrays(session);
     Ok(())
@@ -3643,9 +3711,33 @@ fn profile(session: &Session, out: Option<&Path>) -> Result<()> {
         }
     };
 
+    // The managers Max tactics reads, found as the retirement manager is, where the layout places what they keep.
+    let mut managers = [None, None];
+    for (slot, manager) in managers.iter_mut().zip([Manager::Tactics, Manager::Training]) {
+        let started = Instant::now();
+        let guesses = fmlibre_core::manager_guesses(session, manager);
+        let guessed: Vec<u64> =
+            guesses.iter().copied().filter(|&rva| fmlibre_core::holds_manager(session, manager, rva)).collect();
+        let searched = fmlibre_core::search_manager(session, manager);
+        println!("{} ({:.1} s):", manager.class(), started.elapsed().as_secs_f64());
+        println!(
+            "  as far from the players' array as in other builds: {} of {} guesses hold it",
+            guessed.len(),
+            guesses.len()
+        );
+        println!("  pointers to it in the plugin's writable data: {}", hex(&searched));
+        if guessed.first().is_some_and(|rva| !searched.contains(rva)) {
+            println!("  note: the guess is not among the pointers the search found");
+        }
+        println!("  -> {}", manager_line(session, manager));
+        *slot = session.manager_place(manager);
+    }
+
     println!("Checks with what was found:");
     print_checks(&health);
-    // Not one of the checks: a finance record laid out otherwise leaves only the finances unread, which is easy to miss.
+    // Not one of the checks: a finance record or a team's tactics laid out otherwise leave only the finances or the
+    // tactic in use unread, which is easy to miss.
+    println!("Object layout: {}", layout_line(session));
     match session.finance_class() {
         Some(_) => println!("Club finances: the class of the full finance record is found."),
         None => println!(
@@ -3653,6 +3745,23 @@ fn profile(session: &Session, out: Option<&Path>) -> Result<()> {
              game keeps finances for the clubs of the leagues being played, the record has moved (see `fields club \
              --stats` and DEVELOPING.md)."
         ),
+    }
+    let club_index = ClubIndex::new(session.clubs()?);
+    let members = session.staff()?;
+    let human: Vec<&fmlibre_core::ClubSummary> =
+        members.iter().filter(|member| member.is_human).filter_map(|member| club_index.get(member.club_uid?)).collect();
+    if human.is_empty() {
+        println!("Tactic in use: no human manager has a club, so none tells whether a team's tactics read right.");
+    }
+    for club in human {
+        match session.senior_area_options(club) {
+            Ok(Some(options)) => println!("Tactic in use: found for {}'s senior team, options {options:?}.", club.name),
+            _ => println!(
+                "Tactic in use: none found for {}'s senior team; where a human manager picks its tactic, a team's \
+                 tactics have moved (see `training-history` and DEVELOPING.md).",
+                club.name
+            ),
+        }
     }
 
     let edition = session.layout.edition;
@@ -3676,17 +3785,16 @@ fn profile(session: &Session, out: Option<&Path>) -> Result<()> {
         current_date: date.map(|place| place.rva),
         retirement_manager: retirement.map(|place| place.rva),
         game_ui: game_ui.map(|place| place.rva),
-        // Not looked for: kept from the built-in profile.
-        tactics_manager: session.profile.as_ref().and_then(|profile| profile.tactics_manager),
-        training_manager: session.profile.as_ref().and_then(|profile| profile.training_manager),
+        tactics_manager: managers[0].map(|place| place.rva),
+        training_manager: managers[1].map(|place| place.rva),
         // Checked against the game's screens, not looked for: kept from the built-in profile.
         prize_money: session.profile.as_ref().is_some_and(|profile| profile.prize_money),
         sponsorships: session.profile.as_ref().is_some_and(|profile| profile.sponsorships),
         squad_rules: session.profile.as_ref().is_some_and(|profile| profile.squad_rules),
         national_teams: session.profile.as_ref().and_then(|profile| profile.national_teams),
-        // What the build lays out otherwise (the finances: `fields club --stats` says whether their class is found; a
-        // team's tactics: `training-history` finds the one in use), not looked for: kept from the built-in profile.
-        layout: session.profile.as_ref().map(|profile| profile.layout.clone()).unwrap_or_default(),
+        // What the build lays out otherwise, as the session reads it: its profile's, or for a new build the newest
+        // build's of its kind, which the finance record's class and the tactic in use found above vouch for.
+        layout: session.overrides.clone(),
     };
 
     let failed = health.failed();
@@ -3768,6 +3876,14 @@ fn profile(session: &Session, out: Option<&Path>) -> Result<()> {
                     hex_or_none(built_in.game_ui),
                     hex_or_none(found.game_ui)
                 ));
+            }
+            for (name, built, seen) in [
+                ("tactics_manager", built_in.tactics_manager, found.tactics_manager),
+                ("training_manager", built_in.training_manager, found.training_manager),
+            ] {
+                if built != seen {
+                    differences.push(format!("{name} {} built in, {} found", hex_or_none(built), hex_or_none(seen)));
+                }
             }
             if differences.is_empty() {
                 println!("Built-in profile \"{}\": the same places.", built_in.name);
@@ -5124,6 +5240,65 @@ fn arrange_transfer(
     let done = session.apply_arranged_transfer(&plan)?;
     println!(
         "  arranged: offer at {:#x}, contract at {:#x}; the game makes the move on {}",
+        done.offer,
+        done.contract,
+        done.move_day.to_number()
+    );
+    if let Some(hold) = restore_after {
+        if hold > 0 {
+            println!("  taking it back in {hold} s");
+            std::thread::sleep(std::time::Duration::from_secs(hold));
+        }
+        session.undo_arranged_transfer(&done)?;
+        println!("  taken back");
+    }
+    Ok(())
+}
+
+/// Arranges the loan of the player `uid` to the club `club` from the next day on `terms` (the loan's last day, the end
+/// of the season by default; the part of his wage the club pays; the monthly fee; an option to buy, if any), shows
+/// what it would write with `plan_only`, else writes it, and with `restore_after` takes it back and checks it.
+fn arrange_loan(
+    session: &Session,
+    uid: u32,
+    club: u32,
+    terms: (Option<i64>, u8, i64, Option<i64>),
+    plan_only: bool,
+    restore_after: Option<u64>,
+) -> Result<()> {
+    let (until, wage_share, monthly_fee, option_fee) = terms;
+    let players = PlayerIndex::new(session.players()?);
+    let clubs = ClubIndex::new(session.clubs()?);
+    let player = players.get(uid).with_context(|| format!("no player with UID {uid}"))?;
+    let to = clubs.get(club).with_context(|| format!("no club with UID {club}"))?;
+    let human: Vec<u32> = session.staff()?.iter().filter(|s| s.is_human).filter_map(|s| s.club_uid).collect();
+    let until = match until {
+        Some(until) => until,
+        None => session.season_loan_end(player).context("no in-game date to count the season from")?,
+    };
+    let loan = LoanDeal { until, wage_share, monthly_fee, option_fee };
+    let started = std::time::Instant::now();
+    let plan = session.plan_arranged_loan(player, to, loan, &human)?;
+    let from = clubs.get(plan.from_club).map_or("?", |club| club.name.as_str());
+    let option =
+        option_fee.map_or_else(|| "no option to buy".to_string(), |fee| format!("an option to buy for £{fee}"));
+    println!(
+        "{} (UID {uid}): {from} -> {} on loan from {} until {until}: the club pays £{} a week ({wage_share}%) and \
+         £{monthly_fee} a month, {option}, squad status {}, offer {} (planned in {:.1} s)",
+        player.name,
+        to.name,
+        plan.move_day.to_number(),
+        plan.terms.wage,
+        plan.terms.squad_status,
+        plan.offer_number,
+        started.elapsed().as_secs_f64()
+    );
+    if plan_only {
+        return Ok(());
+    }
+    let done = session.apply_arranged_transfer(&plan)?;
+    println!(
+        "  arranged: offer at {:#x}, the contract its entry holds at {:#x}; the game makes the loan on {}",
         done.offer,
         done.contract,
         done.move_day.to_number()
@@ -6686,11 +6861,12 @@ fn scout(
             println!("tactic {i} (style {}, {} copies)", tactic.style.as_deref().unwrap_or("?"), tactic.copies);
             for s in &tactic.slots {
                 println!(
-                    "  {:>2}  {:<5} {:<5} {:<5} {}",
+                    "  {:>2}  {:<5} {:<5} {:<5} {:<5} {}",
                     s.index,
                     s.in_possession.unwrap_or(&s.in_possession_mask),
                     s.out_of_possession.unwrap_or(&s.out_of_possession_mask),
                     s.position.unwrap_or("?"),
+                    s.position_without.unwrap_or("-"),
                     name(s.player)
                 );
             }
@@ -6835,6 +7011,104 @@ fn teams(session: &Session, uid: u32) -> Result<()> {
                 tags.join(", ")
             );
         }
+    }
+    Ok(())
+}
+
+/// `linked-teams`: one club's linked teams as the editor reads them, or the list checked over every club.
+fn linked_teams(session: &Session, uid: Option<u32>, show: usize) -> Result<()> {
+    let process = &session.process;
+    let (c, t) = (&session.layout.club, &session.layout.team);
+    let offset = c.linked_teams.context("the layout does not place the clubs' linked teams: give --offset")?;
+    let clubs = ClubIndex::new(session.clubs()?);
+    let age = |limit: Option<u8>| limit.map_or_else(|| "no age limit".to_owned(), |age| format!("under {age}"));
+
+    if let Some(uid) = uid {
+        let players = PlayerIndex::new(session.players()?);
+        let club = clubs.get(uid).with_context(|| format!("no club with UID {uid}"))?;
+        let linked = session.linked_teams(club, &clubs);
+        println!("{} (UID {}): {} linked teams at +{offset:#x}", club.name, club.uid, linked.len());
+        for link in linked {
+            let team = session.club_team_at(link.club, link.index, &players)?;
+            println!(
+                "  {} (UID {}) team {} (kind {}, {}): {} players",
+                link.club.name,
+                link.club.uid,
+                link.index,
+                team.kind,
+                age(team.age_limit),
+                team.players.len()
+            );
+        }
+        return Ok(());
+    }
+
+    let by_address: HashMap<u64, &fmlibre_core::ClubSummary> = clubs.iter().map(|club| (club.address, club)).collect();
+    // How many clubs hold how many entries, and what the entries are.
+    let mut sizes: BTreeMap<usize, usize> = BTreeMap::new();
+    let (mut entries, mut read) = (0usize, 0usize);
+    let mut left_out: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+    // The teams read, by their place in their own club's list and their kind.
+    let mut places: BTreeMap<(usize, u8), usize> = BTreeMap::new();
+    let mut parents: Vec<(i32, String)> = Vec::new();
+    // The clubs whose team another club lists, with how many list it.
+    let mut listed: HashMap<u32, usize> = HashMap::new();
+    for club in clubs.iter() {
+        let raw = list_entries(process, club.address + offset, 8);
+        *sizes.entry(raw.len()).or_default() += 1;
+        if raw.is_empty() {
+            continue;
+        }
+        entries += raw.len();
+        let linked = session.linked_teams(club, &clubs);
+        read += linked.len();
+        for entry in &raw {
+            let team = u64::from_le_bytes(entry[..8].try_into().expect("8 bytes"));
+            let owner = is_user_pointer(team).then(|| process.read_u64(team + t.club).ok()).flatten();
+            let why = match owner {
+                None => "not a team",
+                Some(owner) if owner == club.address => "the club's own team",
+                Some(owner) => match by_address.get(&owner) {
+                    None => "a team of no club the editor lists",
+                    Some(other) if linked.iter().any(|link| link.club.uid == other.uid) => continue,
+                    Some(_) => "not in its club's list of teams",
+                },
+            };
+            left_out.entry(why).or_default().push(club.name.clone());
+        }
+        let mut names = Vec::new();
+        for link in &linked {
+            let kind = process.read_bytes(link.address + t.kind, 1)?[0];
+            *places.entry((link.index, kind)).or_default() += 1;
+            *listed.entry(link.club.uid).or_default() += 1;
+            names.push(format!("{} (UID {}) team {}", link.club.name, link.club.uid, link.index));
+        }
+        if !names.is_empty() {
+            let line = format!("{} (UID {}): {}", club.name, club.uid, names.join(", "));
+            parents.push((club.reputation.map_or(-1, i32::from), line));
+        }
+    }
+
+    println!("Linked teams at club +{offset:#x}, over {} clubs:", clubs.len());
+    for (size, count) in &sizes {
+        println!("  {count:>6} clubs hold {size}");
+    }
+    println!("{entries} entries, {read} read as a team of another club:");
+    for ((index, kind), count) in &places {
+        println!("  {count:>6} at place {index} of their club's teams, kind {kind}");
+    }
+    for (why, names) in &left_out {
+        let some: Vec<&str> = names.iter().take(show).map(String::as_str).collect();
+        println!("  {:>6} left out, {why}: {}", names.len(), some.join("; "));
+    }
+    let shared = listed.values().filter(|&&count| count > 1).count();
+    let lists_one = |uid: u32| clubs.get(uid).is_some_and(|club| !session.linked_teams(club, &clubs).is_empty());
+    let back = listed.keys().filter(|&&uid| lists_one(uid)).count();
+    println!("{} clubs are listed; {shared} by more than one club, {back} list a team themselves", listed.len());
+    parents.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+    println!("The best known of the {} clubs that list one:", parents.len());
+    for (_, line) in parents.iter().take(show) {
+        println!("  {line}");
     }
     Ok(())
 }
@@ -7006,6 +7280,64 @@ struct NationalReport {
     teams: bool,
     /// The kinds of team of every container, counted.
     kinds: bool,
+    /// What the profile shows of the nation and federation of each one shown, and how many of all have each.
+    details: bool,
+}
+
+/// What the profiles of the national teams `shown` show of their nation and federation, and then how many of every
+/// container of `index` have each. Only reads memory.
+fn national_details(
+    session: &Session,
+    index: &fmlibre_core::NationalIndex,
+    shown: &[&fmlibre_core::NationalTeamSummary],
+) -> Result<()> {
+    let staff = StaffIndex::new(session.staff()?);
+    let job = |code: Option<u8>| code.and_then(fmlibre_core::job_name).unwrap_or("no job found");
+    for team in shown {
+        let Some(details) = session.nation_details(team, &staff)? else {
+            anyhow::bail!("this build's layout does not place a nation's details");
+        };
+        let name = if team.women { format!("{} (women)", team.name) } else { team.name.clone() };
+        println!();
+        println!("{name} ({}):", team.uid);
+        println!("  founded     {}", details.founded.map_or_else(|| "none".to_owned(), |year| year.to_string()));
+        println!("  continent   {}", details.continent.as_deref().unwrap_or("none"));
+        println!("  staff       {}", details.staff.len());
+        for known in &details.staff {
+            let side =
+                known.team_kind.map_or_else(|| "no team found".to_owned(), |kind| format!("team of kind {kind}"));
+            println!("    {:<28}  {:<20}  {side}", known.member.name, job(known.job));
+        }
+    }
+    // How many containers have each, the continents named, and the jobs and teams of all their staff.
+    let (mut read, mut founded, mut staffed, mut members, mut placed) = (0, 0, 0, 0, 0);
+    let mut continents: BTreeMap<String, usize> = BTreeMap::new();
+    let mut jobs: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut years = (u16::MAX, 0u16);
+    for team in index.search("") {
+        let Some(details) = session.nation_details(team, &staff)? else { continue };
+        read += 1;
+        if let Some(year) = details.founded {
+            founded += 1;
+            years = (years.0.min(year), years.1.max(year));
+        }
+        staffed += usize::from(!details.staff.is_empty());
+        members += details.staff.len();
+        placed += details.staff.iter().filter(|known| known.team_kind.is_some()).count();
+        for known in &details.staff {
+            *jobs.entry(job(known.job)).or_default() += 1;
+        }
+        *continents.entry(details.continent.unwrap_or_else(|| "none".to_owned())).or_default() += 1;
+    }
+    println!();
+    println!(
+        "Of {read} containers: founded at {founded} ({} to {}), staff at {staffed}: {members} members, {placed} with \
+         a job in one of the container's teams.",
+        years.0, years.1
+    );
+    println!("Continents: {}", continents.iter().map(|(name, n)| format!("{name} {n}")).collect::<Vec<_>>().join(", "));
+    println!("Jobs: {}", jobs.iter().map(|(name, n)| format!("{name} {n}")).collect::<Vec<_>>().join(", "));
+    Ok(())
 }
 
 fn national_teams(session: &Session, text: Option<&str>, limit: usize, report: NationalReport) -> Result<()> {
@@ -7048,6 +7380,9 @@ fn national_teams(session: &Session, text: Option<&str>, limit: usize, report: N
                 );
             }
         }
+    }
+    if report.details {
+        national_details(session, &index, &hits[..hits.len().min(limit)])?;
     }
     if report.kinds {
         // Kind -> (teams, women's teams, age limits with how many have each).
@@ -7887,7 +8222,7 @@ fn training_history(
         .training_histories(club)?
         .with_context(|| {
             format!(
-                "the training manager keeps no history for {}, or the layout or the build profile does not place it",
+                "the training manager keeps no history for {}, or the layout does not place it, or it is not found",
                 club.name
             )
         })?

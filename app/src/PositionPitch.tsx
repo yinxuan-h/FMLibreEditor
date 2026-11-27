@@ -181,7 +181,7 @@ export function PositionFreeze({ details }: { details: PlayerDetails }) {
   return (
     <div className="position-freeze">
       <div className="freeze-line">
-        <label className="freeze-toggle" title={editable ? undefined : readOnlyNote}>
+        <label className="freeze-toggle" data-tip={editable ? undefined : readOnlyNote}>
           <input
             type="checkbox"
             checked={frozen}

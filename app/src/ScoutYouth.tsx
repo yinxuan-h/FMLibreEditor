@@ -284,7 +284,7 @@ function IntakeTable({ intake, editing, onEdit, onSaved, onClose, onOpen }: Inta
                     className="icon-button scout-youth-edit"
                     aria-expanded={open}
                     aria-label={text.edit(p.name)}
-                    title={editable ? text.edit(p.name) : readOnlyNote}
+                    data-tip={editable ? text.edit(p.name) : readOnlyNote}
                     disabled={!editable}
                     onClick={() => onEdit(p.uid)}
                   >
@@ -556,7 +556,7 @@ function YouthEditor({
             <button
               type="button"
               className="link-button"
-              title={text.editor.profileTitle}
+              data-tip={text.editor.profileTitle}
               aria-haspopup="dialog"
               onClick={() => onOpen(player)}
             >

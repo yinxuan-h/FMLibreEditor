@@ -37,6 +37,8 @@ export interface Command {
   label: string;
   /** The keys that do the same without the palette. */
   shortcut?: Shortcut;
+  /** Listed only once something is typed that matches it: the box opens on the commands that are always there. */
+  typedOnly?: boolean;
   run: () => void;
 }
 
@@ -280,7 +282,9 @@ export function CommandPalette({ commands, connected, onRun, onOpen, onShowAll, 
 
   const sections = useMemo(() => {
     const built: Section[] = [];
-    const matching = commands.filter((command) => matchesCommand(command.label, term));
+    const matching = commands.filter(
+      (command) => (term !== "" || !command.typedOnly) && matchesCommand(command.label, term),
+    );
     if (matching.length > 0) {
       built.push({
         key: "commands",

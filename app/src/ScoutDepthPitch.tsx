@@ -65,7 +65,7 @@ export function ScoutDepthPitch({
               data-line={l.key}
               data-status={l.status}
               aria-pressed={l.key === line?.key}
-              title={text.positionTip(depthLineName(l.key), l.players.length, l.target, text.status[l.status])}
+              data-tip={text.positionTip(depthLineName(l.key), l.players.length, l.target, text.status[l.status])}
               style={{ gridColumn: column, gridRow: `${row} / span ${rows}` } as CSSProperties}
               onClick={() => setPicked(l.key)}
             >
@@ -124,7 +124,7 @@ function LineDetail({
     <section className="scout-line-detail" aria-label={depthLineName(line.key)} data-status={line.status}>
       <header className="scout-line-detail-head">
         <h3>{depthLineName(line.key)}</h3>
-        <span className="scout-status" data-status={line.status} title={text.depth.statusHelp[line.status]}>
+        <span className="scout-status" data-status={line.status} data-tip={text.depth.statusHelp[line.status]}>
           {text.status[line.status]}
         </span>
         {line.weak && <span className="tag scout-flag">{text.depth.weak}</span>}

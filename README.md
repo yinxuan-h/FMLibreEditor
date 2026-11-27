@@ -1,19 +1,26 @@
-# FMLibreEditor
+<p align="center">
+  <img src="app/src-tauri/icons/128x128@2x.png" alt="" width="96" height="96">
+</p>
 
-A free, open-source live editor for **Football Manager 27**. Edit players, staff and clubs
-while the game runs.
+<h1 align="center">FMLibreEditor</h1>
 
-Works on **Windows** (Xbox / Game Pass and Steam) and **macOS** (Steam). The Epic Games Store
-version on Windows is supported as an experiment, since we cannot test it ourselves.
+<p align="center">
+  A free, open-source live editor for <b>Football Manager 27</b>.<br>
+  Edit players, staff and clubs while the game runs.
+</p>
 
-[![Latest release](https://img.shields.io/github/v/release/tozmoz/FMLibreEditor?label=release)](https://github.com/tozmoz/FMLibreEditor/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/tozmoz/FMLibreEditor/total)](https://github.com/tozmoz/FMLibreEditor/releases)
-[![License: GPL-3.0](https://img.shields.io/github/license/tozmoz/FMLibreEditor)](LICENSE)
+<p align="center">
+  <a href="https://github.com/tozmoz/FMLibreEditor/releases/latest"><img src="https://img.shields.io/github/v/release/tozmoz/FMLibreEditor?label=release" alt="Latest release"></a>
+  <a href="https://github.com/tozmoz/FMLibreEditor/releases"><img src="https://img.shields.io/github/downloads/tozmoz/FMLibreEditor/total" alt="Downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/tozmoz/FMLibreEditor" alt="License: GPL-3.0"></a>
+</p>
+
+Works on **Windows** (Xbox / Game Pass and Steam) and **macOS** (Steam).
 
 **Open source, and open to your help:** fixes, translations, testing on your copy of the game or
 findings about FM27's data are all welcome. See [Contributing](#contributing).
 
-![The player list and a player's profile](docs/images/players.png)
+![My club: the club you manage, who needs a look, and its squad](docs/images/my-club.png)
 
 ## Download
 
@@ -26,82 +33,52 @@ findings about FM27's data are all welcome. See [Contributing](#contributing).
 How to install and use it: [docs/INSTALL.md](docs/INSTALL.md). How the Windows builds are
 signed: [Code signing policy](#code-signing-policy).
 
-## What it does
-
-- Browse, search and filter every player, member of staff and club; clubs by nation, league
-  and reputation.
-- See and change the prize money a club's league pays this season, by final position and per
-  win, draw and loss, in the club's finances: for every club in that league, until the game sets
-  the next season up with its own amounts. So far on the versions of the game it was checked on:
-  Steam builds 26340721, 26577676 and 26620374 on Windows, Steam builds 26340721, 26385295 and
-  26620374 on Apple silicon Macs, and Game Pass 0.9.2409.0, 0.9.2435.0 and 0.9.2524.0; the others
-  say why there is nothing yet.
-- See and change a competition's squad rules in the Competitions tab: how many foreign players a
-  squad may register, how many goalkeepers, how many players in all, and what a team may pick for
-  a match, this season's and next season's apart. A change is kept in the save; UEFA's Champions,
-  Europa and Conference League keep their rules in none, so the editor holds a change of them and
-  writes it again each time it connects. So far on Game Pass 0.9.2524.0 and Steam build 26620374 on
-  Apple silicon Macs, where it was checked; the other versions say why there is nothing yet.
-- See a club's sponsorship deals in its finances, read only: each deal by the name the game gives its
-  kind, what it pays per season and in all, its term, and what a relegation changes. Shown on Game
-  Pass 0.9.2524.0, Steam build 26340721 on Windows and 26385295 on Apple silicon Macs; the others say
-  why there is nothing yet.
-- See each nation's men's and women's national team in the Clubs tab (its **National teams**
-  switch), the players the game lists for its senior team and its reputation, which can be edited,
-  and heal, inspire or refresh its senior team's squad. So far on Windows (Game Pass 0.9.2435.0 and
-  0.9.2524.0, Steam builds 26577676 and 26620374) and on Steam for macOS, builds 26385295 and
-  26620374 on Apple silicon; the other versions of the game say why there are none yet.
-- Opens on **My club**: the club you manage, its money, who needs a look (the injured, the
-  banned, low morale, the tired, unrest, contracts about to end) and the actions on the whole
-  team one click away. With no club of your own, pick one to follow.
-- See how a player develops: the app notes every player's abilities, value and attributes about
-  once a week of the game's time, whenever it reads the game, and a profile's **Development** tab
-  draws them over time and lists the attributes that changed. A note under his abilities, arrows
-  beside the attributes and a club's squad say who gained and who lost over the last year.
-- Find anyone from anywhere: **Ctrl+K** (**⌘K** on macOS) opens one search over players, staff,
-  clubs and the app's commands. The tabs (Ctrl+1 to 7), the list's search (Ctrl+F), Edit
-  (Ctrl+E), Apply (Ctrl+S) and Reload data (Ctrl+R) have shortcuts too, with ⌘ on macOS.
-- Edit attributes, abilities, positions, personality, traits, contracts with their bonuses and
-  clauses, reputation, finances, stadiums and more.
-- Extend a player's or a member of staff's contract by five years in one click; the mass edit adds
-  years to many contracts at once.
-- Heal injuries, lift bans, remove unhappiness, prevent retirement, raise morale and fitness,
-  max out attributes, set captains, for one player or a whole team. **Team at its best** heals,
-  inspires and refreshes a whole team and takes its cohesion and tactic to the top in one press,
-  and **Destroy**, after a question, does the other way round; one Undo takes either back.
-  **Batch traits** gives every player of a team the traits you pick, or takes them away.
-- Freeze a player's attributes, energy and match sharpness, a whole team's from its squad
-  tab, or a club's money: while the app runs, they do not go down, and the app freezes them
-  again when you connect to that save another time.
-- Rename a stadium. The game takes stadium names from its database each time it loads a save,
-  so the app gives the new name back whenever it does, while the app is open.
-- Rename a player: first, last, common and full name. The game keeps names in its saves, so a
-  new name stays once you save.
-- Transfer, swap or release players, sign free agents, and move staff between clubs in their
-  own job or another (doctors, analysts and directors of football too), one by one or a club's
-  whole staff at once, or sign staff who have no club.
-- Arrange a transfer for the game to make on its next day (Windows, and Macs with Apple
-  silicon): the game moves the player, pays the fee, and keeps the move in his career history,
-  with this season's matches at his old club, as it does for its own transfers.
-- Mass edit many at once, with a preview; undo any change.
-- Export the player, staff or club list, with its search and filters, to CSV or JSON for a
-  spreadsheet or your own tools: attributes, positions, personality, contracts, club finances
-  and more, with the in-game date.
-- Checks how it reads the game before it writes, and stays read-only on a version of FM27 it
-  has not been checked with yet.
-- Notices when the game loads a save or goes back to its main menu, and then changes nothing,
-  freezes included, until you reload the data.
-- English, Turkish, Spanish, German, French, Indonesian, Italian, Japanese, Korean, Russian and
-  Simplified Chinese;
-  logos, flags and faces from your graphics packs.
-- Updates itself on Windows and macOS: one click downloads and installs a new version.
-
-The game shows a change once you press **Continue** in FM.
-
-![Editing a player: a change waits, highlighted, until you apply it](docs/images/edit.png)
-
 > **Status: beta.** Use it with offline, single-player saves, and back up your save
 > before editing.
+
+## What it does
+
+- **Browse and find:** every player, member of staff, club and national team, with search and
+  filters. **Ctrl+K** (**⌘K** on macOS) searches all of them and the app's commands.
+- **Edit:** attributes, abilities, positions, personality, traits, names, contracts with their
+  bonuses and clauses, reputation, finances and stadiums.
+- **Fix in one click:** heal injuries, lift bans, remove unhappiness, raise morale and
+  fitness, for one player or a whole team.
+- **Freeze:** a player's attributes, energy and match sharpness, or a club's money, so they do
+  not go down while the app runs.
+- **Move people:** transfer, swap or release players, sign free agents, move staff between
+  clubs. A transfer or a loan can also be left for the game to make, so it shows in the
+  player's career history.
+- **Change the rules:** a league's prize money, and a competition's squad rules, such as how
+  many foreign players a squad may register.
+- **Follow your club:** the app opens on the club you manage and who needs a look there, and
+  a profile's Development tab draws how a player has changed over time.
+- **Mass edit, undo and export:** change many at once with a preview, undo any change, and
+  write the lists to CSV or JSON.
+- **Care with your save:** it checks how it reads the game before it writes, stays read-only
+  on a version of FM27 it has not been checked with yet, and changes nothing after the game
+  loads another save until you reload the data.
+
+In English, Turkish, Spanish, German, French, Indonesian, Italian, Japanese, Korean, Brazilian
+Portuguese, Russian and Simplified Chinese. The app updates itself on Windows and macOS.
+
+Everything it does: [docs/FEATURES.md](docs/FEATURES.md). The game shows a change once you
+press **Continue** in FM.
+
+![Editing a player: changes wait, highlighted, until you apply them](docs/images/edit.png)
+
+## Where it works
+
+| System | FM27 from | |
+| --- | --- | --- |
+| Windows 10 or 11 | Xbox / Game Pass | Checked before every release |
+| Windows 10 or 11 | Steam | Checked before every release |
+| macOS, Apple silicon | Steam | Supported |
+| macOS, Intel | Steam | Players, staff and clubs |
+
+After an update of FM27 the app opens read-only until a release knows the new version, which
+usually takes a few days. Which versions of the game it knows, and the features that wait on
+some of them: [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
 
 ## Contributing
 
@@ -115,8 +92,7 @@ A first pull request can be small: a typo, a clearer sentence, one translated sc
   [Discussions](https://github.com/tozmoz/FMLibreEditor/discussions).
 - **Work on the interface without the game:** `npm run dev` in `app/` opens it in a browser with
   made-up players (React + TypeScript).
-- **Translate:** the app speaks English, Turkish, Spanish, German, French, Indonesian, Italian,
-  Japanese, Korean, Russian and Simplified Chinese; another language is one file, see
+- **Translate:** another language is one file, see
   [CONTRIBUTING.md](CONTRIBUTING.md#translating).
 - **Test:** try a release on your storefront (Game Pass, Steam, macOS) and
   [report](https://github.com/tozmoz/FMLibreEditor/issues/new/choose) what does not work.

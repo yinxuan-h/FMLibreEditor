@@ -119,7 +119,7 @@ function FitnessFreeze({ details }: { details: PlayerDetails }) {
   return (
     <div className="fitness-freeze">
       <div className="freeze-line">
-        <label className="freeze-toggle" title={editable ? profileText.freezeFitnessNote : readOnlyNote}>
+        <label className="freeze-toggle" data-tip={editable ? profileText.freezeFitnessNote : readOnlyNote}>
           <input
             type="checkbox"
             checked={frozen}
@@ -191,7 +191,7 @@ function BanList({ uid, bans }: { uid: number; bans: Ban[] }) {
           disabled={!editable}
           aria-disabled={lifting || undefined}
           aria-busy={lifting || undefined}
-          title={editable ? profileText.liftBansTitle : readOnlyNote}
+          data-tip={editable ? profileText.liftBansTitle : readOnlyNote}
           onClick={() => void lift()}
         >
           {profileText.liftBans}
@@ -277,7 +277,7 @@ function InjuryList({ uid, injuries }: { uid: number; injuries: Injury[] }) {
           disabled={!editable}
           aria-disabled={healing || undefined}
           aria-busy={healing || undefined}
-          title={editable ? profileText.healTitle : readOnlyNote}
+          data-tip={editable ? profileText.healTitle : readOnlyNote}
           onClick={() => void heal()}
         >
           {profileText.heal}

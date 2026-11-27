@@ -444,7 +444,7 @@ function LoanFacts({ uid, name, loan, contract }: { uid: number; name: string; l
         <h4>{profileText.loan}</h4>
         <div className="loan-actions">
           {loan.ends === "today" ? (
-            <span className="tag loan loan-status" role="status" title={profileText.pendingTitle(loan.parent ?? "")}>
+            <span className="tag loan loan-status" role="status" data-tip={profileText.pendingTitle(loan.parent ?? "")}>
               {loan.recalled ? profileText.recalledWaiting : profileText.endsTodayWaiting}
             </span>
           ) : (
@@ -454,7 +454,7 @@ function LoanFacts({ uid, name, loan, contract }: { uid: number; name: string; l
               className="heal-toggle recall-toggle"
               aria-haspopup="dialog"
               disabled={!editable}
-              title={profileText.recallTitle}
+              data-tip={profileText.recallTitle}
               onClick={() => setAsking("recall")}
             >
               {loan.ends === "passed" ? profileText.recallAgain : profileText.recall}
@@ -466,7 +466,7 @@ function LoanFacts({ uid, name, loan, contract }: { uid: number; name: string; l
             className="heal-toggle permanent-toggle"
             aria-haspopup="dialog"
             disabled={!editable}
-            title={profileText.makePermanentTitle}
+            data-tip={profileText.makePermanentTitle}
             onClick={() => setAsking("permanent")}
           >
             {profileText.makePermanent}
@@ -570,7 +570,7 @@ function ConcernList({ uid, concerns }: { uid: number; concerns: Concern[] }) {
             className="heal-toggle"
             disabled={!editable}
             aria-disabled={removing || undefined}
-            title={`${profileText.removeUnhappinessTitle}\n${profileText.removeUnhappinessFollows}`}
+            data-tip={`${profileText.removeUnhappinessTitle}\n${profileText.removeUnhappinessFollows}`}
             onClick={() => void remove()}
           >
             {removing ? profileText.removingUnhappiness : profileText.removeUnhappiness}
@@ -711,7 +711,7 @@ function RetirementPlan({ uid, retires }: { uid: number; retires: FmDate | null 
             disabled={!editable}
             aria-disabled={keeping || undefined}
             aria-busy={keeping || undefined}
-            title={editable ? profileText.keepPlayingTitle : readOnlyNote}
+            data-tip={editable ? profileText.keepPlayingTitle : readOnlyNote}
             onClick={() => void keep()}
           >
             {keeping ? profileText.keepingPlaying : profileText.keepPlaying}

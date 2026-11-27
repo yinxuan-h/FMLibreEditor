@@ -1,0 +1,67 @@
+# FM27 on Steam, build 26797085: the update of 24 November 2026, worked out by `fmlibre-probe profile` on a save of
+# 19 October 2026, where all 12 checks passed. The arrays, the date and the game's own object are where build 26620374
+# keeps them; the retirement manager's static is 0x20 further on, and the search found it. The object layout is
+# 26620374's.
+name = "FM27 Steam build 26797085"
+edition = 27
+storefront = "steam"
+
+# The in-game date, 2026-10-19 on the save: 3638 of 3638 contract dates before it, and 108 of 108 current injuries
+# begun by then and not over. The field beside the arrays held 14 October, which 96 of the injuries fit.
+current_date = 0x58268E0
+
+# The static pointer to the retirement manager (RETIREMENT_MANAGER),
+# 0xC048 before the players pair (0xC068 in build 26620374); 14 planned retirements on the save.
+retirement_manager = 0x586F870
+
+# The static pointer to the game's one GAME_UI object, whose count of saves loaded tells a load from a save (1 loaded
+# on the save): 0xBB8 after the players pair, as in build 26620374. Another static, at 0x586B680, points at it too.
+game_ui = 0x587C470
+
+# The static pointers to the tactics the human managers keep for their teams (TACTICS_MANAGER, 0xD0 after the
+# retirement manager's, as before) and to the training manager (TRAINING_MANAGER), which keeps the history of
+# training of their players: each the one pointer in the plugin to the one object of its class.
+tactics_manager = 0x586F940
+training_manager = 0x586BEE8
+
+# The prize money competitions pay (layout.toml, [prize_money]; #123) was read on this build on a save of 19 October
+# 2026: 309 settings, all held by a stage. The Premier League pays its 20 places from £53,100,000 to £2,600,000, Serie
+# A from £28,691,666 to £773,129, and the Champions League's league phase 36 places from £10,222,480, £1,803,967 per
+# win and £601,323 per draw: to the pound what build 26620374 read.
+prize_money = true
+
+# A club's sponsorship deals (layout.toml, [sponsorship]; #114), read on a save of 26 October 2026 and matched to the
+# game's Sponsors screen: West Ham United's 13 entries, the deals the screen lists with the same kind, amount per
+# season and end. The same FM 27.1.1 as Game Pass 0.9.2562.0.
+sponsorships = true
+
+# The rules competitions register their squads under (layout.toml, [rules]), on the same save: 426 competitions with
+# squad rules, 451 kinds; the Turkish Super League's six (at most 14 foreign players, 10 foreign over 24, 3
+# goalkeepers and 28 in all; at least 4 national players under 23 and 2 domestic goalkeepers) and the Premier
+# League's two (at least 8 homegrown, at most 25) as the game's competition rules screen shows them.
+squad_rules = true
+
+# game_plugin as mapped in memory; these values identify the build.
+[plugin]
+size_of_image = 0x1849A000
+link_timestamp = 0x6AFF57A2
+
+# RVAs in game_plugin of the (begin, end) pointer pairs of the entity arrays.
+[arrays]
+players = 0x587B8B8
+staff = 0x587B900
+clubs = 0x587BA70
+
+# RVAs of the pairs of the arrays of national teams' containers (docs/recon/fm27-national-teams.md): 0xA8 and 0xC0
+# past the players pair as in build 26620374.
+[national_teams]
+men = 0x587B960
+women = 0x587B978
+
+# What this build lays out otherwise than layout.toml, as build 26620374 does.
+[layout.club_finance]
+corporate = 0x8AD
+
+[layout.tactics]
+tactics = 0x1018
+current = 0x1030

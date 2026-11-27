@@ -113,6 +113,13 @@ const FLAGS: Record<Locale, ReactNode> = {
       </g>
     </svg>
   ),
+  "pt-BR": (
+    <svg className="language-flag" viewBox="0 0 20 14" aria-hidden="true">
+      <rect width="20" height="14" fill="#009c3b" />
+      <path d="M10 1.2 18.2 7 10 12.8 1.8 7z" fill="#ffdf00" />
+      <circle cx="10" cy="7" r="3.5" fill="#002776" />
+    </svg>
+  ),
   ru: (
     <svg className="language-flag" viewBox="0 0 9 6" aria-hidden="true">
       <rect width="9" height="6" fill="#d52b1e" />
@@ -145,6 +152,7 @@ const LANGUAGES: readonly { id: Locale; name: string }[] = [
   { id: "it", name: "Italiano" },
   { id: "ja", name: "日本語" },
   { id: "ko", name: "한국어" },
+  { id: "pt-BR", name: "Português (Brasil)" },
   { id: "ru", name: "Русский" },
   { id: "zh-CN", name: "简体中文" },
 ];

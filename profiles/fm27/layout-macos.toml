@@ -350,6 +350,33 @@ slots = 0x28
 count = 26
 player_person = 0x390
 
+# The tactic block the first entry of a selection's list points at, laid out as on Windows (see
+# docs/recon/fm27-tactics-and-value.md) with the places' records 8 bytes later. Read on a save of 14 September 2026
+# (Steam build 26385295, Apple silicon), where the game held selections for the manager's club and for three clubs it
+# runs itself: in each, the roles the editor knows were a goalkeeper's for the goalkeeper, a centre-back's for the
+# centre-backs and a striker's for the strikers. `pairing` is the eleven bytes after a 0x1B at +0x7B3: for each
+# in-possession slot, the out-of-possession slot of the same place. One block read 0 1 2 3 4 6 7 5 8 9 10, which makes
+# the left wing-back (AWB with the ball) an HWB without it and the defensive midfielder a PDM; read slot for slot, the
+# wing-back would defend as a PDM and a central midfielder as an HWB. A selection lists one block for each tactic its
+# manager keeps, and the byte after the list is the index of the one he plays, as `[tactics]` reads it: 0 in every
+# selection of that save, each with one block. On a save of 4 July 2027 each of the manager's selections listed two
+# blocks, and the second matched its eleven; the byte was not read then.
+#
+# A record starts with the place's position, one bit of a u32 (and, for one of two or three in the centre, bit 20 for
+# the left one or bit 21 for the right one). Read in the 19 blocks of the September save: every one gave a goalkeeper
+# and ten outfield positions in each phase, a centre-back's role sat at DC and a striker's at ST, and the positions
+# the pairing joins were one player's in both phases. One block, a 4-3-3 with a holding midfielder, read GK DR DC DC DL
+# DM MC MC AMR AML ST with the ball and GK DR DC DC DL DM MR MC MC ML ST without it; another GK DC DC DC WBR DM WBL MC
+# MC ST ST and GK DC DC DC WBR DM DM WBL AMC ST ST.
+[tactic]
+in_possession = 0x120
+out_of_possession = 0x440
+slot_size = 0x48
+role = 0x40               # in a record: the u64 role mask
+position = 0x00           # in a record: the u32 mask of the place's position
+style = 0x100
+pairing = 0x7B4
+
 # The tactics each human manager keeps for each of his teams, which the game reads to tell how well the players know
 # the tactic in use (game_plugin+0x2039c64 and +0x2ce4aec, Steam build 26340721). The build profile's tactics_manager
 # leads to an object listing one object per human manager; each has a map from a team's id (the team's u32 at +0x08)
@@ -462,6 +489,10 @@ scouting_staff = 0x90
 # its own staff with another job who does that one too (seven managers, three directors).
 director_of_football = 0x148
 nation = 0xE8             # Cardiff City: Wales (they play in England, which 0xD8 names); see layout.toml
+# The teams of other clubs the club runs, its B team's (#254); see layout.toml. Not read on a Mac yet: placed as on
+# Windows, like the rest of the club. An entry is shown only when it is a team in the list of teams of another club, so
+# a list that sits elsewhere here shows no linked team; probe `linked-teams` says what it holds.
+linked_teams = 0x30
 
 # Stadiums are laid out as on Windows: Old Trafford reads 74,879, 74,310 in use, room to grow to 95,285; the
 # Emirates 60,704, the Tottenham Hotspur Stadium 62,850, the Amex 31,876.
@@ -500,6 +531,8 @@ youth_facilities = 0x12B
 youth_coaching = 0x12C
 youth_recruitment = 0x12D
 
+# The class of the full record by its name on Windows (see layout.toml), which only a build without a profile asks for;
+# not yet read on the Mac (`fmlibre-probe types FINANC` lists the classes).
 [club_finance]
 balance = 0x0C
 transfer_budget = 0x7C4
@@ -507,6 +540,7 @@ total_wage_budget = 0x808
 wage_budget = 0x814
 ticket_price = 0x864
 corporate = 0x8A9
+class = "db::CLUB_FINANCE"
 
 [nation]
 uid = 0x0C                # Argentina: 1649
@@ -555,6 +589,23 @@ container_nation = 0x170      # pointer back to its nation, at all 502
 nation_code = 0x28            # an FM string: "ITA"
 nation_men = 0x110
 nation_women = 0x118
+
+# What a national team's profile shows of its nation and federation (#210, docs/recon/fm27-national-teams.md), read on
+# Steam build 26620374 (Apple silicon, a save of 28 September 2026) and checked against the game's nation page and
+# its staff list: the founding year and continent of Italia, the continent of Brasile and Inghilterra, and the job in
+# the national team and the team of each of the 24 members of staff of Italia's men's teams.
+[national.details]
+founded = 0x870               # u16 in the container: Italia 1898, the same in both of a nation's; 0 where none
+medical_staff = 0x60          # in the container, where a club keeps its departments: Italia's men's, 2 physios
+coaching_staff = 0x78         # 16, of its senior, under-21 and under-20 teams; their 4 managers are not in any
+scouting_staff = 0x90         # 2
+continent = 0xF8              # pointer in the nation to its db::CONTINENT
+continent_name = 0x18         # an FM string there: "Europa", in the game's language
+# In a staff object, right after his contract: the record of his other contracts, whose slot 0x10 points at his
+# contract with one of a federation's teams (db::BASIC_CONTRACT, a manager's db::FULL_CONTRACT), the team at its
+# +0x10 and his job there at its +0x26: Walter Martinelli, with no club, a physio (12) of Italia's senior team.
+staff_contracts = 0x178
+national_contract = 0x10
 
 # The game's transfers, and a move agreed for a later day, laid out as on Windows (see layout.toml and
 # crates/fmlibre-core/src/arranged.rs) but for the player's records, which sit in the person, 0x40 earlier as his other
@@ -608,6 +659,36 @@ due_number = 0x0C
 player_offer_numbers = 0x2E0 # 0x320 on Windows
 player_entries = 0x2E8       # 0x328 on Windows
 record_size = 0x18           # (begin, end, capacity), in a block of 24 of the game's; 0x28 on Windows
+
+# A loan agreed for a later day, laid out as on Windows (see layout.toml). Read on Steam build 26797085, Apple silicon,
+# on the Arsenal save of 18 July 2027: 406 LOAN_OFFERs, 0x128 bytes apart in a pool of their own, and 317 loan
+# contracts, 0x100 apart in theirs. Of the 165 loans the game had made, 140 players are still on them, and each one's
+# loan contract holds what his offer holds where the Windows layout places it: the wage, the monthly fee (twice), how
+# long it runs, the future fee and its kind (0xFF none in 109, 0xFE an option in 15, mandatory 0x64, 0x14 or 0x19 in
+# 16), and +0x114 as the contract's +0xC8. Where an offer's two wages differ (3 loans), +0x108 is the contract's wage
+# and +0x100 its +0xD4.
+[transfers.loan]
+offer_class = "LOAN_OFFER"
+offer_size = 0x128
+offer_cleared = [0xB0, 0xB8, 0xC0, 0xC8, 0xD0, 0xD8, 0xE0, 0xE8]
+offer_flags = 0xF8
+offer_wage = [0x100, 0x108]
+offer_unused_fee = 0x104
+offer_option_fee = 0x110
+offer_fee_kind = 0x124
+contract_fee_kind = 0xF7
+offer_unset = [0x114]
+offer_usual = [[0x87, 1], [0x88, 0]]
+offer_usual_zero = [0x118]
+offer_share = [0x120, 0x122]
+offer_length = 0x10C
+contract_length = 0xE8
+contract_size = 0x100
+contract_status_again = 0x56
+contract_wage_again = 0xD4
+contract_cleared = [0x28, 0x30, 0x60, 0x68]
+contract_unset = [0xC4, 0xC8, 0xD8, 0xDC, 0xE0]
+contract_zero = [0xE4]
 
 # The rules a competition's squads are registered under (see layout.toml, crates/fmlibre-core/src/rules.rs and
 # docs/recon/fm27-league-rules.md), read on the Mac (Steam build 26620374, Apple silicon, the Arsenal save of 18 July

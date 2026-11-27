@@ -32,6 +32,10 @@ pub enum Operation {
     AtMost { value: i64 },
     /// Raise it to `value`, and leave one that is higher already as it is.
     AtLeast { value: i64 },
+    /// Move a date on by whole years, keeping its day as Add years does, until it is the day `value` or a later one;
+    /// a date that is that late already stays as it is. Only for dates: a contract made to run until a day at least
+    /// still ends on the day of the year it ended on. A date that [`MOST_YEARS`] do not bring there is left as it is.
+    AtLeastByYears { value: i64 },
 }
 
 impl Operation {
@@ -42,7 +46,10 @@ impl Operation {
             _ if !field.mass => {
                 Err(EditError::Unsupported { field: field.key.clone(), reason: "it is changed one person at a time" })
             }
-            Operation::Set { value } | Operation::AtMost { value } | Operation::AtLeast { value }
+            Operation::Set { value }
+            | Operation::AtMost { value }
+            | Operation::AtLeast { value }
+            | Operation::AtLeastByYears { value }
                 if !field.takes(value) =>
             {
                 Err(EditError::OutOfRange { field: field.key.clone(), value, min: field.min, max: field.max })
@@ -53,7 +60,7 @@ impl Operation {
                     reason: "a date can only be set or moved by years",
                 })
             }
-            Operation::AddYears { .. } if field.kind != Kind::Date => {
+            Operation::AddYears { .. } | Operation::AtLeastByYears { .. } if field.kind != Kind::Date => {
                 Err(EditError::Unsupported { field: field.key.clone(), reason: "only a date can be moved by years" })
             }
             Operation::AddYears { years } if !(-MOST_YEARS..=MOST_YEARS).contains(&years) => {
@@ -78,8 +85,46 @@ impl Operation {
             }
             Operation::AtMost { value } => old.min(value),
             Operation::AtLeast { value } => old.max(value),
+            Operation::AtLeastByYears { value } => FmDate::from_number(old)
+                .and_then(|date| {
+                    (0..=MOST_YEARS).filter_map(|years| date.plus_years(years)).find(|late| late.to_number() >= value)
+                })
+                .map_or(old, FmDate::to_number),
         }
     }
+
+    /// What the operation makes of `value`, read from `field` of someone: the change it plans, nothing where the value
+    /// already is what it would make it, or why it leaves the field alone. No value is a field whose record he lacks
+    /// (no contract, a club without full finances).
+    pub(crate) fn judge(self, field: &Field, value: Option<i64>) -> Verdict {
+        let Some(old) = value else {
+            return Verdict::Skip(EditError::NoRecord { field: field.key.clone() });
+        };
+        if !field.is_plausible(old) {
+            return Verdict::Skip(EditError::Implausible { field: field.key.clone(), value: old });
+        }
+        if field.kind == Kind::Date && old == 0 {
+            return Verdict::Skip(EditError::Unset { field: field.key.clone() });
+        }
+        let new = self.apply(field, old);
+        if new == old {
+            return Verdict::Same { value: old };
+        }
+        // A date moved by years can leave the days the field takes, such as a contract's end past 2100.
+        if !field.takes(new) {
+            let (min, max) = (field.min, field.max);
+            return Verdict::Skip(EditError::OutOfRange { field: field.key.clone(), value: new, min, max });
+        }
+        Verdict::Change { old, new }
+    }
+}
+
+/// What an operation makes of one value (see [`Operation::judge`]).
+#[derive(Debug)]
+pub(crate) enum Verdict {
+    Change { old: i64, new: i64 },
+    Same { value: i64 },
+    Skip(EditError),
 }
 
 /// One change of a plan.
@@ -151,36 +196,20 @@ impl Session {
             };
             let mut changed = false;
             for ((field, operation), value) in operations.iter().zip(values) {
-                let Some(old) = value else {
-                    plan.skipped.push(skip(field, &EditError::NoRecord { field: field.key.clone() }));
-                    continue;
-                };
-                if !field.is_plausible(old) {
-                    plan.skipped.push(skip(field, &EditError::Implausible { field: field.key.clone(), value: old }));
-                    continue;
-                }
-                if field.kind == Kind::Date && old == 0 {
-                    plan.skipped.push(skip(field, &EditError::Unset { field: field.key.clone() }));
-                    continue;
-                }
-                let new = operation.apply(field, old);
-                // A date moved by years can leave the days the field takes, such as a contract's end past 2100.
-                if new != old && !field.takes(new) {
-                    let out =
-                        EditError::OutOfRange { field: field.key.clone(), value: new, min: field.min, max: field.max };
-                    plan.skipped.push(skip(field, &out));
-                    continue;
-                }
-                if new != old {
-                    changed = true;
-                    plan.planned.push(Planned {
-                        target: *target,
-                        uid: target.uid,
-                        name: name.clone(),
-                        field: field.key.clone(),
-                        old,
-                        new,
-                    });
+                match operation.judge(field, value) {
+                    Verdict::Change { old, new } => {
+                        changed = true;
+                        plan.planned.push(Planned {
+                            target: *target,
+                            uid: target.uid,
+                            name: name.clone(),
+                            field: field.key.clone(),
+                            old,
+                            new,
+                        });
+                    }
+                    Verdict::Same { .. } => {}
+                    Verdict::Skip(err) => plan.skipped.push(skip(field, &err)),
                 }
             }
             plan.unchanged += usize::from(!changed);
@@ -242,6 +271,39 @@ mod tests {
         assert!(Operation::AddYears { years: 1 }.check(&ca).is_err());
         let staff_expires = field(Entity::Staff, "contract.expires");
         assert!(Operation::AddYears { years: 5 }.check(&staff_expires).is_ok());
+        assert!(Operation::AtLeastByYears { value: 20290718 }.check(&expires).is_ok());
+        assert!(Operation::AtLeastByYears { value: 20290718 }.check(&ca).is_err());
+        assert!(Operation::AtLeastByYears { value: 21010101 }.check(&expires).is_err());
+    }
+
+    #[test]
+    fn a_date_runs_on_by_whole_years_until_a_day() {
+        let expires = field(Entity::Player, "contract.expires");
+        let until = Operation::AtLeastByYears { value: 20290718 };
+        // 30 June 2029 is before 18 July 2029: one year more.
+        assert_eq!(until.apply(&expires, 20270630), 20300630);
+        assert_eq!(until.apply(&expires, 20271231), 20291231);
+        // On the day or after it, it stays; and it never comes back.
+        assert_eq!(until.apply(&expires, 20290718), 20290718);
+        assert_eq!(until.apply(&expires, 20330630), 20330630);
+        assert_eq!(until.apply(&expires, 20280229), 20300228);
+        // Not a date, or one the most years do not bring there: as it is.
+        assert_eq!(until.apply(&expires, 0), 0);
+        assert_eq!(until.apply(&expires, 19500630), 19500630);
+    }
+
+    #[test]
+    fn a_value_is_changed_kept_or_left_alone() {
+        let finishing = field(Entity::Player, "attribute.finishing");
+        let least = Operation::AtLeast { value: 75 };
+        assert!(matches!(least.judge(&finishing, Some(60)), Verdict::Change { old: 60, new: 75 }));
+        assert!(matches!(least.judge(&finishing, Some(80)), Verdict::Same { value: 80 }));
+        assert!(matches!(least.judge(&finishing, None), Verdict::Skip(EditError::NoRecord { .. })));
+        assert!(matches!(least.judge(&finishing, Some(140)), Verdict::Skip(EditError::Implausible { .. })));
+        let expires = field(Entity::Player, "contract.expires");
+        let years = Operation::AddYears { years: 5 };
+        assert!(matches!(years.judge(&expires, Some(0)), Verdict::Skip(EditError::Unset { .. })));
+        assert!(matches!(years.judge(&expires, Some(20990630)), Verdict::Skip(EditError::OutOfRange { .. })));
     }
 
     #[test]

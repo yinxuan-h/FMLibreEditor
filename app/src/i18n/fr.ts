@@ -108,6 +108,12 @@ const CONTRACT_TYPES: Partial<Record<number, string>> = {
 /** The name of the field a failure names. */
 const field = (key: string | undefined) => fieldName(fr, key ?? "");
 
+/** A day the commands name as "20280131", written out in the language's own way. */
+const dayText = (value: string | undefined) => {
+  const [y, m, d] = [Number(value?.slice(0, 4)), Number(value?.slice(4, 6)), Number(value?.slice(6, 8))];
+  return new Date(y, m - 1, d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+};
+
 /** The same in quotes, for the middle of a sentence: « Finition ». */
 const quoted = (key: string | undefined) => `«\u00a0${field(key)}\u00a0»`;
 
@@ -340,6 +346,8 @@ const errors: ErrorTexts = {
   "sign.noModel": () =>
     "Le club n'a aucun joueur sous simple contrat avec son équipe première sur lequel calquer le nouveau contrat.",
   "sign.noDate": () => "L'éditeur ne parvient pas à lire la date du jeu, à laquelle commence le nouveau contrat.",
+  "loan.end": (p) => `Le prêt doit se terminer après son arrivée et au plus tard avec son contrat\u00a0: entre le ${dayText(p.earliest)} et le ${dayText(p.latest)}.`,
+  "loan.noModel": () => "Le jeu n'a pas de prêt à lui en cours sur lequel modeler celui-ci. Réessayez après un jour de jeu.",
   "move.outOfRange": (p) =>
     `${p.value} n'est pas une valeur valide pour ${quoted(p.field)}\u00a0: ce champ accepte de ${p.min} à ${p.max}.`,
   "move.changed": () => `Le jeu a modifié cette mémoire entre-temps\u00a0; ${reload}.`,
@@ -478,6 +486,10 @@ const errors: ErrorTexts = {
   "mass.tooMany": (p) =>
     `Il y a ${p.count} résultats. Pour une modification groupée, réduisez la recherche ou les filtres à ${p.limit} ` +
     "au maximum.",
+  "recipe.tooOld": (p) =>
+    `Le joueur a ${p.age} ans\u00a0: cette recette est destinée aux joueurs de ${p.oldest} ans ou moins.`,
+  "recipe.ageUnknown": () => "L'âge du joueur n'est pas connu, et cette recette en dépend.",
+  "recipe.outOfDate": () => "Cet aperçu n'est plus à jour. Rouvrez la recette.",
   "mass.outOfDate": () => "Cet aperçu n'est plus à jour. Relancez l'aperçu de la modification groupée.",
 };
 
@@ -679,6 +691,9 @@ export const fr: Strings = {
     jadedness: "Fatigue",
     morale: "Moral",
     "contract.wage": "Salaire hebdomadaire",
+    wageShare: "part du salaire",
+    monthlyFee: "frais mensuels",
+    optionFee: "option d'achat",
     "contract.loyalty_bonus": "Prime de fidélité hebdomadaire",
     "contract.happiness": "État d'esprit",
     "contract.playing_time_happiness": "Satisfaction temps de jeu",
@@ -786,8 +801,8 @@ export const fr: Strings = {
     joined: "Arrivée",
     extendContract: (years: number) => `Prolonger de ${years}\u00a0ans`,
     extendingContract: "Prolongation…",
-    extendContractTitle: (years: number, until: string) =>
-      `Le contrat court ${years}\u00a0ans de plus, jusqu'au ${until}\u00a0; annulable dans Modifications`,
+    extendContractTitle:
+      (years: number, until: string) => `Le contrat court ${years}\u00a0ans de plus, jusqu'au ${until}`,
     squadStatus: "Statut effectif",
     squadStatusName: (status) => SQUAD_STATUSES[status] ?? `Statut ${status}`,
     contractType: "Type de contrat",
@@ -814,9 +829,7 @@ export const fr: Strings = {
     keepPlaying: "Empêcher la retraite",
     keepingPlaying: "En cours…",
     keepPlayingTitle:
-      "Retirer son départ à la retraite des plans du jeu et lui donner la caractéristique «\u00a0Jouera au football " +
-      "le plus longtemps possible\u00a0» à la place de «\u00a0Prendra sa retraite au sommet\u00a0»\u00a0; annulable dans " +
-      "Modifications",
+      "Annuler sa retraite prévue et lui donner la caractéristique «\u00a0Jouera au football le plus longtemps possible\u00a0»",
 
     // Médical
     morale: (value) => `${value} / 20`,
@@ -827,11 +840,9 @@ export const fr: Strings = {
     noUnhappiness: "Rien ne le rend mécontent",
     removeUnhappiness: "Tout retirer",
     removingUnhappiness: "Retrait…",
-    removeUnhappinessTitle:
-      "Retirer de sa liste tous les motifs de mécontentement, comme le fait FMRTE\u00a0; annulable dans Modifications",
+    removeUnhappinessTitle: "Retirer de sa liste tous les motifs de mécontentement",
     removeUnhappinessFollows:
-      "Les motifs de mécontentement de ses coéquipiers à son sujet prennent fin d'eux-mêmes une fois que le jeu " +
-      "avance\u00a0: appuyez sur Continuer dans le jeu",
+      "Ceux de ses coéquipiers à son sujet prennent fin une fois que le jeu avance\u00a0: appuyez sur Continuer dans le jeu",
     concernSince: (date) => `depuis le ${date}`,
     concernAbout: (name) => `à propos de ${name}`,
     concernKind: (kind) => (kind === 1 ? "Préoccupé" : kind === 2 ? "Interne" : `Type ${kind}`),
@@ -850,16 +861,15 @@ export const fr: Strings = {
     loanUntil: "Fin",
     loanNumber: "Numéro au club d'accueil",
     recall: "Rappeler de prêt",
-    recallTitle:
-      "Le faire revenir dans son club\u00a0: le prêt se termine aujourd'hui. Demande confirmation avant tout changement",
+    recallTitle: "Le faire revenir dans son club aujourd'hui\u00a0; demande confirmation avant",
     recallAgain: "Rappeler à nouveau",
     makePermanent: "Rendre définitif",
     makePermanentTitle:
-      "Le garder dans le club où il est prêté, sous contrat avec ce club. Demande confirmation avant tout changement",
+      "Le garder dans le club où il est prêté, sous contrat avec ce club\u00a0; demande confirmation avant",
     recalledWaiting: "Rappelé · retour en attente",
     endsTodayWaiting: "Se termine aujourd'hui · retour en attente",
-    pendingTitle: (parent) =>
-      `Aujourd'hui est le dernier jour du prêt\u00a0: avancez d'un jour dans le jeu et il sera de retour à ${parent}.`,
+    pendingTitle:
+      (parent) => `Le prêt se termine aujourd'hui\u00a0: avancez d'un jour dans le jeu et il sera de retour à ${parent}`,
     endPassed: (date) =>
       `Le prêt devait se terminer le ${date}, mais le jeu ne l'a pas fait revenir. Rappelez-le à nouveau, puis ` +
       "avancez d'un jour.",
@@ -913,11 +923,9 @@ export const fr: Strings = {
     clauseProfitShare: (percent, amount) => `${percent} du bénéfice au-delà de ${amount}`,
     clauseWage: (amount) => `${amount} par semaine`,
     moraleTitle:
-      "Le jeu affiche le moral comme l'état d'esprit général du joueur\u00a0: satisfait à 10, plutôt heureux à 11, " +
-      "extrêmement heureux à 15 et 20",
+      "L'état d'esprit général dans le jeu\u00a0: satisfait à 10, plutôt heureux à 11, extrêmement heureux à 15 et 20",
     jadednessTitle:
-      "À quel point le joueur est usé par les matchs, ce que le repos efface\u00a0: -500 signifie complètement reposé, " +
-      "et plus la valeur est élevée, plus il a besoin de repos",
+      "À quel point il est usé par les matchs\u00a0: -500 signifie complètement reposé, et plus c'est élevé, plus il a besoin de repos",
     noInjuries: "Aucune blessure",
     unknownInjury: "Blessure inconnue",
     injuryStarted: (date) => `Depuis le ${date}`,
@@ -933,8 +941,7 @@ export const fr: Strings = {
     // Au-dessus des attributs, pendant la lecture du profil
     maxAttributes: "Attributs au maximum",
     maxAttributesTitle:
-      "Porter chaque attribut de ce joueur à son meilleur niveau\u00a0: 20, et 1 pour la tendance à se blesser et la " +
-      "violence",
+      "Porter chaque attribut à son meilleur niveau\u00a0: 20, et 1 pour la tendance à se blesser et la violence",
     maxAttributesDone: (count) =>
       count === 0 ? "Tous les attributs sont déjà au maximum" : `${changes(count)} écrite${agree(count)}`,
     maxAttributesUndone: (count) =>
@@ -943,20 +950,14 @@ export const fr: Strings = {
     undoMaxTitle: "Réécrire ses anciens attributs dans le jeu",
     freezeAttributes: "Bloquer les attributs",
     freezeAttributesNote:
-      "Tant que l'application est ouverte et connectée, ses attributs ne baissent pas\u00a0: ce que le jeu retire est " +
-      "remis, et les progrès comptent toujours. L'application s'en souvient pour cette partie, et les bloque à nouveau " +
-      "quand elle s'y connecte.",
+      "Ses attributs ne baissent pas tant que l'application est ouverte et connectée\u00a0; les progrès comptent toujours",
     maxStaffAttributesTitle: "Porter chaque attribut de ce membre du staff à son meilleur niveau\u00a0: 20",
     undoMaxStaffTitle: "Réécrire les anciens attributs dans le jeu",
     freezeStaffAttributesNote:
-      "Tant que l'application est ouverte et connectée, ses attributs ne baissent pas\u00a0: ce que le jeu retire est " +
-      "remis, et les progrès comptent toujours. L'application s'en souvient pour cette partie, et les bloque à nouveau " +
-      "quand elle s'y connecte.",
+      "Ses attributs ne baissent pas tant que l'application est ouverte et connectée\u00a0; les progrès comptent toujours",
     freezeFitness: "Bloquer l'énergie et la forme physique",
     freezeFitnessNote:
-      "Tant que l'application est ouverte et connectée, son énergie et sa forme physique ne baissent pas\u00a0: ce que " +
-      "le jeu retire est remis, et les gains comptent toujours\u00a0; à 100\u00a0%, il y reste donc. L'application s'en " +
-      "souvient pour cette partie.",
+      "Son énergie et sa forme physique ne baissent pas tant que l'application est connectée\u00a0; les gains comptent toujours",
     freezePositions: "Bloquer",
     freezePositionsInfo: "Que fait le blocage des postes\u00a0?",
     freezePositionsNote:
@@ -1156,9 +1157,7 @@ export const fr: Strings = {
     noFinances: "FM ne garde les finances que pour les clubs des championnats joués.",
     freeze: "Bloquer l'argent",
     freezeNote:
-      "Tant que l'application est ouverte et connectée, le solde ne baisse pas\u00a0: ce que le jeu retire est remis, et " +
-      "les revenus comptent toujours. L'application s'en souvient pour cette partie, et le bloque à nouveau quand elle " +
-      "s'y connecte.",
+      "Le solde ne baisse pas tant que l'application est ouverte et connectée\u00a0; les revenus comptent toujours",
 
     // Stade
     stadium: "Stade",
@@ -1166,14 +1165,12 @@ export const fr: Strings = {
     seating: "Places assises",
     used: "Utilisée",
     usedAll: "Totale",
-    usedTitle:
-      "La part de la capacité que le jeu laisse entrer, quand il la limite (par exemple pendant que des places sont " +
-      "fermées)\u00a0; 0 signifie la totalité",
+    usedTitle: "La part de la capacité que le jeu laisse entrer quand il la limite\u00a0; 0 signifie la totalité",
     expansion: "Agrandissement possible jusqu'à",
     noStadium: "Impossible de lire le stade de ce club.",
     stadiumName: "Nom",
     rename: "Renommer",
-    renameTitle: "Donner un autre nom au stade\u00a0; il est écrit aussitôt, et annulable dans Modifications",
+    renameTitle: "Donner un autre nom au stade\u00a0; il est écrit aussitôt",
     renameInfoLabel: "Comment fonctionne le renommage\u00a0?",
     renameInfo:
       "Le jeu ne garde aucun nom de stade dans ses sauvegardes\u00a0: il les reprend de sa base de données chaque fois " +
@@ -1209,7 +1206,7 @@ export const fr: Strings = {
 
     actionsLabel: "Actions sur tout le staff",
     releaseAll: (count) => (count === 0 ? "Libérer tout le staff" : `Libérer tout le staff (${format(count)})`),
-    releaseAllTitle: "Libérer d'un coup tout le staff du club, sauf vous et les dirigeants. Une fenêtre demande d'abord",
+    releaseAllTitle: "Libérer tout le staff du club, sauf vous et les dirigeants\u00a0; demande confirmation avant",
     releaseNone: "Personne dans le staff de ce club ne peut être libéré",
     hint: "Tous quittent aussitôt le club, sauf vous et les dirigeants. L'annulation est aussi dans la vue Modifications.",
     released: (count) => counted(count, "membre du staff libéré", "membres du staff libérés"),
@@ -1247,8 +1244,7 @@ export const fr: Strings = {
 
     moveAll: "Transférer tout le staff",
     moveAllTitle:
-      "Transférer d'un coup tout le staff du club vers un autre club, sauf vous et les dirigeants. Une fenêtre demande " +
-      "d'abord",
+      "Transférer tout le staff du club vers un autre club, sauf vous et les dirigeants\u00a0; demande confirmation avant",
     moveNone: "Personne dans le staff de ce club ne peut être transféré",
     moved: (count, club) => `${counted(count, "membre du staff transféré", "membres du staff transférés")} vers ${club}`,
     undoMoveTitle: "Faire revenir à ce club le staff transféré, avec ses contrats",
@@ -1363,6 +1359,16 @@ export const fr: Strings = {
     squadHeading: (team, count) => `${team} : ${format(count)} ${count === 1 ? "joueur" : "joueurs"}`,
     squadLabel: (team) => `Joueurs de la sélection : ${team}`,
     squadNote: "Les joueurs que le jeu liste pour cette équipe, dans son ordre. Les convocations, les capitaines et le contrat du sélectionneur ne se modifient pas ici.",
+    details: {
+      nation: "Nation",
+      founded: "Fédération fondée en",
+      continent: "Continent",
+      staff: (count) => `Staff de la fédération (${format(count)})`,
+      noStaff: "Aucun membre du staff de la fédération trouvé.",
+      job: "Poste en sélection",
+      team: "Équipe",
+      staffNote: "Lu dans le jeu ; non modifié ici. Le poste est celui de chacun en sélection, pas celui dans un club.",
+    },
     actionsHint: "Les actions portent sur tous les joueurs que liste l'équipe première. L'annulation est aussi dans la vue Modifications.",
     noTeams: "Le jeu ne tient pas d'équipe pour cette sélection : il n'y a ni effectif ni réputation à montrer.",
     reading: "Lecture de l'effectif…",
@@ -1418,9 +1424,9 @@ export const fr: Strings = {
     term: "Durée",
     years: (count) => `${format(count)} ${plural(count) ? "ans" : "an"}`,
     unnamed: (kind) => `Type ${format(kind)}`,
-    unnamedTitle: "Personne n'a encore associé ce type de contrat à un nom de l'écran du jeu, et l'écran peut ne pas l'afficher.",
+    unnamedTitle: "Ce type de contrat n'a pas encore été associé à un nom de l'écran du jeu",
     ended: "Terminé",
-    endedTitle: "Le contrat s'est terminé avant la date du jeu. L'écran Sponsoring du jeu ne l'affiche plus.",
+    endedTitle: "Terminé avant la date du jeu\u00a0: l'écran Sponsoring du jeu ne l'affiche plus",
     falls: (percent) => `Baisse de ${format(percent)} % en cas de relégation`,
     rises: (percent) => `Hausse de ${format(percent)} % en cas de promotion dans l'élite`,
     note: "Lecture seule. Ce sont les montants que le jeu conserve pour chaque contrat. Son écran Sponsoring affiche les contrats qui ne sont pas terminés.",
@@ -1442,7 +1448,7 @@ export const fr: Strings = {
     reading: "Lecture des règles d'effectif des compétitions dans le jeu… Cela prend quelques secondes.",
     readAgain: "Relire",
     readAgainTitle: "Relire les règles dans le jeu",
-    listNote: "Les compétitions sans règles d'effectif ne sont pas listées.",
+    listNote: "Seules les compétitions que le jeu fait jouer dans cette sauvegarde sont listées.",
     unavailableTitle: "Aucune règle d'effectif à afficher",
     unavailableBuild: "Personne n'a encore vérifié où cette version du jeu garde les règles d'effectif des compétitions : l'éditeur n'en montre donc aucune plutôt que de lire la mauvaise mémoire.",
     unavailableUnreadable: "L'éditeur a cherché les règles d'effectif là où il les attend dans cette version du jeu, mais ce qu'il a trouvé ne ressemble pas aux données du jeu : il n'en montre donc aucune.",
@@ -1469,6 +1475,7 @@ export const fr: Strings = {
     begins: (year) => `commence en ${year}`,
     noRules: "Aucune règle d'effectif.",
     noNext: "Le jeu ne contient aucune règle pour la saison prochaine.",
+    noneGiven: "Le jeu ne donne aucune règle d'effectif à cette compétition, il n'y a donc rien à changer ici.",
     ruleColumns: {
       rule: "Règle",
       where: "Compté dans",
@@ -1534,14 +1541,17 @@ export const fr: Strings = {
     },
     yearsTitle: "Les saisons pour lesquelles les règles du pays donnent cette règle, d'après l'année où une saison commence",
     leftAlone: "Laissée telle quelle",
-    notSavedTitle: "Les règles du pays telles qu'une sauvegarde les garde ne contiennent pas cette règle : une modification disparaîtrait au chargement de la sauvegarde. L'éditeur la laisse telle quelle.",
+    notSavedTitle:
+      "La sauvegarde ne contient pas cette règle, une modification disparaîtrait au chargement\u00a0: l'éditeur la laisse telle quelle",
     notACountTitle: "Un montant d'argent, pas un nombre de joueurs : l'éditeur le laisse tel quel.",
     noneChangeable: "Ces règles ne peuvent pas encore être modifiées, à aucune date\u00a0: l'éditeur ne modifie une règle que s'il la trouve aussi dans les règles que la sauvegarde conserve, pour que la modification soit encore là au chargement de la sauvegarde, et il n'y a pas trouvé celles de cette compétition. Pour l'instant, c'est le cas des championnats féminins, de la Major League Soccer et de quelques coupes.",
     unsavedNote: "Le jeu ne garde les règles de cette compétition dans aucune sauvegarde\u00a0: il les crée lui-même à chaque chargement, et de nouveau à chaque saison. L'éditeur maintient donc une modification ici\u00a0: il l'écrit dans le jeu en cours, la retient pour cette carrière et la réécrit chaque fois qu'il se connecte ou relit les données. Après avoir chargé une sauvegarde, connectez l'éditeur (ou cliquez sur Recharger les données) une fois pour que la modification revienne. Annuler dans Modifications la relâche.",
     heldTag: "Maintenue",
-    heldTitle: (original) => `L'éditeur maintient ce nombre et le réécrit chaque fois qu'il lit le jeu. Celui du jeu est ${format(original)}.`,
+    heldTitle: (original) =>
+      `L'éditeur maintient ce nombre et le réécrit chaque fois qu'il lit le jeu\u00a0; celui du jeu est ${format(original)}`,
     savedDiffers: (value) => `Les règles de la sauvegarde indiquent ${format(value)}`,
-    savedDiffersTitle: "Le jeu suit la liste et la refait à partir des règles de la sauvegarde quand il la charge. Enregistrer une modification ici change les deux.",
+    savedDiffersTitle:
+      "Le jeu suit la liste et la refait à partir de la sauvegarde au chargement\u00a0; une modification ici change les deux",
     edit: "Modifier les règles",
     editTitle: "Modifier les nombres des règles d'effectif de cette compétition",
     save: "Enregistrer les règles",
@@ -1576,8 +1586,7 @@ export const fr: Strings = {
     previewTag: "aperçu dans le navigateur · données d'exemple",
     noDate: "Aucune date de jeu",
     noDateTitle:
-      "FMLibreEditor n'a pas pu lire la date du jeu dans cette version du jeu\u00a0: les âges ne sont donc pas affichés " +
-      "et les filtres d'âge ne trouvent personne. Vérifiez s'il existe des mises à jour.",
+      "La date du jeu n'a pas pu être lue\u00a0: pas d'âges, et les filtres d'âge ne trouvent personne. Vérifiez les mises à jour.",
     reload: "Recharger les données",
     refresh: "Actualiser",
     detecting: "Recherche de Football Manager…",
@@ -1693,15 +1702,13 @@ export const fr: Strings = {
       names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`,
     allow: "Modifier quand même",
     allowTitle:
-      "Activer la modification jusqu'à ce que FMLibreEditor soit fermé ou se reconnecte. Faites d'abord une copie de " +
-      "sauvegarde de votre partie.",
+      "Activer la modification jusqu'à ce que l'application soit fermée ou se reconnecte. Faites d'abord une copie de votre partie.",
   },
 
   diagnostics: {
     copy: "Copier le diagnostic",
     copyTitle:
-      "Copier ce que FMLibreEditor a trouvé dans le jeu, pour le coller dans un rapport de bug. Ne contient ni noms ni " +
-      "chemins.",
+      "Copier ce que l'application a trouvé dans le jeu, pour un rapport de bug\u00a0; ne contient ni noms ni chemins",
     copied: "Copié",
     failed: (reason) => `Impossible de copier le diagnostic\u00a0: ${reason}`,
   },
@@ -1726,7 +1733,7 @@ export const fr: Strings = {
     youHave: (version) => `Vous avez la version ${version}.`,
     download: "Télécharger",
     install: "Mettre à jour",
-    installTitle: "Télécharger et installer la nouvelle version\u00a0; FMLibreEditor se ferme et se rouvre avec elle",
+    installTitle: "Télécharger et installer la nouvelle version\u00a0; l'application se ferme et se rouvre avec elle",
     preparing: "Préparation…",
     downloading: (percent) => (percent === null ? "Téléchargement…" : `Téléchargement… ${percent}\u00a0%`),
     installing: "Installation\u00a0: FMLibreEditor se ferme et se rouvre avec la nouvelle version.",
@@ -1800,7 +1807,8 @@ export const fr: Strings = {
     inGame: "Dans le jeu",
     inGameTitle: "Le jeu avait cette valeur à la dernière lecture des données",
     notInGame: "Pas dans le jeu",
-    notInGameTitle: "Le jeu n'avait pas cette valeur à la dernière lecture des données\u00a0: il n'a pas été sauvegardé après la modification, ou il a changé la valeur depuis",
+    notInGameTitle:
+      "Absente du jeu à la dernière lecture\u00a0: pas sauvegardée après la modification, ou changée par le jeu depuis",
     /** In the place of Undo for an earlier change that cannot be undone from here, and its hover text. */
     historyOnly: "Historique",
     historyOnlyTitle: "Faite avant la dernière connexion de l'application\u00a0: l'annuler demandait la mémoire du jeu telle qu'elle était alors",
@@ -1808,7 +1816,8 @@ export const fr: Strings = {
     batchNotInGame: (count) => `${format(count)} absente${agree(count)} du jeu`,
     /** Empties the list and the history of the career; the question that asks first, and its two answers. */
     clearHistory: "Effacer l'historique",
-    clearHistoryTitle: "Vider cette liste et oublier l'historique de cette carrière. Les modifications restent dans le jeu.",
+    clearHistoryTitle:
+      "Vider cette liste et oublier l'historique de cette carrière\u00a0; les modifications restent dans le jeu",
     confirmClear: "Effacer l'historique de cette carrière\u00a0? Les modifications restent dans le jeu, mais ne pourront plus être annulées d'ici.",
     keepHistory: "Garder",
     clearConfirm: "Effacer",
@@ -1817,6 +1826,7 @@ export const fr: Strings = {
     released: (name) => `Libération ${de(name)}`,
     fee: (amount) => `Montant\u00a0: ${amount}`,
     arranged: (date) => `Le jeu effectue le déplacement le ${date}`,
+    arrangedLoan: (day, until) => `Le jeu effectue le prêt le ${day}, jusqu’au ${until}`,
     optionRemoved: (amount) => `Option d'achat (${amount}) supprimée`,
     healed: (count) => counted(count, "blessure soignée", "blessures soignées"),
     lifted: (count) => counted(count, "suspension levée", "suspensions levées"),
@@ -1883,10 +1893,9 @@ export const fr: Strings = {
   export: {
     button: "Exporter",
     buttonTitle: {
-      player: "Écrire les joueurs affichés par la liste dans un fichier CSV ou JSON, pour un tableur ou un script",
-      staff:
-        "Écrire les membres du staff affichés par la liste dans un fichier CSV ou JSON, pour un tableur ou un script",
-      club: "Écrire les clubs affichés par la liste dans un fichier CSV ou JSON, pour un tableur ou un script",
+      player: "Écrire les joueurs affichés par la liste dans un fichier CSV ou JSON",
+      staff: "Écrire les membres du staff affichés par la liste dans un fichier CSV ou JSON",
+      club: "Écrire les clubs affichés par la liste dans un fichier CSV ou JSON",
     },
     title: { player: "Exporter les joueurs", staff: "Exporter le staff", club: "Exporter les clubs" },
     scope: (entity, count) =>
@@ -1943,7 +1952,7 @@ export const fr: Strings = {
 
     /** The export of the Changes view: a CSV file of the changes its search and filters show. */
     changes: {
-      buttonTitle: "Écrire les modifications affichées par la liste dans un fichier CSV, pour un tableur ou un script",
+      buttonTitle: "Écrire les modifications affichées par la liste dans un fichier CSV",
       title: "Exporter les modifications",
       /** What the export covers: everything the list's search and filters select, or, with none on, the whole history. */
       scope: (count, filtering) =>
@@ -2022,8 +2031,7 @@ export const fr: Strings = {
     percentTitle:
       "Un pourcentage de la valeur actuelle\u00a0: 100 la garde, 110 l'augmente d'un dixième, 50 la divise par deux",
     addYearsTitle:
-      "Années ajoutées à chaque date, qui garde son jour et son mois\u00a0; un nombre négatif la recule. " +
-      "Le 29\u00a0février devient le 28\u00a0février une année qui n'en a pas",
+      "Années ajoutées à chaque date\u00a0; un nombre négatif la recule, et le 29\u00a0février peut devenir le 28",
     years: "ans",
     invalidAdd: (min, max) => `Saisissez un nombre entier de ${format(min)} à ${format(max)}`,
     invalidPercent: (min, max) => `Saisissez un pourcentage entier de ${min} à ${max}`,
@@ -2113,7 +2121,7 @@ export const fr: Strings = {
     from: "De",
     to: "Vers",
 
-    modeLabel: "Transfert, déplacer maintenant ou échange",
+    modeLabel: "Transfert, prêt, déplacer maintenant ou échange",
     modeMove: "Déplacer maintenant",
     modeSwap: "Échanger avec un joueur",
     modeArrange: "Transfert",
@@ -2139,6 +2147,32 @@ export const fr: Strings = {
       "Indiqué dans Modifications, où une seule annulation le retire jusqu'à ce jour",
     ],
     arrangeButton: "Préparer le transfert",
+
+    modeLoan: "Prêt",
+    loanNote: "Le jeu effectue le prêt à son prochain jour, comme les siens\u00a0; il retourne ensuite à son club.",
+    loanChecking: "Vérification du prêt…",
+    loanOn: (date: string) => `Le jeu effectue le prêt le ${date}`,
+    loanUntil: (date: string) => `Le prêt dure jusqu'au ${date}`,
+    loanWage: (money: string, share: number) => `Le club paie ${money} par semaine (${format(share)}\u00a0% de son salaire)`,
+    loanMonthlyFee: (money: string) => `Frais mensuels ${money}`,
+    loanOption: (money: string) => `Option d'achat à ${money}`,
+    loanDoes: [
+      "Convenu maintenant\u00a0: le jeu effectue le prêt à son prochain jour",
+      "Son historique indique le prêt, et il retourne à son club le lendemain du dernier jour",
+      "Le club paie sa part du salaire, et les frais mensuels si vous en fixez",
+      "Avec une option, le club qui l'accueille peut le recruter à ce montant à la fin du prêt",
+    ],
+    loanDoesHeading: "Ce que fait le prêt",
+    loanHint: "Rien ne change dans le jeu tant que vous n'appuyez pas sur Préparer le prêt.",
+    loanButton: "Préparer le prêt",
+    loanLastDay: "Dernier jour du prêt",
+    loanLastDayHint: "Il retourne à son club le lendemain",
+    loanShare: "Part du salaire payée",
+    loanShareHint: "Payée par le club qui l'accueille\u00a0; le reste par son club",
+    loanShareInvalid: "Saisissez un nombre entier de 0 à 100",
+    loanMonthly: "Frais mensuels",
+    loanOptionFee: "Option d'achat",
+    loanOptionFeeHint: "À la fin du prêt, le club qui l'accueille peut le recruter à ce montant\u00a0; vide\u00a0: aucune",
 
     // Le choix du club
     searchLabel: "Rechercher le club où le transférer",
@@ -2544,58 +2578,40 @@ export const fr: Strings = {
     liftAllTitle: "Lever toutes les suspensions de tous les joueurs de cette équipe",
     liftNone: "Personne n'est suspendu dans cette équipe",
     inspireAll: "Inspirer l'équipe",
-    inspireAllTitle:
-      "Porter le moral de chaque joueur de cette équipe à 20, le maximum, et retirer ses motifs de mécontentement",
+    inspireAllTitle: "Porter le moral de chaque joueur à 20, le maximum, et retirer ses motifs de mécontentement",
     maxCohesion: "Cohésion maximale",
     maxCohesionTitle:
-      "Porter la cohésion avec le club de chaque joueur de cette équipe à 100, le maximum. Le jeu affiche la cohésion " +
-      "d'équipe sur sa page Dynamique de groupe une fois qu'il avance\u00a0: appuyez sur Continuer dans le jeu",
+      "Porter la cohésion avec le club de chaque joueur à 100, le maximum\u00a0; le jeu l'affiche une fois qu'il avance",
     cohesionNone:
-      "L'éditeur ne peut pas lire la cohésion de cette équipe\u00a0: cette version du jeu n'a pas été vérifiée pour " +
-      "cela, ou aucun de ses joueurs n'a d'entrée pour le club",
+      "Illisible\u00a0: cette version du jeu n'a pas été vérifiée pour cela, ou aucun joueur n'a d'entrée pour le club",
     cohesionWithout: (count: number) =>
       plural(count)
         ? `${format(count)} joueurs n'ont pas encore de cohésion avec le club`
         : `${format(count)} joueur n'a pas encore de cohésion avec le club`,
     maxTactics: "Tactique au maximum",
     maxTacticsTitle:
-      "Faire connaître au mieux à chaque joueur de cette équipe la tactique qu'elle joue, dans les huit domaines de " +
-      "l'écran Efficacité tactique, comme le feraient des semaines d'entraînement. Les attributs ne changent pas. Les " +
-      "domaines baissent de nouveau à mesure que l'entraînement vieillit, au bout de six semaines environ, et une autre " +
-      "tactique demande un autre clic. Le jeu les affiche une fois qu'il avance\u00a0: appuyez sur Continuer dans le jeu",
+      "Faire connaître au mieux la tactique de l'équipe à chaque joueur\u00a0; cela baisse au bout de six semaines environ",
     tacticsNone:
-      "L'éditeur ne peut pas lire à quel point cette équipe connaît sa tactique : cette version du jeu n'a pas été " +
-      "vérifiée pour cela, ou l'équipe ne joue pas une tactique que vous choisissez",
+      "Illisible\u00a0: cette version du jeu n'a pas été vérifiée pour cela, ou l'équipe ne joue pas une tactique que vous choisissez",
     tacticsUntrained: (count: number) =>
       plural(count)
         ? `${format(count)} joueurs ne s'entraînent pas (blessés, par exemple) : leur historique d'entraînement reste tel quel`
         : `${format(count)} joueur ne s'entraîne pas (blessé, par exemple) : son historique d'entraînement reste tel quel`,
     refreshAll: "Tout régénérer",
     refreshAllTitle:
-      "Porter l'énergie et la forme physique de chaque joueur de cette équipe à 100\u00a0%, et le reposer complètement " +
-      "(fatigue -500)",
+      "Porter l'énergie et la forme physique de chaque joueur à 100\u00a0%, et le reposer complètement (fatigue -500)",
     batchTraits: "Caractéristiques du groupe",
     batchTraitsTitle: "Ajouter ou retirer des gestes préférés pour les joueurs de cette équipe",
     maxAll: "Attributs au maximum",
     maxAllTitle:
-      "Porter chaque attribut de chaque joueur de cette équipe à son meilleur niveau\u00a0: 20, et 1 pour la tendance à " +
-      "se blesser et la violence",
+      "Porter chaque attribut de chaque joueur à son meilleur niveau\u00a0: 20, et 1 pour la tendance à se blesser et la violence",
     atItsBest: "Équipe au maximum",
     atItsBestTitle:
-      "«\u00a0Tout soigner\u00a0», «\u00a0Inspirer l'équipe\u00a0», «\u00a0Tout régénérer\u00a0», «\u00a0Cohésion " +
-      "maximale\u00a0» et «\u00a0Tactique au maximum\u00a0» en un seul clic, que «\u00a0Annuler\u00a0» défait d'un " +
-      "coup. Les attributs et les suspensions restent tels quels. Une étape qui ne peut pas se faire, comme " +
-      "«\u00a0Tout soigner\u00a0» quand personne n'est blessé, est sautée, et le résultat le dit. Les domaines de la " +
-      "tactique baissent de nouveau à mesure que l'entraînement vieillit, au bout de six semaines environ, et une " +
-      "autre tactique demande un autre clic. Le jeu affiche les modifications une fois qu'il avance\u00a0: appuyez " +
-      "sur Continuer dans le jeu",
+      "Soigner, inspirer et régénérer tout le monde, cohésion et tactique au maximum en un clic\u00a0; «\u00a0Annuler\u00a0» défait tout",
     atItsBestSkipped: (step, reason) => `Étape «\u00a0${step}\u00a0» sautée\u00a0: ${reason}`,
     destroy: "Équipe au plus bas",
     destroyTitle:
-      "Amener chaque joueur de cette équipe à son plus bas\u00a0: moral et état d'esprit, énergie, forme physique et " +
-      "fatigue, cohésion avec le club et, si vous choisissez la tactique de l'équipe, sa connaissance de celle-ci. " +
-      "Aucune valeur n'est améliorée\u00a0; les attributs, les blessures et les suspensions ne changent pas. Une " +
-      "question est posée d'abord, et tout se défait d'un seul coup",
+      "Amener au plus bas le moral, la forme, la cohésion et la connaissance tactique de chaque joueur\u00a0; demande confirmation avant",
     destroySteps: {
       demoralize: "Moral et état d'esprit",
       exhaust: "Énergie et forme",
@@ -2626,17 +2642,13 @@ export const fr: Strings = {
     freezeLabel: "Bloquer toute l'équipe",
     freezeAttributes: "Bloquer les attributs",
     freezeAttributesTitle:
-      "Tant que l'application est ouverte et connectée, les attributs de chaque joueur de cette équipe ne baissent " +
-      "pas\u00a0: ce que le jeu retire est remis, et les progrès comptent toujours",
+      "Les attributs de chaque joueur de cette équipe ne baissent pas tant que l'application est ouverte et connectée",
     freezeFitness: "Bloquer l'énergie et la forme physique",
     freezeFitnessTitle:
-      "Tant que l'application est ouverte et connectée, l'énergie et la forme physique de chaque joueur de cette équipe " +
-      "ne baissent pas\u00a0: ce que le jeu retire est remis. Utilisez d'abord «\u00a0Tout régénérer\u00a0» pour les " +
-      "garder à 100\u00a0%",
+      "L'énergie et la forme physique de tous ne baissent pas tant que l'application est connectée\u00a0; d'abord «\u00a0Tout régénérer\u00a0» pour 100\u00a0%",
     freezePositions: "Bloquer les postes",
     freezePositionsTitle:
-      "Tant que l'application est ouverte et connectée, les notes par poste de chaque joueur de cette équipe restent " +
-      "telles quelles\u00a0: une note que le jeu monte ou baisse est remise",
+      "Les notes par poste de chaque joueur restent telles quelles tant que l'application est ouverte et connectée",
     frozenCount: (frozen, total) => `${format(frozen)} sur ${format(total)}`,
     freezeHint:
       "Le blocage concerne chaque joueur de la liste et le suit partout où il va. L'application s'en souvient pour " +
@@ -2711,10 +2723,8 @@ export const fr: Strings = {
     unrest: "Tensions",
     unrestTitle: (count) =>
       plural(count)
-        ? `${format(count)} coéquipiers ont un motif de mécontentement à son sujet. «\u00a0Tout retirer\u00a0», dans son ` +
-          "profil, les règle une fois que le jeu avance"
-        : `${format(count)} coéquipier a un motif de mécontentement à son sujet. «\u00a0Tout retirer\u00a0», dans son ` +
-          "profil, le règle une fois que le jeu avance",
+        ? `${format(count)} coéquipiers sont mécontents à son sujet\u00a0; «\u00a0Tout retirer\u00a0», dans son profil, règle cela une fois que le jeu avance`
+        : `${format(count)} coéquipier est mécontent à son sujet\u00a0; «\u00a0Tout retirer\u00a0», dans son profil, règle cela une fois que le jeu avance`,
     onLoan: "Parti en prêt",
     onLoanTitle: "Prêté à un autre club",
     loanee: "Arrivé en prêt",
@@ -3263,6 +3273,8 @@ export const fr: Strings = {
       p: "Renard des surfaces",
       tcf: "Avant-centre de couverture",
       ocf: "Avant-centre point d'appui axial",
+      gk: "Goalkeeper",
+      wm: "Wide Midfielder",
     },
     reasons: {
       listed: () => "Sur liste des transferts",
@@ -3293,6 +3305,54 @@ export const fr: Strings = {
       unwanted: () => "Statut effectif\u00a0: pas utile à l'équipe",
       listed: () => "Déjà sur liste des transferts",
     },
+  },
+
+  /** Recipes (`RecipeMenu`): see `en.ts`. */
+  recipes: {
+    button: "Recettes",
+    buttonTitle: "Des ensembles de modifications tout prêts, avec aperçu",
+    names: {
+      wonderkid: "En faire une jeune pépite",
+      injuryProof: "À l'épreuve des blessures",
+      longCareer: "Prolonger sa carrière",
+      richClub: "Enrichir le club",
+      topFacilities: "Infrastructures au maximum",
+    },
+    notes: {
+      wonderkid:
+        "21 ans ou moins\u00a0: niveau potentiel à 180 au moins, niveau actuel et attributs adaptés à son âge. Les " +
+        "valeurs plus élevées restent.",
+      injuryProof:
+        "Tendance à se blesser à 1, qualités physiques naturelles à 20, endurance à 15 au moins, blessures " +
+        "soignées.",
+      longCareer:
+        "Plus de retraite prévue, contrat de trois ans de plus au moins, qualités physiques naturelles à 20, " +
+        "professionnalisme à 18 au moins.",
+      richClub: "Solde, budget transferts et budgets salariaux au niveau des clubs les plus riches.",
+      topFacilities: "Les cinq infrastructures à 20.",
+    },
+    tooOld: (oldest: number) => `Pour les joueurs de ${oldest} ans ou moins`,
+    command: (recipe: string) => `Recette\u00a0: ${recipe}`,
+    working: "Calcul des modifications…",
+    summary: (changes: number, kept: number, left: number) =>
+      [
+        changeCount(changes),
+        kept > 0 &&
+          (plural(kept) ? `${format(kept)} valeurs déjà aussi bonnes` : `${format(kept)} valeur déjà aussi bonne`),
+        left > 0 && valuesLeftAlone(left),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    tableLabel: "Modifications que ferait la recette",
+    keptHeading: (count: number) =>
+      plural(count)
+        ? `${format(count)} valeurs restent telles quelles\u00a0: déjà aussi bonnes`
+        : `${format(count)} valeur reste telle quelle\u00a0: déjà aussi bonne`,
+    keptLabel: "Valeurs déjà aussi bonnes",
+    valueColumn: "Valeur",
+    leftLabel: "Ce que la recette laisse tel quel",
+    undo: "Annuler cette recette",
+    undoTitle: "Réécrire dans le jeu tout ce que cette recette a modifié",
   },
 
   /** A player's development: the Development tab of his profile, the note under his abilities, the squad's arrows (see en.ts). */
@@ -3388,6 +3448,36 @@ export const fr: Strings = {
     link: "Nouveautés",
     command: "Nouveautés de cette version",
     versions: {
+      "0.5.5": [
+        {
+          title: "FM 27.1.1.",
+          text: "La mise à jour du 24 novembre est reconnue sur Game Pass, Steam et Mac, et tout y fonctionne comme avant. À la sortie d'une prochaine mise à jour, l'application continue de lire les finances des clubs et la tactique en cours jusqu'à ce qu'une version qui la connaît suive.",
+        },
+        {
+          title: "Onglet Compétitions.",
+          text: "Consultez et modifiez les règles d'effectif de chaque compétition, par exemple combien de joueurs étrangers un effectif peut inscrire, pour cette saison et la suivante séparément. Sous Windows et sur les Mac à puce Apple.",
+        },
+        {
+          title: "Prêts.",
+          text: "Le nouveau choix Prêt de la fenêtre Transfert prépare un prêt pour le lendemain dans le jeu, pendant un mercato ou en dehors. Vous fixez son dernier jour, la part du salaire que paie l'autre club, une redevance mensuelle et, si vous le souhaitez, une option d'achat. Sous Windows et sur les Mac à puce Apple.",
+        },
+        {
+          title: "Recettes.",
+          text: "Des ensembles de changements tout prêts pour un joueur ou un club, à savoir En faire une jeune pépite, À l'épreuve des blessures, Prolonger sa carrière, Enrichir le club et Infrastructures au maximum. Chacune montre ce qu'elle va changer avant d'écrire quoi que ce soit, et un seul Annuler la défait.",
+        },
+        {
+          title: "Progression.",
+          text: "L'application garde chaque semaine de jeu une trace de chaque joueur quand elle lit le jeu, et le profil d'un joueur la montre dans le nouvel onglet Progression, avec son niveau, son potentiel, sa valeur et ses attributs au fil de votre carrière.",
+        },
+        {
+          title: "Équipes réserves.",
+          text: "L'onglet Effectif d'un club montre ses équipes réserves après ses propres équipes, comme le Castilla pour le Real Madrid, et les actions d'équipe s'y appliquent aussi.",
+        },
+        {
+          title: "Des notes plus courtes.",
+          text: "Les notes des boutons tiennent sur une ligne, dans un petit cadre au lieu d'une longue bande en travers de la fenêtre.",
+        },
+      ],
       "0.5.4": [
         {
           title: "Les transferts dans l'historique du joueur.",

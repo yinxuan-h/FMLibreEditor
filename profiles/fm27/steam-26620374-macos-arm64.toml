@@ -36,6 +36,12 @@ prize_money = true
 # Competition Stages page under Next Season at once, and came back from a save under another name and a load.
 squad_rules = true
 
+# A club's sponsorship deals (layout-macos.toml, [sponsorship]; #114) were read on this build on a save of 28 September
+# 2026 and matched the game's Sponsorship screen for a Serie BKT club: its five current deals, by kind, amount per
+# season and in all, end date and term, and the 15% its Kit Manufacturer deal rises by on promotion. Its list also holds
+# kinds 6 and 17, which the screen leaves out, and a deal that ended in June 2026.
+sponsorships = true
+
 # game_plugin as mapped in memory: its LC_UUID identifies the build and the architecture.
 [plugin]
 uuid = "869F5F90-FD89-3606-8AE4-2B4A7F02F324"

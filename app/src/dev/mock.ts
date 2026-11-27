@@ -1,7 +1,8 @@
 // Stand-ins for the Rust commands so the UI can be developed in a plain browser
 // (`npm run dev`) without the game or Tauri. Every player here is made up.
 
-import { dateFromNumber, numberFromDate, plusYears } from "../editing";
+import { dateFromNumber, numberFromDate, plusYears, shownValue, storedValue } from "../editing";
+import { GOALKEEPING, MENTAL, PHYSICAL, TECHNICAL } from "../playerAttributes";
 import { fold } from "../format";
 import { scoutingOpportunities, scoutingOverview, scoutingSimilar, scoutingSuggest, youthIntakes } from "./mockScouting";
 import type {
@@ -17,6 +18,7 @@ import type {
   ClubTeam,
   EarlierAbility,
   EditEntity,
+  NationDetails,
   NationalProfile,
   NationalSide,
   NationalStatus,
@@ -86,7 +88,11 @@ import type {
   MassOperationKind,
   MassPreview,
   MassReport,
+  RecipeInfo,
+  RecipePreview,
   ArrangedPreview,
+  LoanPreview,
+  LoanRequest,
   ClubName,
   MovePreview,
   OpportunityRequest,
@@ -996,7 +1002,7 @@ function retiresOf(uid: number): FmDate | null {
 }
 
 /** `keep_playing`: the fixture player's retirement is taken out of the plans, logged as a change of his `retirement`. */
-function keepPlaying(uid: number): LoggedChange {
+function keepPlaying(uid: number, batch: number | null = null): LoggedChange {
   const player = players.find((p) => p.uid === uid);
   if (!player) {
     throw notFound("player", uid);
@@ -1018,7 +1024,7 @@ function keepPlaying(uid: number): LoggedChange {
     undoneAt: null,
     earlier: false,
     undoable: true,
-    batch: null,
+    batch,
   };
   changes.push(logged);
   return { ...logged };
@@ -2280,7 +2286,7 @@ const FULL_CLUB = 500 + (CLUBS.length - 1) * 7;
  * neither injured nor a captain first, the weakest first among each.
  */
 function roomMakers(clubUid: number): RoomMaker[] {
-  const teams = clubSquads(clubUid);
+  const teams = ownSquads(clubUid);
   const captains = new Set(teams.flatMap((team) => [team.captain, team.viceCaptain]));
   const makers = teams[0].players
     .filter((member) => member.loan === null)
@@ -2585,6 +2591,110 @@ function arrangePlayer(uid: number, clubUid: number, terms: MoveTerms, fee?: num
   return { ...logged };
 }
 
+/**
+ * `season_loan_end`: 29 June at least 30 days after the game's date, no later than his contract runs, as the app works
+ * it out.
+ */
+function seasonLoanEnd(uid: number): number | null {
+  const own = currentValues("player", uid);
+  const soonest = numberFromDate(addDays(GAME_DATE, 30));
+  let end = GAME_DATE.year * 10_000 + 629;
+  if (end < soonest) {
+    end = (GAME_DATE.year + 1) * 10_000 + 629;
+  }
+  const contractEnds = own["contract.expires"];
+  return contractEnds !== undefined && contractEnds > numberFromDate(GAME_DATE) ? Math.min(end, contractEnds) : end;
+}
+
+/**
+ * `plan_arranged_loan`: the checks of a move that the fixtures can have, and the loan's own: a share of the wage of
+ * 100% at most, fees of nothing or more, and a last day after the day he joins and no later than his contract runs.
+ */
+function planLoan(uid: number, clubUid: number, loan: LoanRequest): LoanPreview {
+  const player = players.find((p) => p.uid === uid);
+  if (!player) {
+    throw notFound("player", uid);
+  }
+  if (player.clubUid === null) {
+    throw failure("move.freeAgent", "the player is a free agent, with no club to leave or swap");
+  }
+  const moved = planMove(uid, clubUid, {});
+  if (!(loan.wageShare >= 0 && loan.wageShare <= 100)) {
+    throw failure("move.outOfRange", "the share of the wage must be between 0 and 100", {
+      field: "wageShare",
+      value: String(loan.wageShare),
+      min: "0",
+      max: "100",
+    });
+  }
+  // As the real check: a monthly fee from nothing, an option to buy from £1.
+  for (const [field, fee, min] of [
+    ["monthlyFee", loan.monthlyFee, 0],
+    ["optionFee", loan.optionFee, 1],
+  ] as const) {
+    if (fee !== null && !(fee >= min && fee <= 2_000_000_000)) {
+      throw failure("move.outOfRange", `${field} must be between ${min} and 2000000000`, {
+        field,
+        value: String(fee),
+        min: String(min),
+        max: "2000000000",
+      });
+    }
+  }
+  const own = currentValues("player", uid);
+  const moveDay = numberFromDate(addDays(GAME_DATE, 1));
+  const earliest = numberFromDate(addDays(GAME_DATE, 2));
+  const latest = own["contract.expires"] ?? 0;
+  if (loan.until < earliest || loan.until > latest) {
+    throw failure(
+      "loan.end",
+      `the loan must end between ${earliest} and ${latest}: after the day he joins, and no later than his contract does`,
+      { earliest: String(earliest), latest: String(latest) },
+    );
+  }
+  const wage = Math.floor(((own["contract.wage"] ?? 0) * loan.wageShare) / 100);
+  return {
+    from: moved.from!,
+    to: moved.to,
+    moveDay,
+    until: loan.until,
+    wage,
+    wageShare: loan.wageShare,
+    monthlyFee: loan.monthlyFee,
+    ...(loan.optionFee !== null && { optionFee: loan.optionFee }),
+    squadStatus: own["contract.squad_status"] ?? 4,
+  };
+}
+
+/** `arrange_loan`: logs the loan as a change of the player's `club`, as an arranged transfer is, and leaves him where he is. */
+function arrangeLoan(uid: number, clubUid: number, loan: LoanRequest): LoggedChange {
+  const preview = planLoan(uid, clubUid, loan);
+  const player = players.find((p) => p.uid === uid)!;
+  const id = changes.length + 1;
+  moveUndo.set(id, {
+    row: { club: player.club, clubUid: player.clubUid, contractExpires: player.contractExpires },
+    written: written.get(`player:${uid}`),
+    paid: [],
+  });
+  const logged: LoggedChange = {
+    id,
+    at: Date.now(),
+    name: player.name,
+    entity: "player",
+    uid,
+    field: "club",
+    old: preview.from.uid,
+    new: preview.to.uid,
+    undoneAt: null,
+    earlier: false,
+    undoable: true,
+    batch: null,
+    moved: { from: preview.from.name, to: preview.to.name, arranged: preview.moveDay, loanUntil: preview.until },
+  };
+  changes.push(logged);
+  return { ...logged };
+}
+
 /** `plan_release`: the checks of the real command that the fixtures can have, with its messages; names his club. */
 function planRelease(uid: number): ClubName {
   const player = players.find((p) => p.uid === uid);
@@ -2836,8 +2946,29 @@ function captainsOf(clubUid: number, index: number, uids: number[]): CaptainPair
   return index === 0 ? { captain: uids[0] ?? null, viceCaptain: uids[1] ?? null } : { captain: null, viceCaptain: null };
 }
 
-/** `club_squads`: the fixture club's teams with their players' list rows and live values. */
+/**
+ * The fixture clubs that run a team of another club, as a club in the game runs its B team, which is a club of its own:
+ * Northbridge FC lists the senior team of Kuzey Spor as a linked team.
+ */
+const LINKED_CLUBS: Record<number, number> = { 500: 500 + 4 * 7 };
+
+/**
+ * `club_squads`: the fixture club's teams with their players' list rows and live values, then the senior team of the
+ * club it links to, named by that club and read and written as that club's.
+ */
 function clubSquads(clubUid: number): ClubTeam[] {
+  const own = ownSquads(clubUid);
+  const linked = clubs.find((c) => c.uid === LINKED_CLUBS[clubUid]);
+  if (!linked) {
+    return own;
+  }
+  const [team] = ownSquads(linked.uid);
+  // A linked team is the user's own when its parent club is.
+  return [...own, { ...team, linkedClub: linked.shortName ?? linked.name, humanClub: team.humanClub || own[0].humanClub }];
+}
+
+/** The fixture club's own teams with their players' list rows and live values. */
+function ownSquads(clubUid: number): ClubTeam[] {
   if (!clubs.some((c) => c.uid === clubUid)) {
     throw notFound("club", clubUid);
   }
@@ -2852,6 +2983,8 @@ function clubSquads(clubUid: number): ClubTeam[] {
   }
   const humanClub = staff.some((member) => member.isHuman && member.clubUid === clubUid);
   return fixtureTeams(clubUid).map((team, index) => ({
+    clubUid,
+    linkedClub: null,
     index,
     kind: team.kind,
     ageLimit: team.ageLimit,
@@ -2913,7 +3046,7 @@ function freezeTeam(clubUid: number, index: number, kind: FreezeKind, frozen: bo
 
 /** The team at `index` of the fixture club, or the real command's failure. */
 function fixtureTeam(clubUid: number, index: number): ClubTeam {
-  const team = clubSquads(clubUid).find((t) => t.index === index);
+  const team = ownSquads(clubUid).find((t) => t.index === index);
   if (!team) {
     throw failure("squad.noTeam", `the club has no team number ${index} that checks out`, { index });
   }
@@ -3401,6 +3534,203 @@ function undoMassBatch(batch: number): BatchUndo {
   return report;
 }
 
+// Recipes ------------------------------------------------------------------------------------------------------------
+
+/** One field step of a fixture recipe: the field, a floor or a ceiling or a date that many years ahead, as shown. */
+type RecipeStep = [field: string, how: "atLeast" | "atMost" | "yearsAhead", shown: number];
+
+/** A value by age: the one beside the first age the player is not older than, and the last one's past the list. */
+const byAge = (age: number, table: [number, number][]) =>
+  (table.find(([oldest]) => age <= oldest) ?? table[table.length - 1])[1];
+
+/**
+ * The fixture recipes: the keys, ages and steps of the real ones (`RECIPES` in recipes.rs), with their values as the
+ * game shows them.
+ */
+const RECIPES: (RecipeInfo & {
+  heals?: true;
+  keepsPlaying?: true;
+  steps: (age: number, goalkeeper: boolean) => RecipeStep[];
+})[] = [
+  {
+    key: "wonderkid",
+    entity: "player",
+    oldest: 21,
+    steps: (age, goalkeeper) => {
+      const least = byAge(age, [[15, 10], [16, 11], [18, 12], [20, 13], [21, 14]]);
+      const ability = byAge(age, [[15, 110], [16, 120], [17, 130], [18, 140], [19, 150], [20, 155], [21, 160]]);
+      const groups = [...(goalkeeper ? GOALKEEPING : TECHNICAL), ...MENTAL, ...PHYSICAL];
+      return [
+        ["potential_ability", "atLeast", 180],
+        ["current_ability", "atLeast", ability],
+        ...groups
+          .filter((key) => key !== "determination")
+          .map((key): RecipeStep => [`attribute.${key}`, "atLeast", least]),
+        ["attribute.determination", "atLeast", 16],
+        ["attribute.consistency", "atLeast", 15],
+        ["attribute.important_matches", "atLeast", 15],
+        ["attribute.injury_proneness", "atMost", 6],
+        ["personality.ambition", "atLeast", 16],
+        ["personality.professionalism", "atLeast", 17],
+        ["personality.pressure", "atLeast", 15],
+      ];
+    },
+  },
+  {
+    key: "injuryProof",
+    entity: "player",
+    oldest: null,
+    heals: true,
+    steps: () => [
+      ["attribute.injury_proneness", "atMost", 1],
+      ["attribute.natural_fitness", "atLeast", 20],
+      ["attribute.stamina", "atLeast", 15],
+    ],
+  },
+  {
+    key: "longCareer",
+    entity: "player",
+    oldest: null,
+    keepsPlaying: true,
+    steps: () => [
+      ["contract.expires", "yearsAhead", 3],
+      ["attribute.natural_fitness", "atLeast", 20],
+      ["personality.professionalism", "atLeast", 18],
+    ],
+  },
+  {
+    key: "richClub",
+    entity: "club",
+    oldest: null,
+    steps: () => [
+      ["finance.balance", "atLeast", 500_000_000],
+      ["finance.transfer_budget", "atLeast", 200_000_000],
+      ["finance.wage_budget", "atLeast", 6_000_000],
+      ["finance.total_wage_budget", "atLeast", 6_000_000],
+    ],
+  },
+  {
+    key: "topFacilities",
+    entity: "club",
+    oldest: null,
+    steps: () =>
+      ["training", "youth_facilities", "youth_coaching", "youth_recruitment", "corporate"].map(
+        (key): RecipeStep => [`facilities.${key}`, "atLeast", 20],
+      ),
+  },
+];
+
+/** The recipe last previewed, until it is applied or replaced. */
+let pendingRecipe: RecipePreview | null = null;
+
+/** `plan_recipe`, with the real command's refusals: nothing is written. */
+function planRecipe(key: string, uid: number): RecipePreview {
+  const recipe = RECIPES.find((r) => r.key === key);
+  if (!recipe) {
+    throw failure("recipe.unknown", `there is no recipe ${key}`, { recipe: key });
+  }
+  const { entity, oldest } = recipe;
+  const player = entity === "player" ? players.find((p) => p.uid === uid) : undefined;
+  const subject = player ?? (entity === "club" ? clubs.find((c) => c.uid === uid) : undefined);
+  if (!subject) {
+    throw notFound(entity, uid);
+  }
+  const age = player?.age ?? null;
+  if (oldest !== null && age === null) {
+    throw failure("recipe.ageUnknown", "the player's age is not known, and this recipe goes by it", { recipe: key });
+  }
+  if (oldest !== null && age !== null && age > oldest) {
+    const message = `the player is ${age}: this recipe is for players of ${oldest} or younger`;
+    throw failure("recipe.tooOld", message, { recipe: key, age, oldest });
+  }
+  const table = fieldTable(entity);
+  const values = currentValues(entity, uid);
+  const preview: RecipePreview = {
+    id: nextMassId++,
+    recipe: key,
+    entity,
+    uid,
+    name: subject.name,
+    changes: 0,
+    rows: [],
+    kept: [],
+    skipped: [],
+    heals: null,
+    keepsPlaying: null,
+    left: [],
+  };
+  for (const [fieldKey, how, shown] of recipe.steps(age ?? 0, (ratings[uid]?.gk ?? 0) >= 15)) {
+    const field = table.find((f) => f.key === fieldKey);
+    const old: number | undefined = values[fieldKey];
+    if (!field || old === undefined) {
+      const reason = `${fieldKey} cannot be changed here: its record is missing or does not check out`;
+      preview.skipped.push({ uid, name: subject.name, field: fieldKey, reason, code: "edit.noRecord", params: { field: fieldKey } });
+      continue;
+    }
+    let value: number;
+    if (how === "yearsAhead") {
+      // By whole years, keeping its day, until it is that many years after the game's date at least.
+      const until = numberFromDate(plusYears(GAME_DATE, shown));
+      let date = dateFromNumber(old)!;
+      while (numberFromDate(date) < until) {
+        date = plusYears(date, 1);
+      }
+      value = numberFromDate(date);
+    } else {
+      const stored = storedValue(field, shown);
+      value = how === "atLeast" ? Math.max(old, stored) : Math.min(old, stored);
+    }
+    // A value the game already shows as asked stays: an attribute stored as 98 is a 20.
+    if (value === old || (field.scale !== "plain" && shownValue(field, old) === shownValue(field, value))) {
+      preview.kept.push({ field: fieldKey, value: old });
+    } else {
+      preview.rows.push({ uid, name: subject.name, field: fieldKey, old, new: value });
+    }
+  }
+  if (recipe.heals) {
+    const injuries = injuriesOf(uid).length;
+    if (injuries > 0) {
+      preview.heals = injuries;
+    } else {
+      const reason = "the player has no injury to heal";
+      preview.left.push({ step: "heal", reason, code: "heal.notInjured", params: {} });
+    }
+  }
+  if (recipe.keepsPlaying) {
+    const retires = retiresOf(uid);
+    if (retires !== null) {
+      preview.keepsPlaying = { retires };
+    } else {
+      const reason = "the game has not planned the player's retirement, and he already means to play on";
+      preview.left.push({ step: "keepPlaying", reason, code: "retirement.none", params: {} });
+    }
+  }
+  preview.changes = preview.rows.length + Number(preview.heals !== null) + Number(preview.keepsPlaying !== null);
+  pendingRecipe = preview;
+  return preview;
+}
+
+/** `apply_recipe`: what the preview showed, logged as one batch. */
+function applyRecipe(id: number): MassReport {
+  if (!pendingRecipe || pendingRecipe.id !== id) {
+    throw failure("recipe.outOfDate", "This preview is out of date. Open the recipe again.");
+  }
+  const preview = pendingRecipe;
+  pendingRecipe = null;
+  const report: MassReport = { batch: nextMassId++, applied: 0, failed: [] };
+  if (preview.heals !== null) {
+    healPlayer(preview.uid, report.batch);
+    report.applied++;
+  }
+  if (preview.keepsPlaying !== null) {
+    keepPlaying(preview.uid, report.batch);
+    report.applied++;
+  }
+  const values = preview.rows.map((row): [string, number] => [row.field, row.new]);
+  setValues({ uid: preview.uid, name: preview.name }, values, report, preview.entity);
+  return report;
+}
+
 /** The nation each fixture club is from, in the order of `CLUBS`: two of them play in England. */
 const CLUB_NATIONS = ["England", "Spain", "Portugal", "Germany", "Türkiye", "England"];
 
@@ -3470,6 +3800,31 @@ function mockNationalStatus(): NationalStatus {
 }
 
 /**
+ * What the profile shows of a fixture nation and its federation: made-up numbers, and members of the fixture's staff
+ * with no club as its departments. A nation with an odd UID has no year of foundation, as some of the game's have none.
+ */
+function mockNationDetails(team: NationalTeamSummary): NationDetails {
+  const free = staff.filter((member) => member.clubUid === null);
+  // A manager, a goalkeeping coach, a physio and a scout at the senior team, a manager at the under-21s.
+  const jobs: [number, number][] = [
+    [16, 0],
+    [34, 0],
+    [12, 0],
+    [14, 0],
+    [16, 10],
+  ];
+  const offset = team.women ? jobs.length : 0;
+  return {
+    founded: team.nationUid % 2 === 1 ? null : 1880 + (team.nationUid % 90),
+    continent: "Europe",
+    staff: jobs.flatMap(([job, teamKind], at) => {
+      const member = free[offset + at];
+      return member ? [{ member, job, teamKind }] : [];
+    }),
+  };
+}
+
+/**
  * A national team with its teams, and the players of the one of kind `kind` (the senior team by default): the fixture's
  * players of its nation, those under the age limit for a youth team, as the game lists a squad.
  */
@@ -3521,6 +3876,8 @@ function nationalProfile(uid: number, kind: number | null): NationalProfile {
     team: { ...team, players: ofNation.length },
     teams,
     squad: {
+      clubUid: team.uid,
+      linkedClub: null,
       index: shown.index,
       kind: shown.kind,
       ageLimit,
@@ -3529,6 +3886,7 @@ function nationalProfile(uid: number, kind: number | null): NationalProfile {
       humanClub: false,
       players: squad,
     },
+    nation: mockNationDetails(team),
   };
 }
 
@@ -3729,9 +4087,10 @@ const secondLeagueRules = () => [
 ];
 
 /**
- * The competitions the mock has squad rules for (`competition_rules`), as the editor changed them: the Süper Lig's as
- * FM27 lists them, a division whose groups share its lists, a cup whose rules are for the teams of a division, a
- * league with a wage among its rules and a continent's competition with no list for next season.
+ * The competitions the mock is playing (`competition_rules`), with their squad rules as the editor changed them: the
+ * Süper Lig's as FM27 lists them, a division whose groups share its lists, a cup whose rules are for the teams of a
+ * division, a league with a wage among its rules, a continent's competition with no list for next season, and a cup the
+ * game gives no squad rule, as about a quarter of the competitions it plays (#274).
  */
 const ruledCompetitions: CompetitionRules[] = [
   ruledCompetition(130286, "Trendyol Süper Lig", TURKIYE, 0, [
@@ -3769,6 +4128,7 @@ const ruledCompetitions: CompetitionRules[] = [
     squadRule(502, "weekly_wage_for_youth_contract", -1, 71_940_388),
     squadRule(77, "keepers_on_bench", 1, 1),
   ]),
+  ruledCompetition(1301426, "Emirates FA Cup", ENGLAND, 0, [], []),
   ruledCompetition(
     1301394,
     "UEFA Champions League",
@@ -4102,6 +4462,8 @@ const unknownBuild = new URLSearchParams(window.location.search).has("unknownbui
 const failedChecks = new URLSearchParams(window.location.search).has("failedchecks");
 /** `?refrozen` previews connecting to a save in which players and a club were frozen the last time. */
 const refrozen = new URLSearchParams(window.location.search).has("refrozen");
+/** `?noplayers` previews connecting while the game shows its main menu: the player list is not found. */
+const noPlayers = new URLSearchParams(window.location.search).has("noplayers");
 /**
  * `?savechanged` previews the game having loaded a save since the data was read: `save_changed` says so until the data
  * is read again.
@@ -4152,9 +4514,14 @@ function mockReport(connection: ConnectionInfo): string {
     `Game: FM27 Game Pass ${game.packageVersion}`,
     "game_plugin.dll build: size of image 0x175da000, link timestamp 0x6ae563a1",
     `Build profile: ${connection.profile ?? "none for this build"}`,
+    connection.knownBuild
+      ? "Object layout: as the build profile says"
+      : "Object layout: as FM27 0.9.2524.0 (Game Pass) lays it out, the newest build of this kind, club_finance.corporate 0x8ad, tactics.current 0x1030, tactics.tactics 0x1018",
     `Writing: the system lets the app write to the game${allowed}`,
     `In-game date: ${connection.gameDate ? "2026-09-09 (game_plugin.dll+0x56257c8, from the build profile)" : "none"}`,
     "Retirement manager: game_plugin.dll+0x5675060 (from the build profile)",
+    "Tactics manager: game_plugin.dll+0x5675130 (from the build profile)",
+    "Training manager: game_plugin.dll+0x56716f0 (from the build profile)",
     arrays.fromProfile ? "Entity arrays (from the build profile, checked):" : "Entity arrays:",
     array("players", arrays.players),
     array("staff", arrays.staff),
@@ -4286,6 +4653,12 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
     case "bridge_status":
       return (macPreview ? mockBridge : null) as T;
     case "connect": {
+      if (noPlayers) {
+        throw failure(
+          "session.playersNotFound",
+          "could not find the player list; load a save (not just the main menu) and try again",
+        );
+      }
       const info: ConnectionInfo = {
         game,
         profile: unknownBuild ? null : "FM27 0.9.2409.0 (Game Pass)",
@@ -4306,6 +4679,7 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
         // The fixtures know who is a woman, as a layout that places the gender flags does.
         genderKnown: true,
         arrangesTransfers: true,
+        arrangesLoans: true,
         health: mockHealth(),
       };
       mockConnection = info;
@@ -4622,6 +4996,12 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
       ) as T;
     case "apply_mass_edit":
       return applyMass(Number(args?.id)) as T;
+    case "recipes":
+      return RECIPES.map(({ key, entity, oldest }) => ({ key, entity, oldest })) as T;
+    case "plan_recipe":
+      return planRecipe(String(args?.recipe ?? ""), Number(args?.uid)) as T;
+    case "apply_recipe":
+      return applyRecipe(Number(args?.id)) as T;
     case "undo_batch":
       return undoMassBatch(Number(args?.batch)) as T;
     case "plan_club_move": {
@@ -4636,6 +5016,12 @@ export async function mockInvoke<T>(command: string, args?: Record<string, unkno
       const terms = (args?.terms ?? {}) as MoveTerms;
       return arrangePlayer(Number(args?.uid), Number(args?.club), terms, args?.fee as number) as T;
     }
+    case "season_loan_end":
+      return seasonLoanEnd(Number(args?.uid)) as T;
+    case "plan_arranged_loan":
+      return planLoan(Number(args?.uid), Number(args?.club), args?.loan as LoanRequest) as T;
+    case "arrange_loan":
+      return arrangeLoan(Number(args?.uid), Number(args?.club), args?.loan as LoanRequest) as T;
     case "move_player": {
       const terms = (args?.terms ?? {}) as MoveTerms;
       return movePlayer(Number(args?.uid), Number(args?.club), terms, args?.fee as number, args?.release as number) as T;

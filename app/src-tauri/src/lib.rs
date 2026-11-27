@@ -14,16 +14,17 @@ use fmlibre_core::{
     Clause, ClauseSet, ClubDetails, ClubFilter, ClubIndex, ClubMove, ClubSummary, Coded, CohesionSet,
     CompetitionPrizes, CompetitionRules, DIRECTOR_OF_FOOTBALL, Earlier, EditError, Entity, EntityArrays, ExportFormat,
     ExportHeader, Exported, FeePlan, Field, FmDate, GAME_EXE, GAME_PLUGIN, GameInfo, GraphicsCounts, GraphicsIndex,
-    HOMEGROWN_RULES, Healed, Health, Kind, LOAN_EXPIRES, LOAN_OPTION_FEE, Lifted, Listed, Loan, Lock, MANAGER,
-    MoveError, MovePlan, MoveTerms, NameChange, NameKind, Nation, NationalIndex, NationalSide, NationalTeamSummary,
-    NationalUnavailable, NewContract, NewStaffContract, Operation, Paid, People, PersonNames, Picture, Planned,
-    PlayerDetails, PlayerFilter, PlayerIndex, PlayerOrder, PlayerSummary, PrizeAmount, PrizeChange, PrizeError,
-    PrizeMoney, PrizeReadError, PrizeUnavailable, Progress, ROLES, RelationSet, RetirementSet, Role, RuleChange,
-    RuleError, RuleReadError, RuleUnavailable, SCOUT_POSITIONS, SENIOR_KIND, ScoutError, ScoutPosition, ScoutRequest,
-    Scouted, SearchIndex, Season, Session, SessionError, Skipped, Sponsorship, SponsorshipReadError,
-    SponsorshipUnavailable, SquadMember, SquadReport, SquadRule, StadiumName, StadiumRename, StaffChange, StaffDetails,
-    StaffFilter, StaffIndex, StaffOrder, StaffPlan, StaffSummary, TacticsSet, Target, Tie, TieTarget, Timeline,
-    competition_prizes, diagnostics_report, find_game, nations, sort_players, sort_staff, timeline_values,
+    HOMEGROWN_RULES, Healed, Health, Kind, LOAN_EXPIRES, LOAN_OPTION_FEE, Lifted, Listed, Loan, LoanDeal, Lock,
+    MANAGER, MoveError, MovePlan, MoveTerms, NameChange, NameKind, Nation, NationalIndex, NationalSide,
+    NationalTeamSummary, NationalUnavailable, NewContract, NewStaffContract, Operation, Paid, People, PersonNames,
+    Picture, Planned, PlayerDetails, PlayerFilter, PlayerIndex, PlayerOrder, PlayerSummary, PrizeAmount, PrizeChange,
+    PrizeError, PrizeMoney, PrizeReadError, PrizeUnavailable, Progress, RECIPES, ROLES, Recipe, RecipeError,
+    RecipePlan, RelationSet, RetirementSet, Role, RuleChange, RuleError, RuleReadError, RuleUnavailable,
+    SCOUT_POSITIONS, SENIOR_KIND, ScoutError, ScoutPosition, ScoutRequest, Scouted, SearchIndex, Season, Session,
+    SessionError, Skipped, Sponsorship, SponsorshipReadError, SponsorshipUnavailable, SquadMember, SquadReport,
+    SquadRule, StadiumName, StadiumRename, StaffChange, StaffDetails, StaffFilter, StaffIndex, StaffOrder, StaffPlan,
+    StaffSummary, Subject, TacticsSet, Target, Tie, TieTarget, Timeline, competition_prizes, diagnostics_report,
+    find_game, nations, sort_players, sort_staff, timeline_values,
 };
 use fmlibre_mem::{Process, find_processes, is_current_process_elevated, list_modules};
 use serde::{Deserialize, Serialize};
@@ -74,6 +75,8 @@ struct Connection {
     records: Records,
     /// The mass edit last previewed, until it is applied or replaced.
     mass: Option<PendingMass>,
+    /// The recipe that was worked out and shown last, waiting to be applied as it was shown.
+    recipe: Option<PendingRecipe>,
     /// The next id for a mass-edit preview or batch.
     next_id: u32,
     frozen: Frozen,
@@ -756,6 +759,12 @@ struct PendingMass {
     planned: Vec<Planned>,
 }
 
+/// A recipe that was worked out and shown, waiting to be applied as it was shown.
+struct PendingRecipe {
+    id: u32,
+    plan: RecipePlan,
+}
+
 impl Connection {
     /// Reads every list. The change log is the one `kept` by a reload while the game has the same career, or else the
     /// one the history of the career in `folder` lists (see `History`), checked against the game (see
@@ -802,6 +811,7 @@ impl Connection {
             history,
             records,
             mass: None,
+            recipe: None,
             next_id,
             frozen,
             save,
@@ -1368,6 +1378,7 @@ impl Connection {
             known_build: self.session.known_build(),
             gender_known: self.session.layout.player.gender.is_some() && self.session.layout.staff.gender.is_some(),
             arranges_transfers: self.session.arranges_transfers(),
+            arranges_loans: self.session.arranges_loans(),
             health: Health::clone(&self.session.health()),
             refrozen: None,
         }
@@ -1569,8 +1580,8 @@ impl Connection {
     }
 
     /// Logs keeping a player from retiring just written, as a change of his `retirement` from the date he was to retire
-    /// on (0 when the game had planned none) to 0.
-    fn log_retirement(&mut self, done: RetirementSet) -> LoggedChange {
+    /// on (0 when the game had planned none) to 0; `batch` groups it with the other changes of a recipe.
+    fn log_retirement(&mut self, done: RetirementSet, batch: Option<u32>) -> LoggedChange {
         let change = Change {
             entity: Entity::Player,
             uid: done.player,
@@ -1578,7 +1589,7 @@ impl Connection {
             old: done.date.map_or(0, FmDate::to_number),
             new: 0,
         };
-        let entry = self.entry(change, self.player_name(done.player), None);
+        let entry = self.entry(change, self.player_name(done.player), batch);
         self.push_log(LoggedChange { undo: Some(Undo::Retirement(done)), ..entry })
     }
 
@@ -1791,7 +1802,15 @@ impl Connection {
         let change = Change { entity: Entity::Staff, uid: done.member, field: field.to_owned(), old, new };
         let entry = self.entry(change, name, batch);
         self.push_log(LoggedChange {
-            moved: moved.then_some(MovedClubs { from, to, with: None, released: None, fee: None, arranged: None }),
+            moved: moved.then_some(MovedClubs {
+                from,
+                to,
+                with: None,
+                released: None,
+                fee: None,
+                arranged: None,
+                loan_until: None,
+            }),
             undo: Some(Undo::Staff(LoggedStaff { done, club, club_uid, job, contract_expires })),
             ..entry
         })
@@ -1832,6 +1851,14 @@ impl Connection {
         Ok(self.session.plan_arranged_transfer(player, to, terms, fee, &self.human_clubs)?)
     }
 
+    /// Works out arranging the loan of the player `uid` to the club `club` from the next day, on the terms `loan`, for
+    /// the game to make on that day.
+    fn plan_loan(&self, uid: u32, club: u32, loan: LoanDeal) -> Result<ArrangedPlan, Failure> {
+        let player = self.players.get(uid).ok_or_else(|| not_found(Entity::Player, uid))?;
+        let to = self.clubs.get(club).ok_or_else(|| not_found(Entity::Club, club))?;
+        Ok(self.session.plan_arranged_loan(player, to, loan, &self.human_clubs)?)
+    }
+
     /// Refuses moving any of the players `uids` while a transfer this connection arranged for him waits for its day:
     /// the game makes it on that day from the club he is at, so he stays there until then, or until it is undone.
     fn refuse_while_arranged(&self, uids: &[u32]) -> Result<(), Failure> {
@@ -1860,6 +1887,7 @@ impl Connection {
             released: None,
             fee: (plan.fee > 0).then_some(plan.fee),
             arranged: Some(plan.move_day.to_number()),
+            loan_until: plan.loan.map(|loan| loan.until),
         };
         let change = Change {
             entity: Entity::Player,
@@ -2011,13 +2039,11 @@ impl Connection {
         self.rules.as_deref()?.iter().find(|rules| rules.competition.uid == uid)
     }
 
-    /// The competitions with a squad rule to show, this season or the next, as read last: the others, about a
-    /// quarter of those the game plays, register their squads under none.
-    fn ruled_competitions(&self) -> Vec<CompetitionRules> {
-        let ruled = |rules: &&CompetitionRules| {
-            !rules.current.is_empty() || rules.next.as_ref().is_some_and(|next| !next.is_empty())
-        };
-        self.rules.iter().flatten().filter(ruled).cloned().collect()
+    /// The competitions the game is playing, with their squad rules as read last. About a quarter register their
+    /// squads under none (Scotland's and Slovakia's top divisions, most cups): they are listed too, so that the
+    /// Competitions tab finds them and says so, rather than seem not to know them.
+    fn listed_competitions(&self) -> Vec<CompetitionRules> {
+        self.rules.clone().unwrap_or_default()
     }
 
     /// Sets squad rules of the competition `uid`: each the rule at a place of a season's list, as `competition_rules`
@@ -2166,7 +2192,7 @@ impl Connection {
         };
         let entry = self.entry(change, name, None);
         self.push_log(LoggedChange {
-            moved: Some(MovedClubs { from, to: Some(to), with, released, fee, arranged: None }),
+            moved: Some(MovedClubs { from, to: Some(to), with, released, fee, arranged: None, loan_until: None }),
             undo: Some(Undo::Move(before)),
             ..entry
         })
@@ -2196,6 +2222,7 @@ impl Connection {
             released: None,
             fee: None,
             arranged: None,
+            loan_until: None,
         };
         let entry = self.entry(change, self.player_name(done.player), None);
         self.push_log(LoggedChange {
@@ -2756,6 +2783,13 @@ struct Captaincy {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct TeamView {
+    /// The club the team belongs to, which with `index` is what a write to the team names: the club whose squad this
+    /// is, or for a linked team the club the game keeps it as.
+    club_uid: u32,
+    /// For a linked team (a B team, which the game keeps as a club of its own): that club's short name, or its name
+    /// where it has none. None for the club's own teams.
+    linked_club: Option<String>,
+    /// Where it is in the list of teams of the club it belongs to.
     index: usize,
     /// The game's code for the kind of team: 0 for the first team.
     kind: u8,
@@ -2895,6 +2929,9 @@ struct MovedClubs {
     /// fee and moves him on that day.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     arranged: Option<i64>,
+    /// For a loan arranged for the game to make: its last day, as a number like 20280629.
+    #[serde(rename = "loanUntil", default, skip_serializing_if = "Option::is_none")]
+    loan_until: Option<i64>,
 }
 
 /// A move as the log keeps it: the writes to undo, and what the list rows of the players it
@@ -2952,6 +2989,50 @@ struct ArrangedPreview {
     /// The day the game makes the move, as a number like 20261019.
     move_day: i64,
     contract: NewContract,
+}
+
+/// A loan the game is to make the next day, as the plan has it: the clubs, the day, and the loan's terms.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LoanPreview {
+    from: ClubName,
+    to: ClubName,
+    /// The day the game makes the loan, and its last day, as numbers like 20261019.
+    move_day: i64,
+    until: i64,
+    /// Pounds a week of his wage the club he joins pays, and the part of his wage that is, in percent.
+    wage: i64,
+    wage_share: u8,
+    /// Pounds a month the club he joins pays his own.
+    monthly_fee: i64,
+    /// Pounds for which the club he joins may sign him for good when the loan ends: an option to buy; none for none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    option_fee: Option<i64>,
+    /// His squad status at the club he joins.
+    squad_status: u8,
+}
+
+/// A loan's terms as the dialog sends them.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LoanRequest {
+    until: i64,
+    wage_share: u8,
+    #[serde(default)]
+    monthly_fee: i64,
+    #[serde(default)]
+    option_fee: Option<i64>,
+}
+
+impl From<LoanRequest> for LoanDeal {
+    fn from(loan: LoanRequest) -> Self {
+        LoanDeal {
+            until: loan.until,
+            wage_share: loan.wage_share,
+            monthly_fee: loan.monthly_fee,
+            option_fee: loan.option_fee,
+        }
+    }
 }
 
 /// The filter of the list a mass edit applies to; only the one for its entity is used.
@@ -3203,6 +3284,8 @@ struct ConnectionInfo {
     /// Whether a transfer can be arranged for the game to make the next day: this version of the game's layout places
     /// its transfers, and the editor can take blocks of the game's heap (Windows).
     arranges_transfers: bool,
+    /// Whether a loan can be arranged the same way: the layout places the game's loan offers too.
+    arranges_loans: bool,
     /// What the checks the editor makes before it writes found on this game.
     health: Health,
     /// Only from `connect`: what it froze again of what was frozen in this save before, when there was any.
@@ -3281,7 +3364,7 @@ macro_rules! coded_failures {
     )*};
 }
 
-coded_failures!(EditError, MoveError, PrizeError, RuleError, ScoutError, SessionError, fmlibre_mem::Error);
+coded_failures!(EditError, MoveError, PrizeError, RecipeError, RuleError, ScoutError, SessionError, fmlibre_mem::Error);
 
 impl<T> From<std::sync::PoisonError<T>> for Failure {
     fn from(err: std::sync::PoisonError<T>) -> Self {
@@ -3647,10 +3730,11 @@ struct LeaguePrizesSet {
     league: Option<CompetitionPrizes>,
 }
 
-/// The squad rules of every competition that has some, this season's and next season's: how many foreign players a
-/// squad may register, how many goalkeepers, how many players in all; or why this version of the game shows none. The
-/// first time, and with `again`, read from the game: off the window's thread, as it reads all of the game's memory
-/// once, which takes a few seconds. After that, as read then, with the changes the editor made since. Only reads.
+/// Every competition the game is playing, with its squad rules, this season's and next season's (none for about a
+/// quarter of them): how many foreign players a squad may register, how many goalkeepers, how many players in all;
+/// or why this version of the game shows none. The first time, and with `again`, read from the game: off the
+/// window's thread, as it reads all of the game's memory once, which takes a few seconds. After that, as read then,
+/// with the changes the editor made since. Only reads.
 #[tauri::command]
 async fn competition_rules(app: tauri::AppHandle, again: bool) -> Result<CompetitionRulesRead, Failure> {
     tauri::async_runtime::spawn_blocking(move || -> Result<CompetitionRulesRead, Failure> {
@@ -3669,7 +3753,7 @@ async fn competition_rules(app: tauri::AppHandle, again: bool) -> Result<Competi
         }
         Ok(CompetitionRulesRead {
             unavailable: None,
-            competitions: connection.ruled_competitions(),
+            competitions: connection.listed_competitions(),
             held: connection.frozen.rules.clone(),
         })
     })
@@ -3723,7 +3807,7 @@ fn set_competition_rules(
     let changes = connection.set_competition_rules(file.0.as_deref(), competition, &changes)?;
     Ok(CompetitionRulesSet {
         changes,
-        competitions: connection.ruled_competitions(),
+        competitions: connection.listed_competitions(),
         held: connection.frozen.rules.clone(),
     })
 }
@@ -3974,11 +4058,13 @@ struct NationalProfile {
     team: NationalTeamSummary,
     teams: Vec<NationalSide>,
     squad: TeamView,
+    /// What the profile shows of the nation and its federation; none where the layout does not place it.
+    nation: Option<fmlibre_core::NationDetails>,
 }
 
 /// The national team `uid` with its teams, and the players of its team of kind `kind` (its senior team when none is
-/// asked for, or the first of its teams when it has no senior team), read now: each one's list row. Captains, cohesion
-/// and tactics are not read.
+/// asked for, or the first of its teams when it has no senior team), read now: each one's list row; and what the profile
+/// shows of its nation and federation. Captains, cohesion and tactics are not read.
 #[tauri::command]
 fn national_squad(state: State<'_, AppState>, uid: u32, kind: Option<u8>) -> Result<NationalProfile, Failure> {
     let guard = state.0.lock()?;
@@ -4001,6 +4087,8 @@ fn national_squad(state: State<'_, AppState>, uid: u32, kind: Option<u8>) -> Res
         },
     };
     let squad = TeamView {
+        club_uid: uid,
+        linked_club: None,
         index: squad.index,
         kind: squad.kind,
         age_limit: squad.age_limit,
@@ -4033,7 +4121,8 @@ fn national_squad(state: State<'_, AppState>, uid: u32, kind: Option<u8>) -> Res
             })
             .collect(),
     };
-    Ok(NationalProfile { team: team.clone(), teams, squad })
+    let nation = connection.session.nation_details(team, &connection.staff)?;
+    Ok(NationalProfile { team: team.clone(), teams, squad, nation })
 }
 
 /// The full profile of the player with `uid`. Only reads memory.
@@ -4627,6 +4716,64 @@ async fn arrange_transfer(
     .await?
 }
 
+/// The last day of a loan of the player `uid` agreed now until the end of the season: 29 June, at least a month away,
+/// and no later than his contract runs; none without an in-game date.
+#[tauri::command]
+fn season_loan_end(state: tauri::State<'_, AppState>, uid: u32) -> Result<Option<i64>, Failure> {
+    let guard = state.0.lock()?;
+    let connection = guard.as_ref().ok_or_else(not_connected)?;
+    let player = connection.players.get(uid).ok_or_else(|| not_found(Entity::Player, uid))?;
+    Ok(connection.session.season_loan_end(player))
+}
+
+/// Checks that the loan of the player `uid` to the club `club` can be arranged for the game to make the next day, on
+/// the terms `loan`, and says what it would be; the error says why it cannot. Nothing is written. Off the window's
+/// thread: the first time, finding the game's transfers takes a few seconds.
+#[tauri::command]
+async fn plan_arranged_loan(
+    app: tauri::AppHandle,
+    uid: u32,
+    club: u32,
+    loan: LoanRequest,
+) -> Result<LoanPreview, Failure> {
+    tauri::async_runtime::spawn_blocking(move || -> Result<LoanPreview, Failure> {
+        let state = app.state::<AppState>();
+        let guard = state.0.lock()?;
+        let connection = guard.as_ref().ok_or_else(not_connected)?;
+        let loan = LoanDeal::from(loan);
+        let plan = connection.plan_loan(uid, club, loan)?;
+        let name = |uid: u32| ClubName { uid, name: connection.club_name(uid) };
+        Ok(LoanPreview {
+            from: name(plan.from_club),
+            to: name(plan.to_club),
+            move_day: plan.move_day.to_number(),
+            until: loan.until,
+            wage: plan.terms.wage,
+            wage_share: loan.wage_share,
+            monthly_fee: loan.monthly_fee,
+            option_fee: loan.option_fee,
+            squad_status: plan.terms.squad_status,
+        })
+    })
+    .await?
+}
+
+/// Arranges the loan of the player `uid` to the club `club` for the game to make the next day, on the terms `loan`,
+/// worked out again from the game as it is now, and logs it. The game makes the loan on that day, as it makes its own;
+/// until then one undo takes it back. Off the window's thread.
+#[tauri::command]
+async fn arrange_loan(app: tauri::AppHandle, uid: u32, club: u32, loan: LoanRequest) -> Result<LoggedChange, Failure> {
+    tauri::async_runtime::spawn_blocking(move || -> Result<LoggedChange, Failure> {
+        let state = app.state::<AppState>();
+        let mut guard = state.0.lock()?;
+        let connection = guard.as_mut().ok_or_else(not_connected)?;
+        let plan = connection.plan_loan(uid, club, LoanDeal::from(loan))?;
+        let done = connection.session.apply_arranged_transfer(&plan)?;
+        Ok(connection.log_arranged(done, &plan))
+    })
+    .await?
+}
+
 /// Checks that the loan of the player `uid` can be made permanent on the contract `terms`, the club he is on loan to
 /// paying his own one `fee` pounds if given, and names the clubs; the error says why it cannot. Nothing is written.
 #[tauri::command]
@@ -4987,7 +5134,7 @@ fn keep_playing(state: State<'_, AppState>, uid: u32) -> Result<LoggedChange, Fa
     let player = connection.players.get(uid).ok_or_else(|| not_found(Entity::Player, uid))?;
     let plan = connection.session.plan_keep_playing(player)?;
     let done = connection.session.apply_retirement(&plan)?;
-    Ok(connection.log_retirement(done))
+    Ok(connection.log_retirement(done, None))
 }
 
 /// Points the tie `index` of the player `uid` at the nation `nation` or the club `club` (by UID), and gives a
@@ -5325,35 +5472,61 @@ fn save_scout_report(app: tauri::AppHandle, request: tauri::ipc::Request<'_>) ->
 }
 
 /// The teams of the club `uid`, the senior team first, with their players: each one's list
-/// row and the live values a squad screen shows, read now.
+/// row and the live values a squad screen shows, read now. After its own teams come those of other clubs it runs: a
+/// B team is a club of its own to the game (1. FC Nürnberg II), and is read, and written, as that club's team.
 #[tauri::command]
 fn club_squads(state: State<'_, AppState>, uid: u32) -> Result<Vec<TeamView>, Failure> {
     let guard = state.0.lock()?;
     let connection = guard.as_ref().ok_or_else(not_connected)?;
     let club = connection.clubs.get(uid).ok_or_else(|| not_found(Entity::Club, uid))?;
-    let teams = connection.session.club_teams(club, &connection.players)?;
+    let session = &connection.session;
+    // The club's own teams, then the teams of other clubs it runs (its B team), each read as a team of its own club.
+    let mut teams: Vec<(&ClubSummary, fmlibre_core::ClubTeam)> =
+        session.club_teams(club, &connection.players)?.into_iter().map(|team| (club, team)).collect();
+    for link in session.linked_teams(club, &connection.clubs) {
+        // One that cannot be read is left out: the club's own teams are shown all the same.
+        if let Ok(team) = session.club_team_at(link.club, link.index, &connection.players) {
+            teams.push((link.club, team));
+        }
+    }
     // Cohesion is shown only where the lists checked out: a build that moved them would read other bytes. So is how
     // well the players know the tactic.
     let cohesion_read = connection.session.health().passed(Check::Cohesion);
     let tactics_read = connection.session.health().passed(Check::Tactics);
-    // Who the club's players hold reasons to be unhappy about, across its teams.
-    let members: BTreeSet<u32> = teams.iter().flat_map(|team| team.players.iter().map(|member| member.uid)).collect();
-    let members: Vec<&PlayerSummary> = members.iter().filter_map(|&uid| connection.players.get(uid)).collect();
-    let concerned = connection.session.concerned_teammates(&members);
+    // Who each club's players hold reasons to be unhappy about, across its teams.
+    let owners: BTreeSet<u32> = teams.iter().map(|(owner, _)| owner.uid).collect();
+    let concerned: HashMap<u32, HashMap<u32, usize>> = owners
+        .into_iter()
+        .map(|owner| {
+            let members: BTreeSet<u32> = teams
+                .iter()
+                .filter(|(of, _)| of.uid == owner)
+                .flat_map(|(_, team)| team.players.iter().map(|member| member.uid))
+                .collect();
+            let members: Vec<&PlayerSummary> = members.iter().filter_map(|&uid| connection.players.get(uid)).collect();
+            (owner, session.concerned_teammates(&members))
+        })
+        .collect();
+    let human = |club: u32| connection.human_clubs.contains(&club);
     Ok(teams
         .into_iter()
-        .map(|team| {
+        .map(|(club, team)| {
             let known = tactics_read
                 .then(|| connection.session.team_familiarity(club, team.index, &connection.players).ok().flatten())
                 .flatten()
                 .unwrap_or_default();
+            let linked = club.uid != uid;
+            let concerned = concerned.get(&club.uid);
             TeamView {
+                club_uid: club.uid,
+                linked_club: linked.then(|| club.short_name.clone().unwrap_or_else(|| club.name.clone())),
                 index: team.index,
                 kind: team.kind,
                 age_limit: team.age_limit,
                 captain: team.captain,
                 vice_captain: team.vice_captain,
-                human_club: connection.human_clubs.contains(&uid),
+                // A linked team is the user's own when its parent club is.
+                human_club: human(club.uid) || human(uid),
                 players: team
                     .players
                     .into_iter()
@@ -5373,7 +5546,7 @@ fn club_squads(state: State<'_, AppState>, uid: u32) -> Result<Vec<TeamView>, Fa
                             cohesion,
                             tactics: familiarity.map(|f| f.overall),
                             trains: familiarity.is_some_and(|f| f.trains),
-                            concerned_teammates: concerned.get(&member.uid).copied().unwrap_or(0),
+                            concerned_teammates: concerned.and_then(|by| by.get(&member.uid)).copied().unwrap_or(0),
                             injuries: member.injuries,
                             bans: member.bans,
                             attributes_frozen: connection.frozen.attributes.contains_key(&member.uid),
@@ -5843,6 +6016,129 @@ fn apply_mass_edit(state: State<'_, AppState>, id: u32) -> Result<MassReport, Fa
     Ok(connection.write_planned(pending.entity, pending.planned, batch))
 }
 
+/// What a recipe would do to one player or club, as `plan_recipe` worked it out: every value that changes, from what
+/// to what, the values that stay because they are as good already, the ones left alone and why, and the steps on the
+/// game's own lists (healing, keeping him from retiring) with the ones that have nothing to do.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RecipePreview {
+    /// What `apply_recipe` takes to write exactly these changes.
+    id: u32,
+    recipe: &'static str,
+    entity: Entity,
+    uid: u32,
+    name: String,
+    /// How many changes Apply logs: one for each value, and one for each step on the game's lists.
+    changes: usize,
+    rows: Vec<Planned>,
+    kept: Vec<fmlibre_core::Kept>,
+    skipped: Vec<Skipped>,
+    /// How many injuries it heals, where it heals any.
+    heals: Option<usize>,
+    /// Where it keeps him from retiring: what the game had planned.
+    keeps_playing: Option<KeepsPlaying>,
+    left: Vec<fmlibre_core::LeftOut>,
+}
+
+/// Keeping a player from retiring as a recipe's step: the day the game planned him to retire on, none where it had
+/// planned nothing and he only gets the trait "Will play football as long as possible".
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct KeepsPlaying {
+    retires: Option<FmDate>,
+}
+
+/// The recipes there are, in the order to offer them: each one's key, and whether it is a player's or a club's.
+#[tauri::command]
+fn recipes() -> &'static [Recipe] {
+    RECIPES
+}
+
+/// Works out the recipe `recipe` for the player or the club `uid` (as the recipe is for one or the other), from the
+/// values the game holds now. Nothing is written; the plan waits for `apply_recipe` with the preview's id.
+#[tauri::command]
+fn plan_recipe(state: State<'_, AppState>, recipe: String, uid: u32) -> Result<RecipePreview, Failure> {
+    let mut guard = state.0.lock()?;
+    let connection = guard.as_mut().ok_or_else(not_connected)?;
+    let found = fmlibre_core::recipe(&recipe)?;
+    let entity = found.entity;
+    let plan = match entity {
+        Entity::Player => {
+            let player = connection.players.get(uid).ok_or_else(|| not_found(entity, uid))?;
+            connection.session.plan_recipe(found, Subject::Player(player))?
+        }
+        Entity::Club => {
+            let club = connection.clubs.get(uid).ok_or_else(|| not_found(entity, uid))?;
+            connection.session.plan_recipe(found, Subject::Club(club))?
+        }
+        // Recipes are for players and for clubs.
+        _ => return Err(RecipeError::WrongEntity { recipe: found.key, entity }.into()),
+    };
+    let id = connection.fresh_id();
+    let preview = RecipePreview {
+        id,
+        recipe: found.key,
+        entity,
+        uid: plan.uid,
+        name: plan.name.clone(),
+        changes: plan.changes(),
+        rows: plan.planned.clone(),
+        kept: plan.kept.clone(),
+        skipped: plan.skipped.clone(),
+        heals: plan.heal.as_ref().map(|heal| heal.injuries),
+        keeps_playing: plan.retirement.as_ref().map(|retirement| KeepsPlaying { retires: retirement.date }),
+        left: plan.left.clone(),
+    };
+    connection.recipe = Some(PendingRecipe { id, plan });
+    Ok(preview)
+}
+
+/// Writes the recipe previewed as `id`, exactly as it was shown: each value only while the game still holds the one it
+/// was planned from, and each step on the game's lists only while they are as the plan found them. Everything is
+/// logged as one batch, which `undo_batch` takes back.
+#[tauri::command]
+fn apply_recipe(state: State<'_, AppState>, id: u32) -> Result<MassReport, Failure> {
+    let mut guard = state.0.lock()?;
+    let connection = guard.as_mut().ok_or_else(not_connected)?;
+    let plan = match connection.recipe.take() {
+        Some(pending) if pending.id == id => pending.plan,
+        other => {
+            connection.recipe = other;
+            return Err(Failure::new("recipe.outOfDate", "This preview is out of date. Open the recipe again."));
+        }
+    };
+    let batch = connection.fresh_id();
+    // The steps on the game's lists first: keeping him from retiring writes two of his traits, which no value of a
+    // recipe is.
+    let (mut applied, mut failed) = (0, Vec::new());
+    let mut fail = |field: &str, error: Failure| {
+        failed.push(MassFailure { uid: plan.uid, name: plan.name.clone(), field: field.to_owned(), error });
+    };
+    if let Some(heal) = &plan.heal {
+        match connection.session.apply_heal(heal) {
+            Ok(done) => {
+                connection.log_heal(done, Some(batch));
+                applied += 1;
+            }
+            Err(err) => fail("injuries", err.into()),
+        }
+    }
+    if let Some(retirement) = &plan.retirement {
+        match connection.session.apply_retirement(retirement) {
+            Ok(done) => {
+                connection.log_retirement(done, Some(batch));
+                applied += 1;
+            }
+            Err(err) => fail("retirement", err.into()),
+        }
+    }
+    let mut report = connection.write_planned(plan.recipe.entity, plan.planned, batch);
+    report.applied += applied;
+    failed.append(&mut report.failed);
+    report.failed = failed;
+    Ok(report)
+}
+
 /// Undoes every change of the mass edit `batch` that is not undone yet, newest first.
 /// Changes the game has changed since are left as they are and reported. Refused at once
 /// while the game has loaded a save since the lists were read, as each undo would be.
@@ -5983,12 +6279,18 @@ pub fn run() {
             undo_change,
             plan_mass_edit,
             apply_mass_edit,
+            recipes,
+            plan_recipe,
+            apply_recipe,
             undo_batch,
             plan_club_move,
             room_makers,
             move_player,
             plan_arranged_transfer,
             arrange_transfer,
+            season_loan_end,
+            plan_arranged_loan,
+            arrange_loan,
             plan_loan_permanent,
             make_loan_permanent,
             plan_release,
@@ -6269,6 +6571,7 @@ mod tests {
             released: None,
             fee: None,
             arranged: None,
+            loan_until: None,
         });
         second.add(&HistoryLine::Change(Box::new(moved)));
         second.add(&line(&logged(2, "morale", 9, 20, Some(1)), "second"));

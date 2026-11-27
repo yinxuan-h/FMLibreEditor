@@ -54,14 +54,14 @@ export function CopyDiagnostics(props: { className?: string }) {
       <button
         type="button"
         className={props.className}
-        title={text.copyTitle}
+        data-tip={text.copyTitle}
         disabled={phase === "copying"}
         onClick={() => void copy()}
       >
         {phase === "copied" ? text.copied : text.copy}
       </button>
       {error && (
-        <span className="copy-diagnostics-error" role="alert" title={error}>
+        <span className="copy-diagnostics-error" role="alert" data-tip={error}>
           {error}
         </span>
       )}

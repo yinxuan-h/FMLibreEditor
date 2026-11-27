@@ -127,9 +127,79 @@ async function sponsorships({ app, report, probe }) {
   await app.press("Escape");
 }
 
+/**
+ * The linked teams (#254): a B team is a club of its own to the game, whose senior team its parent club lists apart
+ * from its own teams. The squad of the best known club that lists one shows it after the club's own teams, as the
+ * probe's `linked-teams` reads it, with the players that club's own squad lists; and its Squad tab has a button for it,
+ * named by that club, which shows those players.
+ */
+async function linkedTeams({ app, report, probe }) {
+  let survey;
+  try {
+    survey = probe.run(["linked-teams", "--show", "12"]);
+  } catch {
+    report.skip("the linked teams", "this build's layout does not place them");
+    return;
+  }
+  const lines = survey.split(/\r?\n/);
+  const parents = lines.slice(lines.findIndex((text) => text.startsWith("The best known of")) + 1)
+    .map((line) => line.match(/^\s+(.+) \(UID (\d+)\): (.+)$/)).filter(Boolean);
+  if (parents.length === 0) {
+    report.skip("the linked teams", "no club of this save lists one");
+    return;
+  }
+  // The best known club whose first linked team has players: a women's B team often has none.
+  let parent = parents[0];
+  for (const candidate of parents) {
+    const first = (await app.must("club_squads", { uid: Number(candidate[2]) })).find((team) => team.linkedClub !== null);
+    if (first?.players.length > 0) {
+      parent = candidate;
+      break;
+    }
+  }
+  const [, name, uid, rest] = parent;
+  const seen = [...rest.matchAll(/\(UID (\d+)\) team (\d+)/g)].map(([, club, index]) => `${club}:${index}`);
+  const teams = await app.must("club_squads", { uid: Number(uid) });
+  const own = teams.filter((team) => team.linkedClub === null);
+  const linked = teams.filter((team) => team.linkedClub !== null);
+  report.check(`${name}'s own teams come first, as its own`,
+    own.length > 0 && teams.slice(0, own.length).every((team, at) => team.clubUid === Number(uid) && team.index === at),
+    teams.map((team) => `${team.clubUid}:${team.index}`).join(", "));
+  report.check("then its linked teams, as the probe reads them",
+    JSON.stringify(linked.map((team) => `${team.clubUid}:${team.index}`)) === JSON.stringify(seen),
+    `${linked.map((team) => team.linkedClub).join(", ")} (the probe: ${seen.join(", ")})`);
+  const [first] = linked;
+  if (!first) return;
+  const theirs = (await app.must("club_squads", { uid: first.clubUid })).find((team) => team.index === first.index);
+  const uids = (team) => JSON.stringify(team?.players.map((player) => player.uid));
+  report.check(`${first.linkedClub}'s players are those its own squad lists`, uids(first) === uids(theirs),
+    `${first.players.length} players`);
+
+  await app.openClub(name, Number(uid));
+  await app.click(
+    `[...document.querySelectorAll(".profile-tabs [role=tab]")].filter(${SHOWN}).find((t) => t.textContent.trim() === "Squad")`,
+    "the Squad tab",
+  );
+  const tab = `${VIS}(".squad-tab")`;
+  const buttons = `[...(${tab}?.querySelectorAll(".squad-teams button") ?? [])]`;
+  await app.waitFor(`${buttons}.length > 0`, "the squad's teams", 30000);
+  const names = await app.js(`${buttons}.map((b) => b.textContent)`);
+  report.check("the Squad tab has a button for each team, the linked ones named by their clubs",
+    names.length === teams.length && linked.every((team) => names.includes(team.linkedClub)), names.join(", "));
+  const at = teams.indexOf(first);
+  await app.click(`${buttons}[${at}]`, `the team ${first.linkedClub}`);
+  await app.waitFor(`${buttons}[${at}]?.getAttribute("aria-pressed") === "true"`, "the linked team");
+  const pressed = await app.js(`${buttons}.filter((b) => b.getAttribute("aria-pressed") === "true").length`);
+  const rows = await app.js(`${tab}.querySelectorAll(".squad-grid tbody tr").length`);
+  report.check("which shows that team alone, with its players", pressed === 1 && rows === first.players.length,
+    `${pressed} pressed, ${rows} rows of ${first.players.length}`);
+  await app.shot("linked-team");
+}
+
 export async function run({ app, report, probe }) {
   await finances({ app, report, probe });
   await sponsorships({ app, report, probe });
+  await linkedTeams({ app, report, probe });
 
   // The best known men's clubs all have a nation, and nearly all a league this season, of a nation.
   const top = (await app.must("search_clubs", { query: "", limit: 200, filter: { women: false } })).rows;

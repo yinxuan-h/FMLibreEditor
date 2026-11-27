@@ -62,7 +62,7 @@ export function RenameButton({ player }: { player: RenamingPlayer }) {
         type="button"
         className="release-toggle rename-toggle"
         aria-haspopup="dialog"
-        title={text.buttonTitle}
+        data-tip={text.buttonTitle}
         onClick={() => setOpened(player)}
       >
         {text.button}

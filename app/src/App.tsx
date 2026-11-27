@@ -8,6 +8,7 @@ import { NationalBrowser } from "./NationalBrowser";
 import { CommandPalette, Keys, SearchIcon, type Command, type Found, type FoundKind } from "./CommandPalette";
 import { CompetitionBrowser } from "./CompetitionBrowser";
 import { CompatibilityNotice } from "./CompatibilityNotice";
+import { recipeCommand, recipesOnShow } from "./RecipeMenu";
 import { CopyDiagnostics } from "./CopyDiagnostics";
 import { forgetFieldTables } from "./fieldTables";
 import { describeError, describeGame, formatDate } from "./format";
@@ -29,6 +30,7 @@ import {
   whatsNewText,
 } from "./labels";
 import type { ListRequest } from "./ListBrowser";
+import { useMastheadFit } from "./mastheadFit";
 import { PlayerBrowser } from "./PlayerBrowser";
 import { restored, useSnapshot } from "./restore";
 import { SaveChangedNotice, useSaveChanged } from "./SaveChangedNotice";
@@ -38,6 +40,7 @@ import { matches, SHORTCUTS, viewShortcut, withShortcut } from "./shortcuts";
 import { StaffBrowser } from "./StaffBrowser";
 import { StarRequest, useStarRequest } from "./StarRequest";
 import { readTeams, TeamsSwitch, type Teams } from "./TeamsSwitch";
+import { Tips } from "./Tips";
 import type {
   BridgeInfo,
   ClubSummary,
@@ -146,6 +149,10 @@ function App() {
   const [changeFilter, setChangeFilter] = useChangeFilter();
   // The Changes tab counts what this connection wrote: the earlier changes of the history are not news.
   const sessionChanges = log.filter((change) => !change.earlier).length;
+  // The masthead stands closer when it would not fit: the count after the Changes tab, the game's date and Reload in
+  // place of Refresh widen it.
+  const masthead = useRef<HTMLElement>(null);
+  useMastheadFit(masthead, [sessionChanges, connection !== null, connection?.gameDate]);
   const update = useUpdateCheck();
   // What this version brings: told once after an update, and again from the foot of the window or the palette.
   const whatsNew = useWhatsNew(update.current);
@@ -166,7 +173,7 @@ function App() {
     try {
       await task();
     } catch (e) {
-      setError(String(e));
+      setError(describeError(e));
     } finally {
       setBusy(null);
     }
@@ -272,9 +279,10 @@ function App() {
         ? appText.noteUnknownBuild
         : appText.noteReadOnly;
   const arrangesTransfers = connection?.arrangesTransfers ?? false;
+  const arrangesLoans = connection?.arrangesLoans ?? false;
   const editor = useMemo(
-    () => ({ editable, readOnlyNote: note, arrangesTransfers, onEdited: edited }),
-    [editable, note, arrangesTransfers, edited],
+    () => ({ editable, readOnlyNote: note, arrangesTransfers, arrangesLoans, onEdited: edited }),
+    [editable, note, arrangesTransfers, arrangesLoans, edited],
   );
 
   // With edits pending in the open profile, leaving for another view asks first.
@@ -373,6 +381,11 @@ function App() {
         run: profile.toggleEdit,
       });
     }
+    // The recipes of the player or the club on show, as its Recipes button offers them: found by typing, not listed.
+    const recipes = recipesOnShow();
+    recipes?.keys.forEach((key) =>
+      commands.push({ id: `recipe-${key}`, label: recipeCommand(key), typedOnly: true, run: () => recipes.open(key) }),
+    );
     VIEWS.forEach(({ id, label }, index) =>
       commands.push({
         id: `view-${id}`,
@@ -470,7 +483,7 @@ function App() {
 
   return (
     <div className="app">
-      <header className="masthead">
+      <header className="masthead" ref={masthead}>
         <BrandMark />
         <nav className="tabs">
           {VIEWS.map(({ id, label }, index) => (
@@ -504,7 +517,7 @@ function App() {
             (connection.gameDate ? (
               <span className="game-date">{formatDate(connection.gameDate)}</span>
             ) : (
-              <span className="game-date missing" title={appText.noDateTitle}>
+              <span className="game-date missing" data-tip={appText.noDateTitle}>
                 {appText.noDate}
               </span>
             ))}
@@ -639,12 +652,14 @@ function App() {
           {!inTauri && <span className="tag">{appText.previewTag}</span>}
         </div>
         <div className="colophon-notes">
-          <p className="sidebar-note" title={note}>
+          <p className="sidebar-note" data-tip={note}>
             {note}
           </p>
           <GraphicsStatus />
         </div>
       </footer>
+
+      <Tips />
 
       {whatsNew.shown && (
         <WhatsNewDialog notes={whatsNew.shown} updated={whatsNew.updated} onClose={whatsNew.close} />

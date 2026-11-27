@@ -145,7 +145,7 @@ export function EditButton({ editing, ready }: { editing: ProfileEditing; ready:
       aria-pressed={active}
       aria-busy={editing.stage === "loading" || undefined}
       disabled={!ready}
-      title={editText.editTitle}
+      data-tip={editText.editTitle}
       onClick={active ? editing.done : editing.begin}
     >
       {editText.edit}
@@ -234,7 +234,7 @@ export function EditBar({ editing }: { editing: ProfileEditing }) {
                 type="button"
                 className="primary"
                 disabled={!canApply}
-                title={invalid > 0 ? editText.applyBlocked : undefined}
+                data-tip={invalid > 0 ? editText.applyBlocked : undefined}
                 onClick={editing.apply}
               >
                 {applying ? editText.applying : editText.apply}

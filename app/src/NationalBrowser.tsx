@@ -12,6 +12,7 @@ import { changeLog, nationalProfile, nationalStatus, nationalTeamAction, undoBat
 import { FilterBar } from "./FilterBar";
 import { describeError } from "./format";
 import {
+  jobLabel,
   massEditText,
   nationalTeamLabel,
   nationalText as text,
@@ -19,16 +20,18 @@ import {
   positionLabel,
   profileText,
   squadText,
+  staffListText,
 } from "./labels";
 import { ListBrowser, type ListRequest } from "./ListBrowser";
 import { undoFailureLines } from "./massDraft";
 import { percentText } from "./MedicalGroup";
 import { NationFlag, PICTURE_SIZE, WithPicture } from "./Picture";
 import { PlayerDialog } from "./PlayerProfile";
-import { ProfileFrame, ReputationMeter, type Loaded } from "./ProfileParts";
+import { Fact, ProfileFrame, ReputationMeter, type Loaded } from "./ProfileParts";
 import { restored, useSnapshot } from "./restore";
 import { ActionButton, refusalLines, ResultLine, type Result, type Undo } from "./SquadTab";
 import type {
+  NationDetails,
   NationalProfile,
   NationalSide,
   NationalStatus,
@@ -189,6 +192,7 @@ function NationalProfileView({ team, version, onClose }: NationalProfileViewProp
     >
       {loaded?.details && teams && (
         <div className="squad-tab">
+          {loaded.details.nation && <NationDetailsBlock nation={loaded.details.nation} />}
           {teams.length === 0 || !shown ? (
             <p className="empty">{text.noTeams}</p>
           ) : (
@@ -213,6 +217,54 @@ function NationalProfileView({ team, version, onClose }: NationalProfileViewProp
         </div>
       )}
     </ProfileFrame>
+  );
+}
+
+/**
+ * What the game shows of the nation and its federation, read only: the year the federation was founded, the continent,
+ * and the federation's staff as the game's staff list of the nation's team shows them, team by team, each with his job
+ * in the national team (not the one at his club, if he has one).
+ */
+function NationDetailsBlock({ nation }: { nation: NationDetails }) {
+  const none = <span className="muted">{profileText.none}</span>;
+  return (
+    <div className="nation-details">
+      <section className="profile-group">
+        <h3>{text.details.nation}</h3>
+        <dl className="stats">
+          <Fact label={text.details.founded}>{nation.founded ?? none}</Fact>
+          <Fact label={text.details.continent}>{nation.continent ?? none}</Fact>
+        </dl>
+      </section>
+      <section className="profile-group">
+        <h3>{text.details.staff(nation.staff.length)}</h3>
+        {nation.staff.length === 0 ? (
+          <p className="empty">{text.details.noStaff}</p>
+        ) : (
+          <div className="squad-table-wrap">
+            <table className="grid squad-grid" aria-label={text.details.staff(nation.staff.length)}>
+              <thead>
+                <tr>
+                  <th className="col-name">{staffListText.columns.name}</th>
+                  <th>{text.details.job}</th>
+                  <th>{text.details.team}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nation.staff.map(({ member, job, teamKind }) => (
+                  <tr key={member.uid}>
+                    <td className="col-name">{member.name}</td>
+                    <td>{jobLabel(job)}</td>
+                    <td>{teamKind === null ? none : nationalTeamLabel(teamKind)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="note">{text.details.staffNote}</p>
+      </section>
+    </div>
   );
 }
 

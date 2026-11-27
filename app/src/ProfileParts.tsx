@@ -45,7 +45,7 @@ export function useProfileDetails<T>(command: string, uid: number, version: numb
         }
       } catch (e) {
         if (!cancelled) {
-          setLoaded({ error: String(e) });
+          setLoaded({ error: describeError(e) });
         }
       }
     };
@@ -342,7 +342,7 @@ export function RatingGroup({ title, rows }: { title: string; rows: RatingRow[] 
 
 export function Fact({ label, title, children }: { label: ReactNode; title?: string; children: ReactNode }) {
   return (
-    <div className="stat" title={title}>
+    <div className="stat" data-tip={title}>
       <dt>{label}</dt>
       <dd>{children}</dd>
     </div>
@@ -450,7 +450,7 @@ function ContractExtension({ entity, uid, expires }: { entity: "player" | "staff
         disabled={!editable}
         aria-disabled={extending || undefined}
         aria-busy={extending || undefined}
-        title={
+        data-tip={
           editable
             ? profileText.extendContractTitle(CONTRACT_YEARS, formatDate(plusYears(expires, CONTRACT_YEARS)))
             : readOnlyNote

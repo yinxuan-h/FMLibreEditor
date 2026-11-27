@@ -270,7 +270,7 @@ function ClubHead({ subject, subjects, version, onSubject, onOpenClub, onPick }:
       {loaded?.error !== undefined && <p className="home-error error">{loaded.error}</p>}
 
       <div className="home-buttons">
-        <button type="button" disabled={!details} title={text.openProfileTitle} onClick={() => details && onOpenClub(details)}>
+        <button type="button" disabled={!details} data-tip={text.openProfileTitle} onClick={() => details && onOpenClub(details)}>
           {text.openProfile}
         </button>
         {subject.manager === null && (
@@ -403,7 +403,7 @@ function Attention({ team, gameDate, onOpen }: AttentionProps) {
         return (
           <section key={card.key} className={`home-card ${tone}`} aria-labelledby={`${base}-${card.key}`}>
             <div className="home-card-head">
-              <h3 id={`${base}-${card.key}`} title={card.hint}>
+              <h3 id={`${base}-${card.key}`} data-tip={card.hint}>
                 {card.title}
               </h3>
               <span className="home-card-count figure">{count}</span>

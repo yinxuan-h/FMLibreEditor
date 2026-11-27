@@ -5,11 +5,15 @@
 //! players under contract with it, those out on loan too, and the players on loan to it. Its
 //! captain and vice-captain are pointers to the person blocks of two of its players; making a
 //! player captain writes that pointer as a [`Patch`], undone like a move.
+//!
+//! A B team is not one of the club's teams: the game keeps it as a club of its own (1. FC
+//! Nürnberg II), whose senior team the parent club names in a second list, its linked teams.
+//! The squad screen shows those beside the club's own (see [`Session::linked_teams`]).
 
 use fmlibre_mem::is_user_pointer;
 use serde::{Deserialize, Serialize};
 
-use crate::clubs::ClubSummary;
+use crate::clubs::{ClubIndex, ClubSummary};
 use crate::players::{PlayerIndex, PlayerSummary};
 use crate::profile::TeamLayout;
 use crate::session::Session;
@@ -36,6 +40,17 @@ pub struct ClubTeam {
     pub captain: Option<u32>,
     pub vice_captain: Option<u32>,
     pub players: Vec<SquadMember>,
+}
+
+/// A team of another club that a club runs beside its own: its B team, which is a club to the game.
+#[derive(Debug, Clone, Copy)]
+pub struct LinkedTeam<'a> {
+    /// The club the team belongs to, e.g. 1. FC Nürnberg II for 1. FC Nürnberg.
+    pub club: &'a ClubSummary,
+    /// Where the team is in that club's list of teams (see [`ClubTeam::index`]).
+    pub index: usize,
+    /// Where the team is in the game's memory.
+    pub address: u64,
 }
 
 /// A player in a team's list, with what the squad screen shows of him beyond his list row.
@@ -136,6 +151,58 @@ impl Session {
     pub fn club_teams(&self, club: &ClubSummary, players: &PlayerIndex) -> Result<Vec<ClubTeam>, MoveError> {
         let teams = self.team_objects(club)?;
         teams.into_iter().enumerate().map(|(index, team)| self.club_team(club, index, team, players)).collect()
+    }
+
+    /// The teams of other clubs that `club` runs beside its own, in the game's order: each by the club it belongs to
+    /// and its place in that club's list, which is how the editor reads and writes a team. Only reads. An entry is
+    /// left out unless it is a team of a club `clubs` has, and in that club's own list of teams; so a layout that
+    /// places the list wrongly shows no linked team rather than a wrong one. None where the layout has not placed it.
+    pub fn linked_teams<'a>(&self, club: &ClubSummary, clubs: &'a ClubIndex) -> Vec<LinkedTeam<'a>> {
+        let (c, t) = (&self.layout.club, &self.layout.team);
+        let Some(offset) = c.linked_teams else {
+            return Vec::new();
+        };
+        let entries = match PointerList::read(&self.process, club.address + offset) {
+            Ok(Some(list)) if list.len() <= MOST_TEAMS => list.elements(&self.process).unwrap_or_default(),
+            _ => return Vec::new(),
+        };
+        let mut linked: Vec<LinkedTeam<'a>> = Vec::new();
+        for team in entries {
+            let owner = is_user_pointer(team)
+                .then(|| self.process.read_u64(team + t.club).ok())
+                .flatten()
+                .filter(|&owner| is_user_pointer(owner) && owner != club.address)
+                .and_then(|owner| {
+                    let uid = self.process.read_u32(owner + c.uid).ok()?;
+                    clubs.get(uid).filter(|found| found.address == owner)
+                });
+            let Some(owner) = owner else { continue };
+            let index = self.team_objects(owner).ok().and_then(|teams| teams.iter().position(|&other| other == team));
+            let Some(index) = index else { continue };
+            if !linked.iter().any(|seen| seen.club.uid == owner.uid && seen.index == index) {
+                linked.push(LinkedTeam { club: owner, index, address: team });
+            }
+        }
+        linked
+    }
+
+    /// Whether the club at `club` lists the team at `team` among its linked teams, as it lists its B team's.
+    fn links_team(&self, club: u64, team: u64) -> bool {
+        let Some(offset) = self.layout.club.linked_teams else {
+            return false;
+        };
+        match PointerList::read(&self.process, club + offset) {
+            Ok(Some(list)) if list.len() <= MOST_TEAMS => {
+                list.elements(&self.process).is_ok_and(|teams| teams.contains(&team))
+            }
+            _ => false,
+        }
+    }
+
+    /// The team at `index` in the list of `club`'s teams with its players, read now (see [`Session::club_teams`]).
+    pub fn club_team_at(&self, club: &ClubSummary, index: usize, players: &PlayerIndex) -> Result<ClubTeam, MoveError> {
+        let team = self.team_object(club, index)?;
+        self.club_team(club, index, team, players)
     }
 
     /// Works out making `player` the captain or the vice-captain of the team at `team` in the
@@ -295,7 +362,11 @@ impl Session {
             .and_then(club_of);
         let playing = club_of(plays_for);
         let loan = match (club, playing, employer) {
-            (Some(club), Some(playing), Some(employer)) if playing != employer => {
+            // A player of the club's B team is under contract with the club and plays for a team of another, as one on
+            // loan does; but the club lists that team as one it runs, and the game holds no loan for him.
+            (Some(club), Some(playing), Some(employer))
+                if playing != employer && !self.links_team(employer, plays_for) =>
+            {
                 Some(if playing == club.address { Loan::In } else { Loan::Out })
             }
             _ => None,

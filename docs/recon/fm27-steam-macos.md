@@ -482,6 +482,32 @@ As on Windows, two objects keep something a few bytes further on, and neither ha
 Both profiles name them under `[layout.club_finance]` and `[layout.tactics]`; the Intel half's are the arm64 half's, as
 the Mac layout is the same for both.
 
+## The update of 24 November 2026 (Steam build 26797085)
+
+Steam's update of 24 November 2026 (version 27.1.1.2511875) gave both halves of `game_plugin` new UUIDs: arm64
+`F53EAD40-…`, Intel `D1D81C1A-…`. `__DATA` starts 0x10000 further on in the arm64 half (`0x5784000`) and 0x6000
+earlier in the Intel half (`0x5D20000`). Without a profile the editor found the arrays, the date, the retirement
+manager and the game's own object by itself, and all twelve checks passed; the game stayed read-only until Edit
+anyway, and no club's finances were read, as the Mac layout keeps corporate facilities at 0x8A9 (see below).
+
+- **arm64:** read on the maintainer's save (Arsenal, 18 July 2027), the game started from Steam right after the
+  update. The date at `0x5791DC8`, the retirement manager's static at `0x57882B8` and the game's own object's at
+  `0x5784B60` keep their place in `__DATA`; the arrays at `0x57B2FB8`, `0x57B3000` and `0x57B3170` sit 0x10 earlier
+  in it. `instances` finds one `TACTICS_MANAGER` and one `TRAINING_MANAGER`, and `refs` one pointer in the plugin to
+  each, `game_plugin+0x5788320` (still 0x68 after the retirement manager's) and `+0x5785758`. The national teams'
+  arrays sit 0xA8 and 0xC0 past the players pair, 251 containers each; the prize money (398 settings; the Premier
+  League's 20 places from £53,100,000, Serie A's from £28,691,666) and the squad rules (550 competitions, 426 with
+  rules, 451 kinds) read as on build 26620374.
+- **Intel:** not run; checked in the file. Its code's RIP-relative loads peak where build 26620374's did, with the
+  same counts around each: 7,631 at the date `0x5D2D6F0` (0x20 earlier in `__DATA`), 197 and 181 at the players'
+  begin and end `0x5D4D338` (0x30 earlier), 19 and 19 at the staff's, 106 and 94 at the clubs', 66 at the retirement
+  manager's static `0x5D23EE0` (still 0x9810 before the date) and 537 at the game's own object's `0x5D4EE20` (still
+  0x1AE8 after the players pair).
+
+The objects are laid out as in build 26620374: corporate facilities at 0x8AD (Arsenal 19, Liverpool 16, Tottenham
+Hotspur 20; 336 clubs keep finances that look real) and a team's tactics at 0x1008 and 0x1020 (`training-history 602`
+finds Arsenal's tactic in use, options 5, 17, 10, 4, 6, 10), so both profiles name them as that build's do.
+
 ## The game's own object and its count of saves loaded
 
 The object of the class `game_plugin::GAME_UI` (see `layout.toml`'s `[game]`) is laid out as on Windows: at `+0x100`

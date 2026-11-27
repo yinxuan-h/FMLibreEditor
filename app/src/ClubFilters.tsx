@@ -150,7 +150,7 @@ export function ClubFilterBar({ fields, onChange, active, version }: ClubFilterB
         </select>
       </label>
       <TextInput label={text.nation} value={fields.nation} onChange={(nation) => set("nation", nation)} />
-      <label className="filter-field" title={text.leagueTitle}>
+      <label className="filter-field" data-tip={text.leagueTitle}>
         <span>{text.league}</span>
         <select className="league-select" value={fields.league} onChange={(e) => set("league", e.currentTarget.value)}>
           <option value="">{text.anyLeague}</option>
@@ -178,7 +178,7 @@ export function ClubFilterBar({ fields, onChange, active, version }: ClubFilterB
           )}
         </select>
       </label>
-      <div className="filter-field" role="group" aria-labelledby={reputation} title={text.reputationTitle}>
+      <div className="filter-field" role="group" aria-labelledby={reputation} data-tip={text.reputationTitle}>
         <span id={reputation}>{text.reputation}</span>
         <input
           type="number"

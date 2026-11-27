@@ -103,7 +103,7 @@ export function TiesGroup({ details }: { details: PlayerDetails }) {
           className="heal-toggle"
           aria-haspopup="dialog"
           disabled={!editable}
-          title={editable ? text.changeTitle : readOnlyNote}
+          data-tip={editable ? text.changeTitle : readOnlyNote}
           onClick={() => setOpen(true)}
         >
           {text.change}
@@ -289,7 +289,7 @@ function TiesDialog({ details, onClose }: TiesDialogProps) {
               disabled={busy}
               aria-expanded={picking?.kind === "change" && picking.tie.index === tie.index}
               data-change-club={tie.index}
-              title={text.changeClubTitle(name)}
+              data-tip={text.changeClubTitle(name)}
               onClick={() => setPicking({ kind: "change", tie })}
             >
               {text.changeClub}
@@ -400,7 +400,7 @@ function TiesDialog({ details, onClose }: TiesDialogProps) {
         type="button"
         className="heal-toggle"
         disabled={busy}
-        title={text.addClubTitle}
+        data-tip={text.addClubTitle}
         onClick={() => setPicking({ kind: "add" })}
       >
         {text.addClub}

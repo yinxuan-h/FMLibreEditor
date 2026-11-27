@@ -71,7 +71,7 @@ export function WhatsNewDialog({ notes, updated, onClose }: WhatsNewDialogProps)
         <footer className="modal-foot">
           <button
             type="button"
-            title={text.allChangesTitle}
+            data-tip={text.allChangesTitle}
             onClick={() => openRelease({ version: latest.version, url: releasePageOf(latest.version) })}
           >
             {text.allChanges}

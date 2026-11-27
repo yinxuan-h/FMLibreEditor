@@ -85,7 +85,7 @@ export function GraphicsStatus() {
     );
   }
   return (
-    <p className="sidebar-note" title={[text.noneHint, info?.root].filter(Boolean).join("\n")}>
+    <p className="sidebar-note" data-tip={[text.noneHint, info?.root].filter(Boolean).join("\n")}>
       {text.none}
     </p>
   );

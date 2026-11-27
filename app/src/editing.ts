@@ -5,6 +5,8 @@ import { converts, toPounds, toShown } from "./currency";
 import type {
   ApplyReport,
   ArrangedPreview,
+  LoanPreview,
+  LoanRequest,
   BatchUndo,
   CaptainRole,
   Scouted,
@@ -27,6 +29,8 @@ import type {
   MassOperation,
   MassPreview,
   MassReport,
+  RecipeInfo,
+  RecipePreview,
   MovePreview,
   MoveTerms,
   NameKind,
@@ -264,6 +268,31 @@ export const planMassEdit = (entity: Entity, query: string, filters: MassFilters
 /** Writes the mass edit previewed as `id`, exactly as shown; each change only if the value is still the one previewed. */
 export const applyMassEdit = (id: number) => call<MassReport>("apply_mass_edit", { id });
 
+/** The recipes there are, in the order to offer them. They never change while the app runs, so they are asked once. */
+let recipeList: Promise<RecipeInfo[]> | null = null;
+export function recipes(): Promise<RecipeInfo[]> {
+  if (recipeList === null) {
+    const asked = call<RecipeInfo[]>("recipes");
+    recipeList = asked;
+    // A failed call is not kept: the next one asks again.
+    asked.catch(() => {
+      if (recipeList === asked) {
+        recipeList = null;
+      }
+    });
+  }
+  return recipeList;
+}
+
+/**
+ * Works out the recipe `recipe` for the player or club `uid` from the values the game holds now. Nothing is written
+ * until `applyRecipe`; a recipe that is not for him (a wonderkid older than 21) is refused, and the error says why.
+ */
+export const planRecipe = (recipe: string, uid: number) => call<RecipePreview>("plan_recipe", { recipe, uid });
+
+/** Writes the recipe previewed as `id`, exactly as shown, as one batch that `undoBatch` takes back. */
+export const applyRecipe = (id: number) => call<MassReport>("apply_recipe", { id });
+
 /** Undoes every change of a mass edit that is not undone yet. */
 export const undoBatch = (batch: number) => call<BatchUndo>("undo_batch", { batch });
 
@@ -430,6 +459,27 @@ export const planArrangedTransfer = (uid: number, club: number, terms: MoveTerms
  */
 export const arrangeTransfer = (uid: number, club: number, terms: MoveTerms, fee?: number) =>
   call<LoggedChange>("arrange_transfer", { uid, club, terms, fee });
+
+/**
+ * The last day of a loan of the player `uid` agreed now until the end of the season, as a number like 20280629: 29
+ * June at least a month away, no later than his contract runs; null without an in-game date.
+ */
+export const seasonLoanEnd = (uid: number) => call<number | null>("season_loan_end", { uid });
+
+/**
+ * Checks that the loan of the player `uid` to the club `club` can be arranged for the game to make the next day, on
+ * the terms `loan`, and says what it would be. Nothing is written; when it cannot, the error says why.
+ */
+export const planArrangedLoan = (uid: number, club: number, loan: LoanRequest) =>
+  call<LoanPreview>("plan_arranged_loan", { uid, club, loan });
+
+/**
+ * Arranges the loan for the game to make the next day: on that day the game sends him to the club, on loan from his
+ * own, as it makes its own loans, and his history shows it. Logged as a change of his club with `moved.arranged` and
+ * `moved.loanUntil`; one undo takes it back until the day.
+ */
+export const arrangeLoan = (uid: number, club: number, loan: LoanRequest) =>
+  call<LoggedChange>("arrange_loan", { uid, club, loan });
 
 /**
  * Checks that the players `uid` and `other` can swap clubs, each joining the other's senior team on his own contract,

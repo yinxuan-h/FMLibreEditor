@@ -135,6 +135,67 @@ and Mancini, with a reputation of 8500; all 502 containers read. The men's team 
 and Ireland (UID 145174) has no senior team of kind 0, so it lists with no reputation and an empty squad; the other three
 of its four have a senior team that lists no players, with a reputation of 1.
 
+## A nation's details and its federation's staff
+
+For #210, read on the Mac's Steam build 26620374 (Apple silicon), on a save of 28 September 2026 with the game in
+Italian, with the probe only (`national-teams italia --details`), then checked against the game's screens on the same
+save. Nothing was written.
+
+The game's nation page (**Generale**) of Italia's men's shows, besides what the editor already had: "Federazione
+Fondata nel" 1898 (container `+0x870`), and under the name the continent, "Europa". Brasile's says "Sud America",
+Inghilterra's "Europa". The continent is the nation's `+0xF8`, a `db::CONTINENT` with these FM strings:
+
+| Offset | Europe's |
+| --- | --- |
+| `+0x18` | its name in the game's language, "Europa": what the game shows |
+| `+0x20` | "EUR" |
+| `+0x28` | the adjective, "Europeo" |
+| `+0x30` | its confederation's full name |
+| `+0x38`, `+0x40` | "EUR_C", "EURO" |
+
+Of the 502 containers, 458 lead to a continent (Africa 114, Asia 94, Europa 114, Nord America 86, Oceania 30, Sud
+America 20). The 44 that do not are nations of the past or outside FIFA's, such as Jugoslavia, Unione Sovietica and The
+Basque Country. 452 have a founding year, from 1863 (Inghilterra) to 2011.
+
+The page shows no population and no currency, so the editor does not show them. What the nation holds of them: its
+population at `+0x1EC` (above), and its currency at `+0x108`, a `db::CURRENCY_RECORD` whose `+0x18` and `+0x20` are
+English names ("European Euro", "Euro", also in the Italian game), `+0x30` its symbol ("€") and `+0x38` an `f32`
+(1.1641 for the Euro) that may be its value in pounds.
+
+The staff list of the nation's team (**Staff › Tutto lo staff**, column "Incarico in Nazionale") shows 24 people for
+Italia's men's: 13 for the senior team, 6 for the under-21s, 4 for the under-20s and 1 for the under-19s. They are:
+
+- each team's manager, the team's `+0x80` (Mancini, Baldini, Nunziata, Bianchessi);
+- the 20 people of the container's three lists (`+0x60`, `+0x78`, `+0x90`): 2 physiotherapists, 16 coaches of the
+  senior, under-21 and under-20 teams, a scout and the chief scout.
+
+The job the column shows is not the one of a club contract: of the two physiotherapists, Mauro Doimi works for a club
+as a physio too, Walter Martinelli has no club, and the editor reads no contract for him (`staff-member 2000125079`).
+Each of them has a contract with one of the federation's teams, which the staff object reaches through the record that
+follows his contract pointer:
+
+```text
+staff object +0x178 ─> record of his other contracts
+record       +0x10  ─> his contract with a federation's team (db::BASIC_CONTRACT; a manager's, db::FULL_CONTRACT)
+contract     +0x08  owner (his identity block), +0x10 the team (db::NATIONAL_TEAM), +0x26 u8 job, as a club contract
+```
+
+For all 24, the job read there and the team it points at are what the game shows: manager (16) Allenatore,
+goalkeeping coach (34) Allenatore dei portieri, coach (2) Collaboratore Tecnico, assistant coach (20) Allenatore in
+seconda, fitness coach (26) Preparatore atletico, physio (12) Fisioterapista, scout (14) Osservatore, chief scout (44)
+Capo Osservatore. Mancini's contract (above, "keeps his contract somewhere else") is the one this record points at.
+Over the 502 containers, the managers and the three lists hold 2,090 people at 448 containers, and each of them has
+such a contract with one of his container's teams: managers 594, chief scouts 446, assistant coaches 309, physios 186,
+goalkeeping coaches 173, coaches 166, fitness coaches 143, scouts 49, head physios 11, set piece coaches 7, heads of
+sports science 6.
+
+The game's Italian names job 2 "Collaboratore Tecnico" in this column; the editor's Italian names it "Preparatore"
+elsewhere. Which the game uses at a club was not checked.
+
+The national team's profile in the editor shows the founding year, the continent and these people, each with his job
+in the national team and his team, read only (`layout-macos.toml`, `[national.details]`). The record's place was only
+read on the Mac; on Windows the profile shows none of this.
+
 ## Youth teams
 
 On the Mac build and a save of 29 September 2026, with the probe (`national-teams --teams`, `--kinds`):
@@ -206,8 +267,10 @@ September 2026), with a reputation of 8477.
 
 - Where the game shows a national team's captain, and what it makes of a changed reputation over a game day; how it
   turns the reputation into words ("Mondiale").
-- Where a national team's manager keeps his contract, and the world ranking (15 for Italia), which none of the three
-  objects holds as a byte.
+- The world ranking (15 for Italia), which none of the three objects holds as a byte. Where a manager keeps his
+  contract is now known (see [A nation's details](#a-nations-details-and-its-federations-staff)).
+- A nation's details and its federation's staff on Windows, and whether the game's Italian names job 2 "Preparatore"
+  anywhere.
 - The two arrays' places on the Mac's Steam build 26577676 and on the Intel Macs (Windows Game Pass 0.9.2435.0 and
   Steam build 26577676 are read: see [On Windows](#on-windows)).
 - The names of team kinds 3 and 33, and what the numbers from `+0x180` of a nation are.

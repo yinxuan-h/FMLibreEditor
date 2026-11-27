@@ -475,7 +475,7 @@ export function ChangesView({ log, error, reload, onUndone, filter, onFilter }: 
               <button
                 type="button"
                 className="clear-history"
-                title={text.clearHistoryTitle}
+                data-tip={text.clearHistoryTitle}
                 disabled={log.length === 0 || undoing || clearing}
                 onClick={() => setConfirming(true)}
               >
@@ -515,7 +515,7 @@ export function ChangesView({ log, error, reload, onUndone, filter, onFilter }: 
               </button>
             ))}
           </div>
-          <label className="filter-field" title={text.notUndoneTitle}>
+          <label className="filter-field" data-tip={text.notUndoneTitle}>
             <input
               type="checkbox"
               checked={filter.notUndone}
@@ -523,7 +523,7 @@ export function ChangesView({ log, error, reload, onUndone, filter, onFilter }: 
             />
             <span>{text.notUndone}</span>
           </label>
-          <label className="filter-field" title={text.notInGameFilterTitle}>
+          <label className="filter-field" data-tip={text.notInGameFilterTitle}>
             <input
               type="checkbox"
               checked={filter.notInGame}
@@ -694,7 +694,7 @@ function BatchRow({ batch, open, filtering, undoing, outcome, onToggle, onUndo }
           <span className="tag kind">{text.kinds[batch.entity]}</span>
           <span className="tag batch">{text.batch}</span>
           {earlier && (
-            <span className="tag earlier" title={text.earlierTitle}>
+            <span className="tag earlier" data-tip={text.earlierTitle}>
               {text.earlierTag}
             </span>
           )}
@@ -712,7 +712,7 @@ function BatchRow({ batch, open, filtering, undoing, outcome, onToggle, onUndo }
               type="button"
               className="batch-undo"
               disabled={undoing}
-              title={text.undoBatchTitle(batch.undoable)}
+              data-tip={text.undoBatchTitle(batch.undoable)}
               onClick={() => onUndo(batch.id)}
             >
               {text.undoBatch}
@@ -762,7 +762,7 @@ function ChangeRow({ change, field, failure, undoing, onUndo, inBatch }: ChangeR
           {change.name}
           <span className="tag kind">{text.kinds[change.entity]}</span>
           {change.earlier && (
-            <span className="tag earlier" title={text.earlierTitle}>
+            <span className="tag earlier" data-tip={text.earlierTitle}>
               {text.earlierTag}
             </span>
           )}
@@ -784,11 +784,11 @@ function ChangeRow({ change, field, failure, undoing, onUndo, inBatch }: ChangeR
         <div className="row-actions">
           {change.undoneAt === null ? (
             change.undoable ? (
-              <button type="button" disabled={undoing} title={text.undoTitle(label)} onClick={() => onUndo(change)}>
+              <button type="button" disabled={undoing} data-tip={text.undoTitle(label)} onClick={() => onUndo(change)}>
                 {text.undo}
               </button>
             ) : (
-              <span className="history-only" title={text.historyOnlyTitle}>
+              <span className="history-only" data-tip={text.historyOnlyTitle}>
                 {text.historyOnly}
               </span>
             )
@@ -800,7 +800,7 @@ function ChangeRow({ change, field, failure, undoing, onUndo, inBatch }: ChangeR
         {change.undoneAt === null && change.earlier && change.inGame !== undefined && (
           <div
             className={change.inGame ? "in-game" : "in-game missing"}
-            title={change.inGame ? text.inGameTitle : text.notInGameTitle}
+            data-tip={change.inGame ? text.inGameTitle : text.notInGameTitle}
           >
             {change.inGame ? text.inGame : text.notInGame}
           </div>

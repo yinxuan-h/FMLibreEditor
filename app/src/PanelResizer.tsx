@@ -165,7 +165,7 @@ export function PanelResizer({ panelWidth }: { panelWidth: ReturnType<typeof use
       aria-valuemin={PANEL_MIN}
       aria-valuemax={shown?.max}
       aria-valuenow={shown?.now}
-      title={profileText.resizeHint}
+      data-tip={profileText.resizeHint}
       tabIndex={0}
       onFocus={(event) => describe(panelOf(event.currentTarget))}
       onPointerDown={onPointerDown}

@@ -110,6 +110,37 @@ entries found their offer.
 | 16 | not known | 2 | state 4 (2) |
 | 3 | not known | 2 | |
 
+## The loan offer
+
+Class `LOAN_OFFER` (no `db::`), `0x128` bytes apart in a pool of its own; 597 of the 12,154 offers in the manager's
+list on Game Pass 0.9.2562.0 (save of 4 August 2027), with transfer offers (9,824), moves to a B team (1,590), trades,
+trials and an enquiry. Up to its state and kind it is laid out as a transfer offer, with `+0x86` 1 in every one; its fee
+`+0x58` is the monthly fee. `+0xA8` is not a pointer here. Its own part, from the 29 offers in state 8 and the loan
+contracts they offered (`[transfers.loan]` in `layout.toml`):
+
+| Offset | Type | What it holds |
+| --- | --- | --- |
+| `+0xB0`, `+0xC8` | lists | values, and pointers to `db::AWARD`s: conditions on the future fee; empty in most |
+| `+0xE0` | pointer | a `db::COMP` the future fee turns on (the loan contract keeps its number at `+0xC4`); null in most |
+| `+0xE8` | pointer | the add-ons, a record of lists as a transfer's payment record (amount, count, mark); copied into the loan contract's `+0x68` |
+| `+0xF8` | `u32` | the flags, as the loan contract's `+0xB0` |
+| `+0x100`, `+0x108` | `i32` | pounds a week of his wage the club he joins pays |
+| `+0x104` | `i32` | the monthly fee when he is not used |
+| `+0x10C` | `u32` | how long it runs: `0x1000` a season, `0x10`, `0x20`, `0x40` some months, `0x4000` more than a season; the loan contract's `+0xE8` |
+| `+0x110` | `i32` | the future fee, -1 for none (the loan contract's `+0xC0`) |
+| `+0x124` | `u8` | the kind of the future fee, which the game copies into the loan contract's `+0xF7`: 0xFF none, 0xFE an option to buy, others a mandatory fee (read on Steam 26797085; see `fm27-loans.md`) |
+| `+0x114` | `i32` | -1 in all but one (482,245, the loan contract's `+0xC8`) |
+| `+0x120`, `+0x122` | `u16` | the part of his wage the club he joins pays, in percent (100, 90, 80; 0 where no wage is paid) |
+
+A loan agreed for a later day is kept as a transfer is: the offer in state 19, an entry of kind 1 and the move due.
+The game's own completed loans with a mandatory future fee keep their entry, in state 2, holding a full contract with the
+club the player is on loan at, from the loan's last day: the one he signs when the fee is paid. Those with an option to
+buy keep none. See `fm27-loans.md` for what the
+game made of the loans the editor arranged.
+
+The Mac Steam build 26797085 (Apple silicon) lays the loan offer out alike (`10LOAN_OFFER`, `0x128` bytes): see
+`fm27-loans.md`, Arranging a loan on the Mac.
+
 ## How the fee is paid
 
 The record behind `+0xA8` holds three `(begin, end, capacity)` lists, at `+0x00`, `+0x18` and `+0x30`. On Game Pass

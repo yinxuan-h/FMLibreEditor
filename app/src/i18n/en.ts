@@ -107,6 +107,12 @@ export type ErrorTexts = Partial<Record<string, (params: Readonly<Record<string,
 /** The name of the field a failure names. */
 const field = (key: string | undefined) => fieldName(en, key ?? "");
 
+/** A day the commands name as "20280131", written out: "31 January 2028". */
+const dayText = (value: string | undefined) => {
+  const [y, m, d] = [Number(value?.slice(0, 4)), Number(value?.slice(4, 6)), Number(value?.slice(6, 8))];
+  return new Date(y, m - 1, d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+};
+
 /** What a check is about, from the key a failure gives, with a capital: "Contracts". */
 const checkName = (key: string | undefined) => {
   const name = (en.checks as Partial<Record<string, string>>)[key ?? ""] ?? key ?? "";
@@ -132,6 +138,9 @@ const errors: ErrorTexts = {
   "edit.notApplied": (p) => `${field(p.field)}: wrote ${p.wrote} but read back ${p.read}.`,
   "edit.conflict": (p) => `${field(p.field)} is now ${p.found}, not ${p.expected}: the game has changed it since.`,
   "move.outOfRange": (p) => `${p.value} is not a valid ${field(p.field)}: it takes ${p.min} to ${p.max}.`,
+  "loan.end": (p) => `The loan must end after he joins, and no later than his contract: from ${dayText(p.earliest)} to ${dayText(p.latest)}.`,
+  "loan.noModel": () =>
+    "The game has no loan of its own under way to model this one on. Try again after a day has passed in the game.",
   "names.unknown": () =>
     "The editor cannot find where the game keeps people's names in this version of the game, so it cannot change them.",
   "names.noRoom": (p) =>
@@ -496,6 +505,9 @@ export const en = {
     jadedness: "Jadedness",
     morale: "Morale",
     "contract.wage": "Wage per week",
+    wageShare: "share of the wage",
+    monthlyFee: "monthly fee",
+    optionFee: "option to buy",
     "contract.loyalty_bonus": "Loyalty bonus per week",
     "contract.happiness": "Happiness",
     "contract.playing_time_happiness": "Playing time happiness",
@@ -624,8 +636,7 @@ export const en = {
     extendContract: (years: number) => `Extend by ${years} years`,
     extendingContract: "Extending…",
     /** `until` is the day the contract would end then. */
-    extendContractTitle: (years: number, until: string) =>
-      `Make the contract run ${years} years longer, to ${until}; Changes can undo it`,
+    extendContractTitle: (years: number, until: string) => `Make the contract run ${years} years longer, to ${until}`,
     squadStatus: "Squad status",
     squadStatusName: (status: number) => SQUAD_STATUSES[status] ?? `Status ${status}`,
     contractType: "Contract type",
@@ -652,8 +663,7 @@ export const en = {
     noRetirement: "The game has not planned his retirement",
     keepPlaying: "Prevent retirement",
     keepingPlaying: "Preventing…",
-    keepPlayingTitle:
-      "Take his retirement out of the game's plans and give him the trait “Will play football as long as possible” in place of “Will retire at top”; Changes can undo it",
+    keepPlayingTitle: "Cancel his planned retirement and give him the trait “Will play football as long as possible”",
 
     // Medical (the group's heading is `medical`, below; the names of its values are in `fields`)
     /** A player's morale, 1–20. */
@@ -668,10 +678,9 @@ export const en = {
     noUnhappiness: "Nothing makes him unhappy",
     removeUnhappiness: "Remove all",
     removingUnhappiness: "Removing…",
-    removeUnhappinessTitle: "Take every reason to be unhappy off his list, as FMRTE's Remove all does; Changes can undo it",
+    removeUnhappinessTitle: "Take every reason to be unhappy off his list",
     /** The second line of Remove all's hover text: what the game then does about his teammates. */
-    removeUnhappinessFollows:
-      "The reasons his teammates hold about him end by themselves once the game moves on: press Continue in the game",
+    removeUnhappinessFollows: "His teammates' reasons about him end once the game moves on: press Continue in the game",
     concernSince: (date: string) => `since ${date}`,
     /** After a reason held about a teammate whose sentence does not name him: who he is. */
     concernAbout: (name: string) => `about ${name}`,
@@ -695,15 +704,14 @@ export const en = {
     loanUntil: "Until",
     loanNumber: "Number there",
     recall: "Recall from loan",
-    recallTitle: "Bring him back to his club: the loan ends today. Asks before anything changes",
+    recallTitle: "Bring him back to his club today; it asks first",
     recallAgain: "Recall again",
     makePermanent: "Make permanent",
-    makePermanentTitle: "Keep him at the club he is on loan to, under contract with it. Asks before anything changes",
+    makePermanentTitle: "Keep him at the club he is on loan to, under contract with it; it asks first",
     /** Where the Recall button was, once the loan ends today: recalled by the editor, or ending today anyway. */
     recalledWaiting: "Recalled · return pending",
     endsTodayWaiting: "Ends today · return pending",
-    pendingTitle: (parent: string) =>
-      `Today is the last day of the loan: continue one day in the game and he is back at ${parent}.`,
+    pendingTitle: (parent: string) => `The loan ends today: continue one day in the game and he is back at ${parent}`,
     endPassed: (date: string) =>
       `The loan was to end on ${date}, but the game has not brought him back. Recall him again, then continue one day.`,
     /** The loan's terms, as the game's Loan Club tab shows them. */
@@ -759,9 +767,10 @@ export const en = {
     clauseProfitShare: (percent: string, amount: string) => `${percent} of the profit over ${amount}`,
     /** The wage a clause gives from then on. */
     clauseWage: (amount: string) => `${amount} a week`,
-    moraleTitle: "The game shows morale as the player's overall happiness: content at 10, slightly happy at 11, extremely happy at 15 and 20",
+    moraleTitle: "Overall happiness in the game: content at 10, slightly happy at 11, extremely happy at 15 and 20",
     /** Hover text of jadedness, which the profile shows as stored. */
-    jadednessTitle: "How worn out the player is by playing, which rest takes away: -500 is fully rested, and the higher it is, the more he needs a rest",
+    jadednessTitle:
+      "How worn out he is by playing: -500 is fully rested, and the higher it is, the more he needs a rest",
     noInjuries: "No injuries",
     /** The name of an injury the game gave none for. */
     unknownInjury: "Unknown injury",
@@ -782,7 +791,7 @@ export const en = {
     // Above the attributes, while the profile is read
     /** Sets every attribute of the player to its best at once. */
     maxAttributes: "Max attributes",
-    maxAttributesTitle: "Set every attribute of this player to its best: 20, and 1 for injury proneness and dirtiness",
+    maxAttributesTitle: "Set every attribute to its best: 20, and 1 for injury proneness and dirtiness",
     /** What Max attributes wrote, beside the button that takes it back; then what that undid. */
     maxAttributesDone: (count: number) =>
       count === 0 ? "Every attribute is at its best already" : `${changeCount(count)} written`,
@@ -792,19 +801,16 @@ export const en = {
     /** Freezing his attributes, while the game can be written to, and what that does. */
     freezeAttributes: "Freeze attributes",
     freezeAttributesNote:
-      "While the app is open and connected, his attributes do not get worse: what the game takes is put back, and " +
-      "improvements still count. The app remembers this for this save, and freezes them again when it connects to it.",
+      "His attributes do not get worse while the app is open and connected; improvements still count",
     /** The same for a member of staff, who has no injury proneness or dirtiness. */
     maxStaffAttributesTitle: "Set every attribute of this member of staff to its best: 20",
     undoMaxStaffTitle: "Write the old attributes back to the game",
     freezeStaffAttributesNote:
-      "While the app is open and connected, their attributes do not get worse: what the game takes is put back, and " +
-      "improvements still count. The app remembers this for this save, and freezes them again when it connects to it.",
+      "Their attributes do not get worse while the app is open and connected; improvements still count",
     /** Freezing his energy and match sharpness, under them in the Medical group, and what that does. */
     freezeFitness: "Freeze energy and sharpness",
     freezeFitnessNote:
-      "While the app is open and connected, his energy and match sharpness do not go down: what the game takes is put " +
-      "back, and gains still count, so at 100% he stays there. The app remembers this for this save.",
+      "His energy and match sharpness do not go down while the app is open and connected; gains still count",
     /** Freezing his position ratings: the box under the pitch, and the (i) after it, which says what that does. */
     freezePositions: "Freeze",
     freezePositionsInfo: "What does freezing positions do?",
@@ -1054,9 +1060,7 @@ export const en = {
     noFinances: "FM keeps finances only for clubs in the leagues being played.",
     /** Freezing the club's money, while the game can be written to, and what that does. */
     freeze: "Freeze money",
-    freezeNote:
-      "While the app is open and connected, the balance does not go down: what the game takes is put back, and " +
-      "income still counts. The app remembers this for this save, and freezes it again when it connects to it.",
+    freezeNote: "The balance does not go down while the app is open and connected; income still counts",
 
     // Stadium
     stadium: "Stadium",
@@ -1065,14 +1069,14 @@ export const en = {
     used: "In use",
     /** The capacity in use when the game does not limit it (stored as 0). */
     usedAll: "All of it",
-    usedTitle: "The part of the capacity the game lets in, when it limits it (for example while seats are closed); 0 means all of it",
+    usedTitle: "The part of the capacity the game lets in while it limits it; 0 means all of it",
     expansion: "Can grow to",
     /** When the layout of this build does not know where the stadium is, or the club's stadium did not check out. */
     noStadium: "The stadium could not be read for this club.",
     /** Its name, which can be changed in place: in the block the game gave the old one. */
     stadiumName: "Name",
     rename: "Rename",
-    renameTitle: "Give the stadium another name; it is written at once, and Changes can undo it",
+    renameTitle: "Give the stadium another name; it is written at once",
     /** The (i) beside the name: how a new name lasts, and that the app has to stay open for it. */
     renameInfoLabel: "How does renaming work?",
     renameInfo:
@@ -1121,7 +1125,7 @@ export const en = {
     actionsLabel: "Actions on the whole staff",
     /** `count` is how many of the club's staff it releases. */
     releaseAll: (count: number) => (count === 0 ? "Release all staff" : `Release all staff (${format(count)})`),
-    releaseAllTitle: "Release every member of the club's staff at once, but you and the board; a dialog asks first",
+    releaseAllTitle: "Release all of the club's staff but you and the board; it asks first",
     /** Hover text of Release all staff while none of the club's staff can be released. */
     releaseNone: "None of this club's staff can be released",
     /** Beside the button: whom it leaves, and where undoing is. */
@@ -1174,8 +1178,7 @@ export const en = {
 
     // Moving the whole staff to another club: a button beside Release all staff, and a dialog that asks for the club
     moveAll: "Move all staff",
-    moveAllTitle:
-      "Move every member of the club's staff to another club at once, but you and the board; a dialog asks first",
+    moveAllTitle: "Move all of the club's staff but you and the board to another club; it asks first",
     /** Hover text of Move all staff while none of the club's staff can be moved. */
     moveNone: "None of this club's staff can be moved",
     /** What Move all did, under the button; `count` is how many moved, `club` the club they joined. */
@@ -1319,6 +1322,17 @@ export const en = {
     /** The name of the squad table for assistive technology; `team` is the name of the team picked. */
     squadLabel: (team: string) => `Players of the national team: ${team}`,
     squadNote: "The players the game lists for this team, in its order. Calling players up, captains and the manager's contract are not edited here.",
+    /** What the profile shows of the nation and its federation, read from the game; the staff's heading has how many there are. */
+    details: {
+      nation: "Nation",
+      founded: "Federation founded",
+      continent: "Continent",
+      staff: (count: number) => `Federation staff (${format(count)})`,
+      noStaff: "No staff of the federation found.",
+      job: "Job in the national team",
+      team: "Team",
+      staffNote: "Read from the game; not edited here. The job is the one each has with the federation, not the one at a club.",
+    },
     /** Beside Heal all, Inspire all and Refresh all, which the senior team has: whom they cover, and where undoing is. */
     actionsHint: "The actions cover every player the senior team lists. Undo is in the Changes view as well.",
     /** For a nation the game keeps no team for. */
@@ -1404,10 +1418,10 @@ export const en = {
     years: (count: number) => (count === 1 ? "1 year" : `${format(count)} years`),
     /** The name of a kind the game's screen is not known to name here. */
     unnamed: (kind: number) => `Type ${format(kind)}`,
-    unnamedTitle: "Nobody has matched this kind of deal to a name on the game's screen yet, and the screen may not list it.",
+    unnamedTitle: "This kind of deal has not been matched to a name on the game's screen yet",
     /** A badge on a deal that ended before the game's date. */
     ended: "Ended",
-    endedTitle: "The deal ended before the game's date. The game's Sponsorship screen no longer lists it.",
+    endedTitle: "Ended before the game's date: the game's Sponsorship screen no longer lists it",
     /** What a deal's percentage does: on relegation, and for a kit manufacturer on promotion. */
     falls: (percent: number) => `Falls by ${format(percent)}% on relegation`,
     rises: (percent: number) => `Rises by ${format(percent)}% on promotion to the top division`,
@@ -1419,9 +1433,9 @@ export const en = {
   },
 
   /**
-   * The Competitions tab: the competitions that have squad rules, and beside the list the rules of the one picked, this
-   * season's and next season's in an area each: how many players of a kind a squad may register or a team may pick.
-   * While the game can be written to, the counts can be changed.
+   * The Competitions tab: the competitions the game is playing, and beside the list the squad rules of the one picked,
+   * this season's and next season's in an area each: how many players of a kind a squad may register or a team may
+   * pick. While the game can be written to, the counts can be changed.
    */
   competitions: {
     /** The tab in the masthead, and the palette's command to go there. */
@@ -1440,8 +1454,8 @@ export const en = {
     reading: "Reading the competitions' squad rules from the game… This takes a few seconds.",
     readAgain: "Read again",
     readAgainTitle: "Read the rules from the game again",
-    /** Under the list. */
-    listNote: "Competitions that have no squad rules are not listed.",
+    /** Under the list, and under a search that finds none: competitions with no squad rules are listed too. */
+    listNote: "Only the competitions the game is playing in this save are listed.",
     /** Where the app cannot show the rules: the heading, and why. */
     unavailableTitle: "No squad rules to show",
     unavailableBuild: "Nobody has checked yet where this version of the game keeps the competitions' squad rules, so the editor shows none rather than read the wrong memory.",
@@ -1475,6 +1489,8 @@ export const en = {
     /** In an area with no rules, and in next season's when the game holds no list for it. */
     noRules: "No squad rules.",
     noNext: "The game holds no rules for next season.",
+    /** The panel of a competition with no squad rule in either season (Scotland's top division, most cups). */
+    noneGiven: "The game gives this competition no squad rules, so there is nothing to change here.",
     ruleColumns: {
       rule: "Rule",
       where: "Counted in",
@@ -1549,7 +1565,8 @@ export const en = {
     yearsTitle: "The seasons the nation's rules give this rule for, by the year a season begins in",
     /** In the place of an input, for a rule the editor leaves alone, and why. */
     leftAlone: "Left alone",
-    notSavedTitle: "The nation's rules as a save keeps them hold no such rule, so a change would be gone when the save is loaded: the editor leaves it alone.",
+    notSavedTitle:
+      "The save keeps no such rule, so a change would be gone once it is loaded: the editor leaves it alone",
     notACountTitle: "An amount of money, not a count of players: the editor leaves it alone.",
     /** Over the areas, when the editor changes none of the competition's rules: why, and that no date changes it. */
     noneChangeable: "These rules cannot be changed yet, at any date: the editor changes a rule only where it finds it in the rules the save keeps, so that the change is still there when the save is loaded, and it has not found this competition's there. So far that goes for the women's leagues, Major League Soccer and a few cups.",
@@ -1560,10 +1577,12 @@ export const en = {
      */
     unsavedNote: "The game keeps this competition's rules in no save: it makes them itself each time it loads one, and again for each new season. So the editor holds a change here: it writes it to the running game, remembers it for this career, and writes it again whenever it connects or reads the data again. After loading a save, connect the editor (or press Reload data) once for the change to be back. Undo in Changes lets go of it.",
     heldTag: "Held",
-    heldTitle: (original: number) => `The editor holds this count and writes it again whenever it reads the game. The game's own is ${format(original)}.`,
+    heldTitle: (original: number) =>
+      `The editor holds this count and writes it again when it reads the game; the game's own is ${format(original)}`,
     /** Under a rule whose count in the save's rules is another than the list's. */
     savedDiffers: (value: number) => `The save's rules hold ${format(value)}`,
-    savedDiffersTitle: "The game plays by the list, and makes the list from the save's rules when it loads the save. Saving a change here sets both.",
+    savedDiffersTitle:
+      "The game plays by the list and makes it from the save's rules on loading; a change here sets both",
     /** The button that turns the counts into inputs, and the ones under them. */
     edit: "Change rules",
     editTitle: "Change the counts of this competition's squad rules",
@@ -1619,8 +1638,7 @@ export const en = {
     /** In place of the game's date when it could not be read, and the note it shows on hover. */
     noDate: "No in-game date",
     noDateTitle:
-      "FMLibreEditor could not read the in-game date in this version of the game, so ages are not shown and age " +
-      "filters find no one. Check for updates.",
+      "The in-game date could not be read: ages are not shown and age filters find no one. Check for updates.",
     /** The button that reads the game again, once connected. */
     reload: "Reload data",
     /** The button that looks for the game again, while not connected. */
@@ -1749,7 +1767,7 @@ export const en = {
     join: (names: string[]) =>
       names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`,
     allow: "Edit anyway",
-    allowTitle: "Turn editing on until FMLibreEditor is closed or connects again. Back up your save first.",
+    allowTitle: "Turn editing on until the app is closed or connects again. Back up your save first.",
   },
 
   /**
@@ -1758,7 +1776,7 @@ export const en = {
    */
   diagnostics: {
     copy: "Copy diagnostics",
-    copyTitle: "Copy what FMLibreEditor found in the game, to paste into a bug report. It holds no names or paths.",
+    copyTitle: "Copy what the app found in the game, for a bug report; it holds no names or paths",
     /** Said by the button for a moment once the report is on the clipboard. */
     copied: "Copied",
     failed: (reason: string) => `Could not copy the diagnostics: ${reason}`,
@@ -1789,7 +1807,7 @@ export const en = {
     download: "Download",
     /** Downloads the new version's installer and runs it, where the app can update itself (see `can_self_update`). */
     install: "Update",
-    installTitle: "Download and install the new version; FMLibreEditor closes and opens again with it",
+    installTitle: "Download and install the new version; the app closes and opens again with it",
     preparing: "Preparing…",
     /** `percent` is null while the size of the download is not known. */
     downloading: (percent: number | null) => (percent === null ? "Downloading…" : `Downloading… ${percent}%`),
@@ -1899,7 +1917,7 @@ export const en = {
     inGameTitle: "The game held this value when the data was last read",
     notInGame: "Not in the game",
     notInGameTitle:
-      "The game did not hold this value when the data was last read: the game was not saved after the change, or it has changed the value since",
+      "Not in the game when the data was last read: not saved after the change, or changed by the game since",
     /** In the place of Undo for an earlier change that cannot be undone from here, and its hover text. */
     historyOnly: "History",
     historyOnlyTitle: "Made before the app last connected: undoing it needed the game's memory as it was then",
@@ -1907,7 +1925,7 @@ export const en = {
     batchNotInGame: (count: number) => `${format(count)} not in the game`,
     /** Empties the list and the history of the career; the question that asks first, and its two answers. */
     clearHistory: "Clear history",
-    clearHistoryTitle: "Empty this list and forget the history of this career. The changes stay in the game.",
+    clearHistoryTitle: "Empty this list and forget this career's history; the changes stay in the game",
     confirmClear: "Clear the history of this career? The changes stay in the game, but can no longer be undone from here.",
     keepHistory: "Keep",
     clearConfirm: "Clear",
@@ -1921,6 +1939,8 @@ export const en = {
     fee: (amount: string) => `Fee ${amount}`,
     /** Under a transfer arranged for the game to make: the day it moves him (and pays the fee). */
     arranged: (date: string) => `The game makes the move on ${date}`,
+    /** Under a loan arranged for the game to make: the day it sends him there, and the loan's last day. */
+    arrangedLoan: (day: string, until: string) => `The game makes the loan on ${day}, until ${until}`,
     /** Under a recall from loan that took the loan's option to buy away, which its undo writes back. */
     optionRemoved: (amount: string) => `Option to buy (${amount}) taken away`,
     /** What a heal changed, in the place of its values: `count` is how many injuries the player had. */
@@ -2009,9 +2029,9 @@ export const en = {
   export: {
     button: "Export",
     buttonTitle: {
-      player: "Write the players the list shows to a CSV or JSON file, for a spreadsheet or a script",
-      staff: "Write the staff the list shows to a CSV or JSON file, for a spreadsheet or a script",
-      club: "Write the clubs the list shows to a CSV or JSON file, for a spreadsheet or a script",
+      player: "Write the players the list shows to a CSV or JSON file",
+      staff: "Write the staff the list shows to a CSV or JSON file",
+      club: "Write the clubs the list shows to a CSV or JSON file",
     } satisfies Record<ExportEntity, string>,
     title: { player: "Export players", staff: "Export staff", club: "Export clubs" } satisfies Record<
       ExportEntity,
@@ -2073,7 +2093,7 @@ export const en = {
 
     /** The export of the Changes view: a CSV file of the changes its search and filters show. */
     changes: {
-      buttonTitle: "Write the changes the list shows to a CSV file, for a spreadsheet or a script",
+      buttonTitle: "Write the changes the list shows to a CSV file",
       title: "Export changes",
       /** What the export covers: everything the list's search and filters select, or, with none on, the whole history. */
       scope: (count: number, filtering: boolean) =>
@@ -2169,9 +2189,7 @@ export const en = {
     ofCurrent: "% of current",
     percentTitle: "A percent of the current value: 100 keeps it, 110 raises it by a tenth, 50 halves it",
     /** Hover text of the years of an Add years, and the word after its input. */
-    addYearsTitle:
-      "Years added to every date, which keeps its day and month; a negative number moves it back. " +
-      "29 February becomes 28 February in a year without one",
+    addYearsTitle: "Years added to every date; a negative number moves it back, and 29 February may become 28",
     years: "years",
     /** Hover text of an amount that cannot be applied; `min` and `max` are what it takes. */
     invalidAdd: (min: number, max: number) => `Enter a whole number from ${format(min)} to ${format(max)}`,
@@ -2289,7 +2307,7 @@ export const en = {
     // The switch at the top of the dialog: a transfer the game makes the next day, a move to a club now, or a swap with
     // one of its players.
     /** Its name for assistive technology. */
-    modeLabel: "Transfer, move now or swap",
+    modeLabel: "Transfer, loan, move now or swap",
     modeArrange: "Transfer",
     modeMove: "Move now",
     modeSwap: "Swap with a player",
@@ -2323,6 +2341,41 @@ export const en = {
     ],
     /** The button of the foot. */
     arrangeButton: "Arrange transfer",
+
+    // A loan the game makes the next day
+    /** The choice of the switch. */
+    modeLoan: "Loan",
+    /** Under the switch in loan mode. */
+    loanNote: "The game makes the loan on its next day, as it makes its own; he is back at his club after it.",
+    /** While the loan's plan is worked out. */
+    loanChecking: "Checking the loan…",
+    /** The plan's lines: the day the game makes the loan, its last day, what the club pays, the monthly fee, the option. */
+    loanOn: (date: string) => `The game makes the loan on ${date}`,
+    loanUntil: (date: string) => `The loan lasts until ${date}`,
+    loanWage: (money: string, share: number) => `The club pays ${money} a week (${format(share)}% of his wage)`,
+    loanMonthlyFee: (money: string) => `Monthly fee ${money}`,
+    loanOption: (money: string) => `Option to buy for ${money}`,
+    /** What arranging the loan does, one line each, in the place of `does`. */
+    loanDoes: [
+      "Agreed now: the game makes the loan when it reaches its next day",
+      "His history lists the loan, and he returns to his own club the day after the last day",
+      "The club pays its share of his wage, and the monthly fee if you set one",
+      "With an option, the club he joins may sign him for its fee when the loan ends",
+    ],
+    /** The heading of `loanDoes`. */
+    loanDoesHeading: "What the loan does",
+    /** The foot's hint and button in loan mode. */
+    loanHint: "Nothing changes in the game until you press Arrange loan.",
+    loanButton: "Arrange loan",
+    /** The loan's inputs: label, and the short hint under it. */
+    loanLastDay: "Last day of the loan",
+    loanLastDayHint: "He is back at his own club the next day",
+    loanShare: "Share of his wage paid",
+    loanShareHint: "What the club he joins pays; his own club pays the rest",
+    loanShareInvalid: "Enter a whole number from 0 to 100",
+    loanMonthly: "Monthly fee",
+    loanOptionFee: "Option to buy",
+    loanOptionFeeHint: "The club he joins may sign him for this fee when the loan ends; empty for none",
 
     // Choosing the club
     /** The name of the search box, and of the list of clubs under it, for assistive technology. */
@@ -2825,13 +2878,12 @@ export const en = {
     /** Hover text of Lift bans while nobody in the team is banned. */
     liftNone: "Nobody in this team is banned",
     inspireAll: "Inspire all",
-    inspireAllTitle: "Set the morale of every player in this team to 20, the highest, and remove their reasons to be unhappy",
+    inspireAllTitle: "Set every player's morale to 20, the highest, and remove their reasons to be unhappy",
     maxCohesion: "Max cohesion",
     maxCohesionTitle:
-      "Set the cohesion with the club of every player in this team to 100, the highest. The game shows the team's cohesion on its Dynamics page once it moves on: press Continue in the game",
+      "Set every player's cohesion with the club to 100, the highest; the game shows it once it moves on",
     /** Hover text of Max cohesion while no player's cohesion with the club can be read. */
-    cohesionNone:
-      "The editor cannot read this team's cohesion: this version of the game has not been checked for it, or none of its players has an entry for the club",
+    cohesionNone: "Cannot be read: this game version is not checked for it, or no player has an entry for the club",
     /** After Max cohesion: how many players of the team have no entry for the club yet, and were left out. */
     cohesionWithout: (count: number) =>
       count === 1
@@ -2839,36 +2891,28 @@ export const en = {
         : `${format(count)} players have no cohesion with the club yet`,
     maxTactics: "Max tactics",
     maxTacticsTitle:
-      "Have every player in this team know the tactic it plays at its best, in the eight areas of the Tactical Effectiveness screen, as weeks of training on it would. Attributes stay as they are. The areas fall again as the training ages, after some six weeks, and another tactic needs another press. The game shows them once it moves on: press Continue in the game",
+      "Have every player know the team's tactic at its best; it fades after some six weeks, as training does",
     /** Hover text of Max tactics while no player's familiarity with the team's tactic can be read. */
-    tacticsNone:
-      "The editor cannot read how well this team knows its tactic: this version of the game has not been checked for it, or the team does not play a tactic you pick",
+    tacticsNone: "Cannot be read: this game version is not checked for it, or the team does not play a tactic you pick",
     /** After Max tactics: how many players of the team do not train, whose history of training was left as it is. */
     tacticsUntrained: (count: number) =>
       count === 1
         ? "1 player does not train (as when injured): his history of training stays as it is"
         : `${format(count)} players do not train (as when injured): their history of training stays as it is`,
     refreshAll: "Refresh all",
-    refreshAllTitle: "Set the energy and match sharpness of every player in this team to 100%, and rest them fully (jadedness -500)",
+    refreshAllTitle: "Set every player's energy and match sharpness to 100%, and rest them fully (jadedness -500)",
     batchTraits: "Batch traits",
     batchTraitsTitle: "Add or remove preferred moves for players in this team",
     maxAll: "Max attributes",
-    maxAllTitle:
-      "Set every attribute of every player in this team to its best: 20, and 1 for injury proneness and dirtiness",
+    maxAllTitle: "Set every attribute of every player to its best: 20, and 1 for injury proneness and dirtiness",
     atItsBest: "Team at its best",
     atItsBestTitle:
-      "Heal all, Inspire all, Refresh all, Max cohesion and Max tactics in one press, which one Undo takes back. " +
-      "Attributes and bans stay as they are. A step that cannot run, such as Heal all while nobody is injured, is " +
-      "skipped, and the result says so. The areas of the tactic fall again as the training ages, after some six weeks, " +
-      "and another tactic needs another press. The game shows the changes once it moves on: press Continue in the game",
+      "Heal all, Inspire all, Refresh all, Max cohesion and Max tactics in one press; one Undo takes it back",
     /** After Team at its best or Destroy: a step it left out, by its name, and why. */
     atItsBestSkipped: (step: string, reason: string) => `${step} skipped: ${reason}`,
     /** The red button that takes the team to its worst, after asking (see `destroyDialog`). */
     destroy: "Destroy",
-    destroyTitle:
-      "Take every player in this team to his worst: morale and happiness, energy, match sharpness and jadedness, " +
-      "cohesion with the club and, where you pick the team's tactic, how well he knows it. Nothing is made better " +
-      "than it is; attributes, injuries and bans stay. It asks first, and one Undo takes it all back",
+    destroyTitle: "Take every player's morale, fitness, cohesion and tactic knowledge to their worst; it asks first",
     /** The names of Destroy's steps, for one it left out (see `atItsBestSkipped`). */
     destroySteps: {
       demoralize: "Morale and happiness",
@@ -2903,16 +2947,13 @@ export const en = {
     freezeLabel: "Freeze the whole team",
     freezeAttributes: "Freeze attributes",
     freezeAttributesTitle:
-      "While the app is open and connected, the attributes of every player in this team do not get worse: what the " +
-      "game takes is put back, and improvements still count",
+      "The attributes of every player in this team do not get worse while the app is open and connected",
     freezeFitness: "Freeze energy and sharpness",
     freezeFitnessTitle:
-      "While the app is open and connected, the energy and match sharpness of every player in this team do not go " +
-      "down: what the game takes is put back. Refresh all first to keep them at 100%",
+      "Every player's energy and match sharpness stay up while the app is connected; Refresh all first for 100%",
     freezePositions: "Freeze positions",
     freezePositionsTitle:
-      "While the app is open and connected, the position ratings of every player in this team stay as they are: " +
-      "a rating the game raises or lowers is put back",
+      "The position ratings of every player in this team stay as they are while the app is open and connected",
     /** After a box: how many of the team's `total` players are frozen that way, while some are and some are not. */
     frozenCount: (frozen: number, total: number) => `${format(frozen)} of ${format(total)}`,
     /** Beside the boxes: whom freezing covers, and for how long. */
@@ -3004,8 +3045,8 @@ export const en = {
     unrest: "Unrest",
     unrestTitle: (count: number) =>
       count === 1
-        ? "1 teammate has a reason to be unhappy about him. Remove all, in his profile, settles it once the game moves on"
-        : `${format(count)} teammates have a reason to be unhappy about him. Remove all, in his profile, settles them once the game moves on`,
+        ? "1 teammate is unhappy about him; Remove all, in his profile, settles it once the game moves on"
+        : `${format(count)} teammates are unhappy about him; Remove all, in his profile, settles it once the game moves on`,
     onLoan: "On loan",
     onLoanTitle: "Out on loan to another club",
     loanee: "Loanee",
@@ -3565,6 +3606,8 @@ export const en = {
       p: "Poacher",
       tcf: "Tracking Centre Forward",
       ocf: "Outlet Centre Forward",
+      gk: "Goalkeeper",
+      wm: "Wide Midfielder",
     } as Record<string, string>,
     reasons: {
       listed: () => "Transfer listed",
@@ -3638,6 +3681,61 @@ export const en = {
       /** After the first few names. */
       more: (count: number) => `and ${format(count)} more`,
     },
+  },
+
+  /**
+   * Recipes (`RecipeMenu`): ready-made sets of changes to one player or one club. The Recipes button opens a menu of
+   * them; the dialog of the one picked lists what it would write, like the preview of a mass edit, whose words for
+   * Apply, the columns and the outcome it shares.
+   */
+  recipes: {
+    /** The button beside Max attributes in a player's profile, and in the header of a club's. */
+    button: "Recipes",
+    buttonTitle: "Ready-made sets of changes, previewed first",
+    /** The recipes by key, as the menu and the title of the dialog name them. */
+    names: {
+      wonderkid: "Make a wonderkid",
+      injuryProof: "Injury-proof",
+      longCareer: "Extend his career",
+      richClub: "Make the club rich",
+      topFacilities: "Top facilities",
+    },
+    /** What each one does, kept short: the note beside its menu item, and the line under the dialog's title. */
+    notes: {
+      wonderkid:
+        "21 or younger: potential ability at least 180, ability and attributes to suit his age. Higher values " +
+        "stay.",
+      injuryProof: "Injury proneness 1, natural fitness 20, stamina at least 15, injuries healed.",
+      longCareer:
+        "No planned retirement, three more years of contract, natural fitness 20, professionalism at least 18.",
+      richClub: "Balance, transfer budget and wage budgets up to the level of the richest clubs.",
+      topFacilities: "All five facilities to 20.",
+    },
+    /** The note of a recipe that is dimmed: the player is older than `oldest`, or his age is not known. */
+    tooOld: (oldest: number) => `For players of ${oldest} or younger`,
+    /** A recipe as the command palette lists it for the profile on show. */
+    command: (recipe: string) => `Recipe: ${recipe}`,
+    /** In the dialog while the recipe is worked out. */
+    working: "Working out the changes…",
+    /** "14 changes · 30 values as good already · 2 values left alone". */
+    summary: (changes: number, kept: number, left: number) =>
+      [
+        changeCount(changes),
+        kept > 0 && (kept === 1 ? "1 value as good already" : `${format(kept)} values as good already`),
+        left > 0 && valuesLeftAlone(left),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    tableLabel: "Changes the recipe would make",
+    /** The line that opens the list of the values that stay because they are as good already, or better. */
+    keptHeading: (count: number) =>
+      count === 1 ? "1 value stays as it is: as good already" : `${format(count)} values stay as they are: as good already`,
+    keptLabel: "Values that are as good already",
+    /** The head of the column of those values. */
+    valueColumn: "Value",
+    leftLabel: "What the recipe leaves alone",
+    undo: "Undo this recipe",
+    undoTitle: "Write everything this recipe changed back to the game",
   },
 
   /**
@@ -3741,6 +3839,36 @@ export const en = {
      * the dialog shows it in English. A release adds its version here (see docs/DEVELOPING.md).
      */
     versions: {
+      "0.5.5": [
+        {
+          title: "FM 27.1.1.",
+          text: "The update of 24 November is known on Game Pass, Steam and Mac, and everything works on it as before. When a future update comes out, the app keeps reading club finances and the tactic in use until a version that knows it follows.",
+        },
+        {
+          title: "Competitions tab.",
+          text: "See and change each competition's squad rules, such as how many foreign players a squad may register, for this season and the next apart. On Windows and Apple silicon Macs.",
+        },
+        {
+          title: "Loans.",
+          text: "The Transfer dialog's new Loan arranges a loan for the game's next day, in a transfer window or out of one. You set its last day, the share of his wage the other club pays, a monthly fee and, if you like, an option to buy. On Windows and Apple silicon Macs.",
+        },
+        {
+          title: "Recipes.",
+          text: "Ready-made sets of changes for a player or a club: Make a wonderkid, Injury-proof, Extend his career, Make the club rich and Top facilities. Each shows what it will change before anything is written, and one Undo takes it back.",
+        },
+        {
+          title: "Development.",
+          text: "The app keeps a weekly record of every player as it reads the game, and a player's profile shows it in a new Development tab: his ability, potential, value and attributes over your career.",
+        },
+        {
+          title: "B teams.",
+          text: "A club's Squad tab shows its B teams after its own teams, such as Castilla for Real Madrid, and the team actions work on them too.",
+        },
+        {
+          title: "Shorter notes.",
+          text: "The notes on buttons are a line each, in a small box instead of a long strip across the window.",
+        },
+      ],
       "0.5.4": [
         {
           title: "Transfers in the player's history.",

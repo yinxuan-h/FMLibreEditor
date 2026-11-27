@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize, Serializer};
 use crate::{
     ATTRIBUTE_GROUPS, ClubDetails, ClubSummary, Contract, Entity, FmDate, International, PERSONALITY, PlayerDetails,
     PlayerSummary, RELEASE_CLAUSE, RELEASE_CLAUSES, Reputation, STAFF_ATTRIBUTE_GROUPS, SUPPORTER_MIX,
-    SUPPORTER_TRAITS, Session, StaffContract, StaffDetails, StaffSummary, job_name, read_club_details,
-    read_player_details, read_staff_details, release_clause_expiry, release_clause_never_expires,
+    SUPPORTER_TRAITS, Session, StaffContract, StaffDetails, StaffSummary, job_name, read_player_details,
+    read_staff_details, release_clause_expiry, release_clause_never_expires,
 };
 
 /// How an export writes the players, staff or clubs.
@@ -170,7 +170,7 @@ impl Session {
         out: &mut impl Write,
     ) -> io::Result<Exported> {
         let mut exported = Exported::default();
-        let details = clubs.iter().filter_map(|club| match read_club_details(&self.process, &self.layout, club) {
+        let details = clubs.iter().filter_map(|club| match self.club_details(club) {
             Ok(Some(details)) => {
                 exported.count += 1;
                 Some(details)

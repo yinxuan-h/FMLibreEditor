@@ -22,8 +22,8 @@ const STORAGE_KEY = "fmlibre.exportFormat";
 
 /**
  * The format chosen last, if `formats` offers it; at first, CSV with semicolons in a language whose Excel writes decimals
- * with a comma (Turkish, Spanish, German, French, Indonesian, Italian and Russian), and with commas in English, Japanese,
- * Korean and Chinese, whose Excel writes them with a point.
+ * with a comma (Turkish, Spanish, German, French, Indonesian, Italian, Brazilian Portuguese and Russian), and with
+ * commas in English, Japanese, Korean and Chinese, whose Excel writes them with a point.
  */
 function startFormat(formats: readonly ExportFormat[]): ExportFormat {
   try {
@@ -148,7 +148,7 @@ export function ExportToggle({ title, disabled, job }: ExportToggleProps) {
         className="export-toggle"
         aria-haspopup="dialog"
         disabled={disabled}
-        title={title}
+        data-tip={title}
         onClick={() => setOpen(job())}
       >
         {text.button}
@@ -302,10 +302,10 @@ function ExportDialog({ job, onClose }: { job: ExportJob; onClose: () => void })
         <footer className="modal-foot">
           {report !== null && (
             <>
-              <button type="button" className="primary" title={text.openTitle} onClick={() => void reveal("open_export")}>
+              <button type="button" className="primary" data-tip={text.openTitle} onClick={() => void reveal("open_export")}>
                 {text.open}
               </button>
-              <button type="button" title={text.showTitle} onClick={() => void reveal("show_export")}>
+              <button type="button" data-tip={text.showTitle} onClick={() => void reveal("show_export")}>
                 {text.show}
               </button>
             </>

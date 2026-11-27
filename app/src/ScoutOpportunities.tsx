@@ -225,7 +225,7 @@ export function ScoutOpportunities({
             onChange={(e) => onBrief({ maxFee: e.currentTarget.value })}
           />
         </label>
-        <label className="scout-check" title={text.betterOnlyTitle}>
+        <label className="scout-check" data-tip={text.betterOnlyTitle}>
           <input
             type="checkbox"
             checked={brief.betterOnly}

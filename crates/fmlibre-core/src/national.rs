@@ -17,9 +17,10 @@ use serde::Serialize;
 
 use crate::index::{Listed, SearchIndex};
 use crate::players::PlayerIndex;
-use crate::profile::NationalLayout;
+use crate::profile::{NationDetailsLayout, NationalLayout};
 use crate::session::Session;
 use crate::squad::ClubTeam;
+use crate::staff::{StaffIndex, StaffSummary};
 use crate::text::read_fm_string;
 use crate::transfer::{MoveError, PointerList};
 
@@ -320,6 +321,100 @@ impl Session {
         })
     }
 
+    /// What the profile of the nation's team `team` shows of its nation and federation, read now: the year the
+    /// federation was founded, the nation's continent, and the federation's staff, as the game's staff list of the
+    /// nation's team shows them: each team's manager and the staff of the container's departments, each a member of
+    /// staff the index has at that address, with his job in the team his contract with the federation is with. `None`
+    /// where the layout has not placed them. Only reads memory.
+    pub fn nation_details(
+        &self,
+        team: &NationalTeamSummary,
+        staff: &StaffIndex,
+    ) -> Result<Option<NationDetails>, MoveError> {
+        let Some(national) = self.layout.national.as_ref() else {
+            return Ok(None);
+        };
+        let Some(d) = national.details.as_ref() else {
+            return Ok(None);
+        };
+        self.check_container(national, team)?;
+        let process = &self.process;
+        let container = team.address;
+        let founded = process.read_bytes(container + d.founded, 2)?;
+        let founded = u16::from_le_bytes([founded[0], founded[1]]);
+        let nation = process.read_u64(container + national.container_nation)?;
+        let continent = is_user_pointer(nation)
+            .then(|| process.read_u64(nation + d.continent).ok())
+            .flatten()
+            .filter(|&continent| is_user_pointer(continent))
+            .and_then(|continent| process.read_u64(continent + d.continent_name).ok())
+            .and_then(|name| read_fm_string(process, name));
+
+        // The teams' managers first, in the order the container lists the teams, then the departments.
+        let sides = self.national_sides(team)?;
+        let mut objects = Vec::new();
+        if let Some(manager) = self.layout.team.manager {
+            for side in &sides {
+                objects.push(process.read_u64(side.address + manager)?);
+            }
+        }
+        for at in [d.coaching_staff, d.medical_staff, d.scouting_staff] {
+            if let Some(list) = PointerList::read_up_to(process, container + at, MOST_STAFF)? {
+                objects.extend(list.elements(process)?);
+            }
+        }
+        let mut members: Vec<FederationMember> = Vec::new();
+        for object in objects {
+            let Some(member) = self.staff_at(object, staff) else { continue };
+            if members.iter().any(|known| known.member.uid == member.uid) {
+                continue;
+            }
+            let (job, team_kind) = match self.national_contract(d, object, member.shift) {
+                Some((team, job)) => match sides.iter().find(|side| side.address == team) {
+                    Some(side) => (Some(job), Some(side.kind)),
+                    None => (None, None),
+                },
+                None => (None, None),
+            };
+            members.push(FederationMember { member, job, team_kind });
+        }
+        // Grouped by team, in the container's order; within one, as read. Those whose team was not found come last.
+        members.sort_by_key(|known| {
+            known.team_kind.and_then(|kind| sides.iter().position(|side| side.kind == kind)).unwrap_or(usize::MAX)
+        });
+        Ok(Some(NationDetails { founded: (founded > 0).then_some(founded), continent, staff: members }))
+    }
+
+    /// The member of staff whose object is at `object`, if the index has him at that address.
+    fn staff_at(&self, object: u64, staff: &StaffIndex) -> Option<StaffSummary> {
+        if !is_user_pointer(object) {
+            return None;
+        }
+        let s = &self.layout.staff;
+        let shift = crate::staff::person_shift(&self.process, s, object);
+        let uid = self.process.read_u32(object + s.at(s.uid, shift)).ok()?;
+        staff.get(uid).filter(|member| member.address == object).cloned()
+    }
+
+    /// The team the contract of the member of staff at `object` with a federation is with, and his job there; none
+    /// when he has no such contract or it does not point back at him.
+    fn national_contract(&self, d: &NationDetailsLayout, object: u64, shift: u64) -> Option<(u64, u8)> {
+        let process = &self.process;
+        let s = &self.layout.staff;
+        let c = &self.layout.contract;
+        let record = process.read_u64(object + s.at(d.staff_contracts, shift)).ok()?;
+        let contract = is_user_pointer(record).then(|| process.read_u64(record + d.national_contract).ok())??;
+        if !is_user_pointer(contract) {
+            return None;
+        }
+        // Only as far as a db::BASIC_CONTRACT goes, which ends after the job.
+        let bytes = process.read_bytes(contract, ((c.owner.max(c.team) + 8).max(c.job + 1)) as usize).ok()?;
+        let u64_at = |at: u64| u64::from_le_bytes(bytes[at as usize..][..8].try_into().expect("8 bytes"));
+        // A contract's owner is the identity block of its member of staff.
+        let owner = u64_at(c.owner);
+        (owner == object + s.at(s.identity(), shift)).then(|| (u64_at(c.team), bytes[c.job as usize]))
+    }
+
     /// Checks that the container of `team` still carries its UID.
     fn check_container(&self, national: &NationalLayout, team: &NationalTeamSummary) -> Result<(), MoveError> {
         if self.process.read_u32(team.address + national.container_uid)? != team.uid {
@@ -327,6 +422,34 @@ impl Session {
         }
         Ok(())
     }
+}
+
+/// The most members of staff a federation's department lists.
+const MOST_STAFF: u64 = 256;
+
+/// What a national team's profile shows of its nation and federation (see `docs/recon/fm27-national-teams.md`), as the
+/// game's nation page and staff list show it. The federation's staff are those of the men's or the women's container.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NationDetails {
+    /// The year its federation was founded; none where the game has none.
+    pub founded: Option<u16>,
+    /// The continent's name, in the game's language; none for a nation of the past and some others.
+    pub continent: Option<String>,
+    /// Grouped by team, in the order the container lists its teams.
+    pub staff: Vec<FederationMember>,
+}
+
+/// A member of a federation's staff, with what his contract with it says.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FederationMember {
+    pub member: StaffSummary,
+    /// His job in the national team, as an FM job code (see [`job_name`](crate::staff::job_name)); not the job of his
+    /// contract with a club, which `member` has.
+    pub job: Option<u8>,
+    /// The kind of the team of the container his contract is with (see [`NationalSide::kind`]).
+    pub team_kind: Option<u8>,
 }
 
 /// The kind of a nation's senior team, the first of its container's teams.
@@ -423,10 +546,13 @@ mod tests {
             [
                 "FM27 0.9.2435.0 (Game Pass)",
                 "FM27 0.9.2524.0 (Game Pass)",
+                "FM27 0.9.2562.0 (Game Pass)",
                 "FM27 Steam build 26577676",
                 "FM27 Steam build 26620374",
+                "FM27 Steam build 26797085",
                 "FM27 Steam build 26385295 (27.0.1, macOS, Apple silicon)",
                 "FM27 Steam build 26620374 (macOS, Apple silicon)",
+                "FM27 Steam build 26797085 (macOS, Apple silicon)",
                 "FM27 (Epic Games Store)"
             ]
         );

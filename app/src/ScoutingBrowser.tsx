@@ -227,7 +227,7 @@ export function ScoutingBrowser({
           <button
             type="button"
             className="scout-refresh"
-            title={text.refreshTitle}
+            data-tip={text.refreshTitle}
             disabled={loading}
             onClick={() => void load()}
           >

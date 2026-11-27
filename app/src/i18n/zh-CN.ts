@@ -95,6 +95,12 @@ export type ErrorTexts = Partial<Record<string, (params: Readonly<Record<string,
 /** The name of the field a failure names. */
 const field = (key: string | undefined) => fieldName(zhCN, key ?? "");
 
+/** A day the commands name as "20280131", written out in the language's own way. */
+const dayText = (value: string | undefined) => {
+  const [y, m, d] = [Number(value?.slice(0, 4)), Number(value?.slice(4, 6)), Number(value?.slice(6, 8))];
+  return new Date(y, m - 1, d).toLocaleDateString("zh-CN", { day: "numeric", month: "long", year: "numeric" });
+};
+
 /** What a check is about, from the key a failure gives, with a capital: "Contracts". */
 const checkName = (key: string | undefined) => {
   const name = (zhCN.checks as Partial<Record<string, string>>)[key ?? ""] ?? key ?? "";
@@ -145,6 +151,8 @@ const errors: ErrorTexts = {
   "edit.implausible": (p) => `${field(p.field)}的值 ${p.value} 超出合理范围；为安全起见，保留原值。`,
   "edit.notApplied": (p) => `${field(p.field)}：写入值为 ${p.wrote}，但读回值为 ${p.read}。`,
   "edit.conflict": (p) => `${field(p.field)}当前为 ${p.found}，预期为 ${p.expected}；游戏已在此期间修改了它。`,
+  "loan.end": (p) => `租借必须在球员加入之后结束，且不晚于其合同到期日：${dayText(p.earliest)} 至 ${dayText(p.latest)}。`,
+  "loan.noModel": () => "游戏当前没有进行中的自有租借可供参照。请在游戏中过一天后再试。",
   "move.outOfRange": (p) => `${p.value} 不是有效的${field(p.field)}；取值范围为 ${p.min}–${p.max}。`,
   "export.failed": (p) => `无法写入文件：${p.reason}`,
   "export.notAllowed": (p) =>
@@ -278,6 +286,9 @@ const errors: ErrorTexts = {
 
   // Mass edits and exports
   "mass.noOperations": () => "请至少选择一个要修改的字段。",
+  "recipe.tooOld": (p) => `该球员 ${p.age} 岁：此配方适用于 ${p.oldest} 岁或以下的球员。`,
+  "recipe.ageUnknown": () => "不知道该球员的年龄，而此配方需要按年龄计算。",
+  "recipe.outOfDate": () => "此预览已过期。请重新打开配方。",
   "mass.outOfDate": () => "此预览已过期。请重新生成批量编辑的预览。",
   "mass.tooMany": (p) => `共有 ${p.count} 个结果。批量编辑一次最多处理 ${p.limit} 个，请缩小搜索或筛选范围。`,
   "export.noFolder": () => "没有可导出到的文件夹。",
@@ -604,6 +615,9 @@ export const zhCN: Strings = {
     cohesion: "凝聚力",
     tactics: "战术熟悉度",
     "contract.wage": "周薪",
+    wageShare: "承担周薪比例",
+    monthlyFee: "月租借费",
+    optionFee: "买断选项",
     "contract.loyalty_bonus": "每周忠诚奖金",
     "contract.happiness": "满意度",
     "contract.playing_time_happiness": "出场时间满意度",
@@ -726,8 +740,7 @@ export const zhCN: Strings = {
     joined: "加入日期",
     extendContract: (years: number) => `延长 ${years} 年`,
     extendingContract: "正在延长…",
-    extendContractTitle: (years: number, until: string) =>
-      `将合同延长 ${years} 年，至 ${until}；可在“改动记录”中撤销`,
+    extendContractTitle: (years: number, until: string) => `将合同延长 ${years} 年，至 ${until}`,
     squadStatus: "队内定位",
     squadStatusName: (status: number) => SQUAD_STATUSES[status] ?? `定位 ${status}`,
     contractType: "合同类型",
@@ -754,8 +767,7 @@ export const zhCN: Strings = {
     noRetirement: "游戏尚未安排其退役",
     keepPlaying: "阻止退役",
     keepingPlaying: "正在阻止…",
-    keepPlayingTitle:
-      "从游戏的退役计划中移除此球员，并将其习惯改为“尽可能延长职业生涯”，替换“巅峰退役”；可在“改动记录”中撤销",
+    keepPlayingTitle: "取消此球员的退役计划，并将其习惯改为“尽可能延长职业生涯”",
 
     // Medical (the group's heading is `medical`, below; the names of its values are in `fields`)
     /** A player's morale, 1–20. */
@@ -770,8 +782,8 @@ export const zhCN: Strings = {
     noUnhappiness: "没有不满原因",
     removeUnhappiness: "全部移除",
     removingUnhappiness: "正在移除…",
-    removeUnhappinessTitle: "移除此球员的所有不满原因，效果与 FMRTE 的“全部移除”相同；可在“改动记录”中撤销",
-    removeUnhappinessFollows: "队友针对他的不满原因会在游戏推进后自行消除：在游戏中点击“继续”",
+    removeUnhappinessTitle: "移除此球员的所有不满原因",
+    removeUnhappinessFollows: "队友针对他的不满原因会在游戏推进后消除：在游戏中点击“继续”",
     concernSince: (date: string) => `始于 ${date}`,
     concernAbout: (name: string) => `针对 ${name}`,
     concernKind: (kind: number) => (kind === 1 ? "不满" : kind === 2 ? "内部问题" : `类型 ${kind}`),
@@ -793,15 +805,14 @@ export const zhCN: Strings = {
     loanUntil: "结束日期",
     loanNumber: "租借球衣号码",
     recall: "召回租借球员",
-    recallTitle: "将球员召回原俱乐部：租借今日结束。执行前会再次确认",
+    recallTitle: "今日将球员召回原俱乐部；执行前会先确认",
     recallAgain: "再次召回",
     makePermanent: "转为永久转会",
-    makePermanentTitle: "将球员永久转入当前租借俱乐部并与其签约。执行前会再次确认",
+    makePermanentTitle: "将球员永久转入当前租借俱乐部并与其签约；执行前会先确认",
     /** Where the Recall button was, once the loan ends today: recalled by the editor, or ending today anyway. */
     recalledWaiting: "已召回 · 等待归队",
     endsTodayWaiting: "今日结束 · 等待归队",
-    pendingTitle: (parent: string) =>
-      `今天是租借的最后一天；在游戏中推进一天后，球员将返回 ${parent}。`,
+    pendingTitle: (parent: string) => `租借今日结束；在游戏中推进一天后，球员将返回 ${parent}`,
     endPassed: (date: string) =>
       `租借原定于 ${date} 结束，但游戏尚未让球员归队。请再次召回，然后在游戏中推进一天。`,
     /** The loan's terms, as the game's Loan Club tab shows them. */
@@ -856,9 +867,9 @@ export const zhCN: Strings = {
     clauseProfitShare: (percent: string, amount: string) => `超过 ${amount} 的利润部分中，${percent}`,
     /** The wage a clause gives from then on. */
     clauseWage: (amount: string) => `每周 ${amount}`,
-    moraleTitle: "游戏以球员的整体满意度显示士气：10 为满意，11 为略感开心，15 和 20 为非常开心",
+    moraleTitle: "游戏中的整体满意度：10 为满意，11 为略感开心，15 和 20 为非常开心",
     /** Hover text of jadedness, which the profile shows as stored. */
-    jadednessTitle: "表示球员因比赛累积的疲劳，可通过休息恢复；-500 表示完全恢复，数值越高越需要休息",
+    jadednessTitle: "球员因比赛累积的疲劳；-500 表示完全恢复，数值越高越需要休息",
     noInjuries: "没有伤病",
     /** The name of an injury the game gave none for. */
     unknownInjury: "未知伤病",
@@ -879,7 +890,7 @@ export const zhCN: Strings = {
     // Above the attributes, while the profile is read
     /** Sets every attribute of the player to its best at once. */
     maxAttributes: "属性拉满",
-    maxAttributesTitle: "将该球员的所有属性设为最高值 20；受伤倾向和肮脏动作设为最低值 1",
+    maxAttributesTitle: "将所有属性设为最高值 20；受伤倾向和肮脏动作设为最低值 1",
     /** What Max attributes wrote, beside the button that takes it back; then what that undid. */
     maxAttributesDone: (count: number) =>
       count === 0 ? "所有属性已是最高值" : `已写入 ${changeCount(count)}`,
@@ -888,17 +899,14 @@ export const zhCN: Strings = {
     undoMaxTitle: "将该球员原有的属性值写回游戏",
     /** Freezing his attributes, while the game can be written to, and what that does. */
     freezeAttributes: "锁定属性",
-    freezeAttributesNote:
-      "应用保持打开并连接时，球员属性不会下降：游戏扣减的数值会写回，属性提升仍会保留。此设置会记在当前存档中，下次连接时自动重新锁定。",
+    freezeAttributesNote: "应用保持打开并连接时，球员属性不会下降；属性提升仍会保留。",
     /** The same for a member of staff, who has no injury proneness or dirtiness. */
     maxStaffAttributesTitle: "将该职员的所有属性设为最高值 20",
     undoMaxStaffTitle: "将原有的属性值写回游戏",
-    freezeStaffAttributesNote:
-      "应用保持打开并连接时，职员属性不会下降：游戏扣减的数值会写回，属性提升仍会保留。此设置会记在当前存档中，下次连接时自动重新锁定。",
+    freezeStaffAttributesNote: "应用保持打开并连接时，职员属性不会下降；属性提升仍会保留。",
     /** Freezing his energy and match sharpness, under them in the Medical group, and what that does. */
     freezeFitness: "锁定体能与比赛状态",
-    freezeFitnessNote:
-      "应用保持打开并连接时，体能和比赛状态不会下降：游戏扣减的数值会写回，提升仍会保留；达到 100% 后会保持在 100%。此设置会记在当前存档中。",
+    freezeFitnessNote: "应用保持打开并连接时，体能和比赛状态不会下降；提升仍会保留。",
     /** Freezing his position ratings: the box under the pitch, and the (i) after it, which says what that does. */
     freezePositions: "锁定",
     freezePositionsInfo: "锁定位置能力有什么作用？",
@@ -1146,9 +1154,7 @@ export const zhCN: Strings = {
     noFinances: "FM 只为正在进行的联赛中的俱乐部保存财务数据。",
     /** Freezing the club's money, while the game can be written to, and what that does. */
     freeze: "锁定资金",
-    freezeNote:
-      "应用保持打开并连接时，俱乐部余额不会减少：游戏扣除的金额会写回，收入仍会正常计入。" +
-      "此设置会记录在当前存档中，下次连接时自动重新锁定。",
+    freezeNote: "应用保持打开并连接时，俱乐部余额不会减少；收入仍会正常计入。",
 
     // Stadium
     stadium: "球场",
@@ -1157,14 +1163,14 @@ export const zhCN: Strings = {
     used: "已使用",
     /** The capacity in use when the game does not limit it (stored as 0). */
     usedAll: "全部",
-    usedTitle: "游戏限制入场人数时实际开放的容量（例如关闭部分看台时）；0 表示不限制。",
+    usedTitle: "游戏限制入场人数时实际开放的容量；0 表示不限制。",
     expansion: "扩建后容量",
     /** When the layout of this build does not know where the stadium is, or the club's stadium did not check out. */
     noStadium: "无法读取该俱乐部的球场信息。",
     /** Its name, which can be changed in place: in the block the game gave the old one. */
     stadiumName: "球场名称",
     rename: "重命名",
-    renameTitle: "修改球场名称会立即写入游戏，也可在“改动记录”中撤销。",
+    renameTitle: "修改球场名称，会立即写入游戏。",
     /** The (i) beside the name: how a new name lasts, and that the app has to stay open for it. */
     renameInfoLabel: "重命名如何运作？",
     renameInfo:
@@ -1199,7 +1205,7 @@ export const zhCN: Strings = {
 
     actionsLabel: "全体职员操作",
     releaseAll: (count: number) => (count === 0 ? "解约全部职员" : `解约全部职员（${format(count)}）`),
-    releaseAllTitle: "一次性解约俱乐部除你和董事会以外的全部职员；会先弹出确认窗口",
+    releaseAllTitle: "解约俱乐部除你和董事会以外的全部职员；执行前会先确认",
     releaseNone: "这家俱乐部没有可以解约的职员",
     hint: "除你和董事会外，所有人都会立即离开俱乐部。也可以在“改动记录”中撤销。",
     released: (count: number) => `已解约 ${format(count)} 名职员`,
@@ -1236,7 +1242,7 @@ export const zhCN: Strings = {
     cancel: "取消",
 
     moveAll: "调动全部职员",
-    moveAllTitle: "一次性将俱乐部除你和董事会以外的全部职员调往其他俱乐部；会先弹出确认窗口",
+    moveAllTitle: "将俱乐部除你和董事会以外的全部职员调往其他俱乐部；执行前会先确认",
     moveNone: "这家俱乐部没有可以调动的职员",
     moved: (count: number, club: string) => `已将 ${format(count)} 名职员调往 ${club}`,
     undoMoveTitle: "让已调动的职员以原合同回到这家俱乐部",
@@ -1352,6 +1358,16 @@ export const zhCN: Strings = {
     squadHeading: (team: string, count: number) => `${team}：${format(count)} 名球员`,
     squadLabel: (team: string) => `国家队球员：${team}`,
     squadNote: "游戏为这支球队列出的球员，按游戏的顺序显示。征召、队长和主教练合同不在此处编辑。",
+    details: {
+      nation: "国家",
+      founded: "足协成立于",
+      continent: "大洲",
+      staff: (count) => `足协职员 (${format(count)})`,
+      noStaff: "未找到足协职员。",
+      job: "国家队职务",
+      team: "球队",
+      staffNote: "从游戏读取，此处不编辑。职务为国家队职务，而非俱乐部职务。",
+    },
     actionsHint: "这些操作作用于一线队列出的所有球员。也可以在“改动记录”中撤销。",
     noTeams: "游戏中这支国家队没有任何球队，因此没有可显示的阵容或声望。",
     reading: "正在读取阵容…",
@@ -1408,9 +1424,9 @@ export const zhCN: Strings = {
     term: "期限",
     years: (count) => `${format(count)} 年`,
     unnamed: (kind) => `类型 ${format(kind)}`,
-    unnamedTitle: "这种合同类型尚未与游戏界面上的名称对应，界面也可能不显示它。",
+    unnamedTitle: "这种合同类型尚未与游戏界面上的名称对应。",
     ended: "已结束",
-    endedTitle: "该合同在游戏日期之前已结束，游戏的赞助界面不再列出它。",
+    endedTitle: "在游戏日期之前已结束，游戏的赞助界面不再列出它。",
     falls: (percent) => `降级时减少 ${format(percent)}%`,
     rises: (percent) => `升入顶级联赛时增加 ${format(percent)}%`,
     note: "只读。这是游戏为每份合同保存的金额。游戏的赞助界面会列出尚未结束的合同。",
@@ -1432,7 +1448,7 @@ export const zhCN: Strings = {
     reading: "正在从游戏读取各赛事的阵容规则…这需要几秒钟。",
     readAgain: "重新读取",
     readAgainTitle: "重新从游戏读取规则",
-    listNote: "没有阵容规则的赛事不会列出。",
+    listNote: "只列出游戏在此存档中进行的赛事。",
     unavailableTitle: "没有可显示的阵容规则",
     unavailableBuild: "还没有人确认此版本的游戏把赛事的阵容规则存放在哪里，因此编辑器不显示，以免读取错误的内存。",
     unavailableUnreadable: "编辑器在此版本游戏中预期的位置查找了阵容规则，但找到的内容不像游戏的数据，因此不显示。",
@@ -1459,6 +1475,7 @@ export const zhCN: Strings = {
     begins: (year: number) => `将于 ${year} 年开始`,
     noRules: "没有阵容规则。",
     noNext: "游戏中没有下赛季的规则。",
+    noneGiven: "游戏没有给这项赛事设定阵容规则，因此这里没有可修改的内容。",
     ruleColumns: {
       rule: "规则",
       where: "计入范围",
@@ -1524,14 +1541,14 @@ export const zhCN: Strings = {
     },
     yearsTitle: "该国规则适用此规则的赛季，按赛季开始的年份计",
     leftAlone: "保持不变",
-    notSavedTitle: "存档保存的该国规则中没有这条规则，因此改动会在加载存档后消失：编辑器不会改动它。",
+    notSavedTitle: "存档中没有这条规则，改动会在加载存档后消失：编辑器不会改动它。",
     notACountTitle: "这是一笔金额，不是球员人数：编辑器不会改动它。",
     noneChangeable: "这些规则目前无法修改，与日期无关：只有在存档保存的规则中也找到同一条规则时，编辑器才会修改它（这样加载存档后改动仍然存在），而本赛事的规则尚未在其中找到。目前女子联赛、美国职业足球大联盟和部分杯赛属于这种情况。",
     unsavedNote: "游戏不会把本赛事的规则保存在任何存档里：每次加载存档时以及每个新赛季，游戏都会自行重新生成。因此编辑器会保持此处的改动：把它写入运行中的游戏，为本生涯记住它，并在每次连接或重新读取数据时再次写入。加载存档后，请连接一次编辑器（或点击“重新读取数据”），改动才会恢复。在“改动记录”中点击“撤销”可取消保持。",
     heldTag: "保持中",
-    heldTitle: (original: number) => `编辑器保持这个人数，并在每次读取游戏时再次写入。游戏原本的数值是${format(original)}。`,
+    heldTitle: (original: number) => `编辑器保持这个人数，并在每次读取游戏时再次写入；游戏原本的数值是${format(original)}`,
     savedDiffers: (value: number) => `存档的规则中为 ${format(value)}`,
-    savedDiffersTitle: "游戏按列表运行，并在加载存档时根据存档的规则生成列表。在此保存改动会同时设置两者。",
+    savedDiffersTitle: "游戏按列表运行，并在加载时根据存档的规则生成列表；在此改动会同时设置两者。",
     edit: "修改规则",
     editTitle: "修改此赛事阵容规则中的人数",
     save: "保存规则",
@@ -1572,7 +1589,7 @@ export const zhCN: Strings = {
     previewTag: "浏览器预览 · 示例数据",
     /** In place of the game's date when it could not be read, and the note it shows on hover. */
     noDate: "没有游戏内日期",
-    noDateTitle: "FMLibreEditor 无法读取此游戏版本的游戏内日期，因此不显示年龄，年龄筛选也不会匹配结果。请检查更新。",
+    noDateTitle: "无法读取游戏内日期，因此不显示年龄，年龄筛选也不会匹配结果。请检查更新。",
     /** The button that reads the game again, once connected. */
     reload: "重新读取数据",
     /** The button that looks for the game again, while not connected. */
@@ -1692,12 +1709,12 @@ export const zhCN: Strings = {
     join: (names: string[]) =>
       names.length <= 1 ? names.join("") : `${names.slice(0, -1).join("、")}和${names[names.length - 1]}`,
     allow: "仍要编辑",
-    allowTitle: "启用编辑，直到关闭 FMLibreEditor 或重新连接为止。请先备份存档。",
+    allowTitle: "启用编辑，直到关闭应用或重新连接为止。请先备份存档。",
   },
 
   diagnostics: {
     copy: "复制诊断信息",
-    copyTitle: "复制 FMLibreEditor 在游戏中发现的信息，以便粘贴到问题报告中。信息不包含姓名或路径。",
+    copyTitle: "复制应用在游戏中发现的信息，用于问题报告；不包含姓名或路径。",
     copied: "已复制",
     failed: (reason: string) => `无法复制诊断信息：${reason}`,
   },
@@ -1727,7 +1744,7 @@ export const zhCN: Strings = {
     download: "下载",
     /** Downloads the new version's installer and runs it, where the app can update itself (see `can_self_update`). */
     install: "更新",
-    installTitle: "下载并安装新版本；FMLibreEditor 将关闭，并在更新后重新启动。",
+    installTitle: "下载并安装新版本；应用将关闭，并在更新后重新启动。",
     preparing: "正在准备…",
     /** `percent` is null while the size of the download is not known. */
     downloading: (percent: number | null) => (percent === null ? "正在下载…" : `正在下载… ${percent}%`),
@@ -1832,7 +1849,7 @@ export const zhCN: Strings = {
     inGame: "在游戏中",
     inGameTitle: "上次读取数据时，游戏中是这个值",
     notInGame: "不在游戏中",
-    notInGameTitle: "上次读取数据时，游戏中不是这个值：改动后没有保存游戏，或者游戏此后又改了这个值",
+    notInGameTitle: "上次读取数据时不在游戏中：改动后没有保存游戏，或者游戏此后又改了这个值",
     /** In the place of Undo for an earlier change that cannot be undone from here, and its hover text. */
     historyOnly: "历史",
     historyOnlyTitle: "在应用上次连接之前做出：撤销它需要当时的游戏内存",
@@ -1840,7 +1857,7 @@ export const zhCN: Strings = {
     batchNotInGame: (count: number) => `${format(count)} 项不在游戏中`,
     /** Empties the list and the history of the career; the question that asks first, and its two answers. */
     clearHistory: "清除历史",
-    clearHistoryTitle: "清空此列表并忘记此存档的历史记录。改动仍保留在游戏中。",
+    clearHistoryTitle: "清空此列表并忘记此存档的历史记录；改动仍保留在游戏中。",
     confirmClear: "清除此存档的历史记录？改动仍保留在游戏中，但无法再从这里撤销。",
     keepHistory: "保留",
     clearConfirm: "清除",
@@ -1853,6 +1870,7 @@ export const zhCN: Strings = {
     /** Under a transfer that had a fee: the amount, written out. */
     fee: (amount: string) => `转会费 ${amount}`,
     arranged: (date: string) => `游戏会在 ${date} 办理调动`,
+    arrangedLoan: (day: string, until: string) => `游戏会在 ${day} 办理租借，至 ${until}`,
     /** Under a recall from loan that took the loan's option to buy away, which its undo writes back. */
     optionRemoved: (amount: string) => `已移除买断选项（${amount}）`,
     /** What a heal changed, in the place of its values: `count` is how many injuries the player had. */
@@ -1935,9 +1953,9 @@ export const zhCN: Strings = {
   export: {
     button: "导出",
     buttonTitle: {
-      player: "将当前列表中的球员导出为 CSV 或 JSON 文件，供表格或脚本使用。",
-      staff: "将当前列表中的职员导出为 CSV 或 JSON 文件，供表格或脚本使用。",
-      club: "将当前列表中的俱乐部导出为 CSV 或 JSON 文件，供表格或脚本使用。",
+      player: "将当前列表中的球员导出为 CSV 或 JSON 文件。",
+      staff: "将当前列表中的职员导出为 CSV 或 JSON 文件。",
+      club: "将当前列表中的俱乐部导出为 CSV 或 JSON 文件。",
     } satisfies Record<ExportEntity, string>,
     title: { player: "导出球员", staff: "导出职员", club: "导出俱乐部" } satisfies Record<ExportEntity, string>,
     /** What the export covers: everything the list's search and filters select, in its order. */
@@ -1988,7 +2006,7 @@ export const zhCN: Strings = {
 
     /** The export of the Changes view: a CSV file of the changes its search and filters show. */
     changes: {
-      buttonTitle: "将列表中显示的改动写入 CSV 文件，供表格或脚本使用",
+      buttonTitle: "将列表中显示的改动写入 CSV 文件",
       title: "导出改动",
       /** What the export covers: everything the list's search and filters select, or, with none on, the whole history. */
       scope: (count: number, filtering: boolean) =>
@@ -2079,8 +2097,7 @@ export const zhCN: Strings = {
     ofCurrent: "当前值的百分比",
     percentTitle: "按当前值的百分比缩放：100% 保持不变，110% 增加十分之一，50% 减半。",
     /** Hover text of an amount that cannot be applied; `min` and `max` are what it takes. */
-    addYearsTitle:
-      "为每个日期增加的年数，月日保持不变；输入负数则往前推。非闰年中的 2 月 29 日会变为 2 月 28 日。",
+    addYearsTitle: "为每个日期增加的年数；输入负数则往前推，2 月 29 日可能变为 2 月 28 日。",
     years: "年",
     invalidAdd: (min: number, max: number) => `请输入 ${format(min)} 至 ${format(max)} 之间的整数`,
     invalidPercent: (min: number, max: number) => `请输入 ${min} 至 ${max} 之间的整数百分比`,
@@ -2196,7 +2213,7 @@ export const zhCN: Strings = {
 
     // The switch at the top of the dialog: a move to a club, or a swap with one of its players.
     /** Its name for assistive technology. */
-    modeLabel: "转会、立即调动或交换",
+    modeLabel: "转会、租借、立即调动或交换",
     modeMove: "立即调动",
     modeSwap: "与球员互换",
     modeArrange: "转会",
@@ -2218,6 +2235,32 @@ export const zhCN: Strings = {
       "记录在“改动记录”中，到那天之前一次撤销即可取消",
     ],
     arrangeButton: "安排转会",
+
+    modeLoan: "租借",
+    loanNote: "游戏会在下一天办理租借，和它自己的租借一样；之后球员回到原俱乐部。",
+    loanChecking: "正在检查租借…",
+    loanOn: (date: string) => `游戏会在 ${date} 办理租借`,
+    loanUntil: (date: string) => `租借至 ${date}`,
+    loanWage: (money: string, share: number) => `俱乐部每周支付 ${money}（其周薪的 ${format(share)}%）`,
+    loanMonthlyFee: (money: string) => `月租借费 ${money}`,
+    loanOption: (money: string) => `买断选项 ${money}`,
+    loanDoes: [
+      "现已约定：游戏到下一天时办理租借",
+      "球员履历会记录这次租借，最后一天的次日回到原俱乐部",
+      "俱乐部支付其分担的周薪；设置了月租借费也一并支付",
+      "设有买断选项时，租借结束后租借球队可按该金额将其买断",
+    ],
+    loanDoesHeading: "租借会做什么",
+    loanHint: "点击“安排租借”后才会修改游戏。",
+    loanButton: "安排租借",
+    loanLastDay: "租借最后一天",
+    loanLastDayHint: "次日回到原俱乐部",
+    loanShare: "承担周薪比例",
+    loanShareHint: "由接收俱乐部支付，其余由原俱乐部承担",
+    loanShareInvalid: "请输入 0 至 100 之间的整数",
+    loanMonthly: "月租借费",
+    loanOptionFee: "买断选项",
+    loanOptionFeeHint: "租借结束时，租借球队可按此金额将其买断；留空表示没有",
 
     // Choosing the club
     /** The name of the search box, and of the list of clubs under it, for assistive technology. */
@@ -2700,30 +2743,24 @@ export const zhCN: Strings = {
     inspireAll: "鼓舞全队",
     inspireAllTitle: "将全队士气设为最高值 20，并移除球员的不满原因",
     maxCohesion: "凝聚力拉满",
-    maxCohesionTitle:
-      "将这支球队每位球员与俱乐部的凝聚力设为最高值 100。在游戏中点击“继续”推进后，球队动态页面会显示更新后的凝聚力。",
-    cohesionNone: "无法读取这支球队的凝聚力：此游戏版本尚未验证该功能，或球员都没有与俱乐部的凝聚力记录。",
+    maxCohesionTitle: "将每位球员与俱乐部的凝聚力设为最高值 100；游戏推进后才会显示。",
+    cohesionNone: "无法读取：此游戏版本尚未验证该功能，或球员都没有与俱乐部的凝聚力记录。",
     cohesionWithout: (count: number) => `${format(count)} 名球员尚无与俱乐部的凝聚力记录`,
     maxTactics: "战术拉满",
-    maxTacticsTitle:
-      "让这支球队每位球员在“战术效率”页面的八个方面都把球队所用的战术掌握到最高，相当于数周的训练。属性不会改变。随着训练变旧，约六周后各方面会再次下降；换用其他战术需要再点一次。在游戏中点击“继续”推进后，页面才会显示更新后的数值。",
-    tacticsNone: "无法读取这支球队对其战术的熟悉程度：此游戏版本尚未验证该功能，或这支球队使用的不是你选择的战术。",
+    maxTacticsTitle: "让每位球员把球队所用的战术掌握到最高；与训练一样，约六周后会再次下降。",
+    tacticsNone: "无法读取：此游戏版本尚未验证该功能，或这支球队使用的不是你选择的战术。",
     tacticsUntrained: (count: number) => `${format(count)} 名球员没有训练（例如受伤），其训练记录保持不变`,
     refreshAll: "恢复全队状态",
     refreshAllTitle: "将全队体能和比赛状态恢复至 100%，并彻底消除疲劳（疲劳度 -500）",
     batchTraits: "批量设置球员习惯",
     batchTraitsTitle: "为该球队中的球员批量添加或移除习惯动作",
     maxAll: "属性拉满",
-    maxAllTitle:
-      "将全队所有球员的属性设为最高值 20；受伤倾向和肮脏动作设为最低值 1",
+    maxAllTitle: "将全队所有球员的属性设为最高值 20；受伤倾向和肮脏动作设为最低值 1",
     atItsBest: "全队状态拉满",
-    atItsBestTitle:
-      "一键完成“治疗全队”“鼓舞全队”“恢复全队状态”“凝聚力拉满”和“战术拉满”，点一次“撤销”即可全部撤回。属性和停赛保持不变。无法执行的步骤（例如没有球员受伤时的“治疗全队”）会被跳过，结果中会注明。随着训练变旧，约六周后战术各方面会再次下降；换用其他战术需要再点一次。在游戏中点击“继续”推进后，页面才会显示更新后的数值。",
+    atItsBestTitle: "一键完成治疗、鼓舞、恢复全队，并拉满凝聚力和战术；点一次“撤销”即可全部撤回。",
     atItsBestSkipped: (step, reason) => `已跳过“${step}”：${reason}`,
     destroy: "全队状态跌入谷底",
-    destroyTitle:
-      "将这支球队每位球员的状态降到最差：士气和满意度、体能、比赛状态和疲劳度、与俱乐部的凝聚力，以及在由你选择球队" +
-      "战术时的战术熟悉度。不会让任何数值变好；属性、伤病和停赛保持不变。执行前会先确认，点一次“撤销”即可全部撤回",
+    destroyTitle: "将每位球员的士气、体能、凝聚力和战术熟悉度降到最差；执行前会先确认",
     destroySteps: {
       demoralize: "士气和满意度",
       exhaust: "体能和比赛状态",
@@ -2753,14 +2790,11 @@ export const zhCN: Strings = {
     /** The name of the group of boxes for assistive technology. */
     freezeLabel: "锁定全队",
     freezeAttributes: "锁定属性",
-    freezeAttributesTitle:
-      "应用保持打开并连接时，全队球员属性不会下降：游戏扣减的数值会写回，属性提升仍会保留。",
+    freezeAttributesTitle: "应用保持打开并连接时，全队球员属性不会下降。",
     freezeFitness: "锁定体能和比赛状态",
-    freezeFitnessTitle:
-      "应用保持打开并连接时，全队球员的体能和比赛状态不会下降：游戏扣减的数值会写回。先恢复全队状态可将其保持在 100%。",
+    freezeFitnessTitle: "应用保持连接时，全队球员的体能和比赛状态不会下降；先恢复全队状态可保持在 100%。",
     freezePositions: "锁定位置能力",
-    freezePositionsTitle:
-      "应用保持打开并连接时，全队球员的位置能力会保持不变：游戏提高或降低的能力值都会写回原值。",
+    freezePositionsTitle: "应用保持打开并连接时，全队球员的位置能力会保持不变。",
     /** After a box: how many of the team's `total` players are frozen that way, while some are and some are not. */
     frozenCount: (frozen: number, total: number) => `${format(frozen)} / ${format(total)}`,
     /** Beside the boxes: whom freezing covers, and for how long. */
@@ -2848,7 +2882,7 @@ export const zhCN: Strings = {
     /** `count` is how many bans he has. */
     bannedTitle: (count: number) => `${format(count)} 项禁赛`,
     unrest: "队友不满",
-    unrestTitle: (count: number) => `${format(count)} 位队友对他有不满原因。在他的档案中点击“全部移除”，游戏推进后即可化解`,
+    unrestTitle: (count: number) => `${format(count)} 位队友对他不满；在他的档案中点击“全部移除”，游戏推进后即可化解`,
     onLoan: "外租",
     onLoanTitle: "租借至其他俱乐部",
     loanee: "租入",
@@ -3404,6 +3438,8 @@ export const zhCN: Strings = {
       p: "偷猎者",
       tcf: "回防型中锋",
       ocf: "出球点型中锋",
+      gk: "Goalkeeper",
+      wm: "Wide Midfielder",
     } as Record<string, string>,
     reasons: {
       listed: () => "已列入转会名单",
@@ -3435,6 +3471,40 @@ export const zhCN: Strings = {
       unwanted: () => "队内定位：冗员",
       listed: () => "已列入转会名单",
     } as Record<string, (value: string) => string>,
+  },
+
+  /** Recipes (`RecipeMenu`): see `en.ts`. */
+  recipes: {
+    button: "配方",
+    buttonTitle: "现成的成套改动，写入前先预览",
+    names: {
+      wonderkid: "打造妖人",
+      injuryProof: "不易受伤",
+      longCareer: "延长职业生涯",
+      richClub: "让俱乐部变富",
+      topFacilities: "顶级设施",
+    },
+    notes: {
+      wonderkid: "21 岁或以下：潜力至少 180，当前能力和属性与年龄相称。更高的值保持不变。",
+      injuryProof: "受伤倾向 1，自然体能 20，耐力至少 15，治愈当前伤病。",
+      longCareer: "取消预定的退役，合同至少再续三年，自然体能 20，职业素养至少 18。",
+      richClub: "余额、转会预算和工资预算提高到最富有俱乐部的水平。",
+      topFacilities: "五项设施全部改为 20。",
+    },
+    tooOld: (oldest: number) => `适用于 ${oldest} 岁或以下的球员`,
+    command: (recipe: string) => `配方：${recipe}`,
+    working: "正在计算改动…",
+    summary: (changes: number, kept: number, left: number) =>
+      [changeCount(changes), kept > 0 && `${format(kept)} 个值已经够好`, left > 0 && valuesLeftAlone(left)]
+        .filter(Boolean)
+        .join(" · "),
+    tableLabel: "配方将进行的改动",
+    keptHeading: (count: number) => `${format(count)} 个值保持不变：已经够好`,
+    keptLabel: "已经够好的值",
+    valueColumn: "数值",
+    leftLabel: "配方保留不变的内容",
+    undo: "撤销本次配方",
+    undoTitle: "将本次配方改动的内容全部写回游戏。",
   },
 
   /** A player's development: the Development tab of his profile, the note under his abilities, the squad's arrows (see en.ts). */
@@ -3528,6 +3598,36 @@ export const zhCN: Strings = {
     link: "新功能",
     command: "此版本的新功能",
     versions: {
+      "0.5.5": [
+        {
+          title: "FM 27.1.1：",
+          text: "已支持 11 月 24 日的更新，Game Pass、Steam 和 Mac 均可使用，一切照常。今后游戏再更新时，在能识别新版本的编辑器发布之前，仍会继续读取俱乐部财务和当前使用的战术。",
+        },
+        {
+          title: "“赛事”标签页：",
+          text: "查看并修改每项赛事的阵容注册规则，例如一个阵容最多可注册多少名外籍球员，本赛季和下赛季分开设置。支持 Windows 和搭载 Apple 芯片的 Mac。",
+        },
+        {
+          title: "租借：",
+          text: "“转会”对话框新增“租借”，可把租借安排在游戏中的第二天，转会窗口内外均可。你可以设置最后一天、对方俱乐部承担的工资比例、每月费用，以及可选的买断选项。支持 Windows 和搭载 Apple 芯片的 Mac。",
+        },
+        {
+          title: "配方：",
+          text: "为球员或俱乐部准备的现成修改组合：“打造妖人”“不易受伤”“延长职业生涯”“让俱乐部变富”和“顶级设施”。每个配方都会先显示将要修改的内容再写入，一次“撤销”即可还原。",
+        },
+        {
+          title: "成长：",
+          text: "编辑器读取游戏时，每个游戏周为所有球员记录一次；球员资料新增“成长”标签页，显示他在你的生涯中能力、潜力、身价和属性的变化。",
+        },
+        {
+          title: "B 队：",
+          text: "俱乐部的“阵容”标签页会在本队之后显示其 B 队（如皇家马德里的卡斯蒂亚），全队操作同样适用。",
+        },
+        {
+          title: "更短的说明：",
+          text: "按钮说明缩短为一行，显示在小方框中，不再是横跨窗口的长条。",
+        },
+      ],
       "0.5.4": [
         {
           title: "转会写入球员履历：",

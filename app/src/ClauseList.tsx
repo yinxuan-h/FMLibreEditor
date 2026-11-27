@@ -136,7 +136,7 @@ export function ClauseList({ uid, name, clauses, room, signed }: ClauseListProps
           className="heal-toggle"
           aria-haspopup="dialog"
           disabled={!editable}
-          title={editable ? text.changeTitle : readOnlyNote}
+          data-tip={editable ? text.changeTitle : readOnlyNote}
           onClick={() => setOpen(true)}
         >
           {text.change}

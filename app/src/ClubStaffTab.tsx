@@ -301,7 +301,7 @@ export function ClubStaffTab({ club, version, panel }: ClubStaffTabProps) {
                 aria-disabled={busy || undefined}
                 aria-busy={busy || undefined}
                 aria-haspopup="dialog"
-                title={releaseTitle}
+                data-tip={releaseTitle}
                 onClick={() => !busy && setAsking("release")}
               >
                 {text.releaseAll(leaving.length)}
@@ -314,7 +314,7 @@ export function ClubStaffTab({ club, version, panel }: ClubStaffTabProps) {
                 aria-disabled={busy || undefined}
                 aria-busy={busy || undefined}
                 aria-haspopup="dialog"
-                title={moveTitle}
+                data-tip={moveTitle}
                 onClick={() => !busy && setAsking("move")}
               >
                 {text.moveAll}
@@ -397,7 +397,7 @@ function StaffRow({ row }: { row: ClubStaffRow }) {
       <td className="num">
         <Ability value={row.potentialAbility} />
       </td>
-      <td title={row.stays ? describeError(row.stays) : undefined}>{row.stays && staysLabel(row.stays)}</td>
+      <td data-tip={row.stays ? describeError(row.stays) : undefined}>{row.stays && staysLabel(row.stays)}</td>
     </tr>
   );
 }
@@ -426,7 +426,7 @@ function ResultLine({ result, busy, onUndo, ref }: ResultLineProps) {
                 type="button"
                 className="squad-action"
                 aria-disabled={busy || undefined}
-                title={result.undoTitle}
+                data-tip={result.undoTitle}
                 onClick={() => !busy && result.undo && onUndo(result.undo)}
               >
                 {text.undo}
@@ -470,7 +470,7 @@ function StayingList({ staying, label }: { staying: readonly ClubStaffRow[]; lab
   return (
     <ul className="move-facts">
       {staying.map((row) => (
-        <li key={row.uid} title={row.stays ? describeError(row.stays) : undefined}>
+        <li key={row.uid} data-tip={row.stays ? describeError(row.stays) : undefined}>
           {person(row)}: {row.stays && label(row.stays)}
         </li>
       ))}

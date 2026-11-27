@@ -12,6 +12,7 @@ import { id } from "./id";
 import { it } from "./it";
 import { ja } from "./ja";
 import { ko } from "./ko";
+import { ptBR } from "./pt-BR";
 import { ru } from "./ru";
 import { tr } from "./tr";
 import { zhCN } from "./zh-CN";
@@ -30,6 +31,7 @@ const LANGUAGES = {
   it: { strings: it, intl: "it-IT" },
   ja: { strings: ja, intl: "ja-JP" },
   ko: { strings: ko, intl: "ko-KR" },
+  "pt-BR": { strings: ptBR, intl: "pt-BR" },
   ru: { strings: ru, intl: "ru-RU" },
   "zh-CN": { strings: zhCN, intl: "zh-CN" },
 } satisfies Record<string, { strings: Strings; intl: string }>;
@@ -56,9 +58,10 @@ function savedLocale(): Locale | null {
 
 /**
  * The first of the system's languages, most preferred first, that the app has: "es-MX" is Spanish, "tr" Turkish,
- * "id-ID" Indonesian, "ja-JP" Japanese, "ko-KR" Korean, and "zh", "zh-CN", "zh-SG" or "zh-Hans" Simplified Chinese. Traditional Chinese
- * ("zh-TW", "zh-HK", "zh-Hant") is not taken for it: English reads better than the other script. English when it has
- * none of them. WebView2 lists the languages of Windows; WKWebView only the first one of macOS.
+ * "id-ID" Indonesian, "ja-JP" Japanese, "ko-KR" Korean, "pt" and "pt-BR" Brazilian Portuguese (there is no pt-PT yet),
+ * and "zh", "zh-CN", "zh-SG" or "zh-Hans" Simplified Chinese. Traditional Chinese ("zh-TW", "zh-HK", "zh-Hant") is not
+ * taken for it: English reads better than the other script. English when it has none of them. WebView2 lists the
+ * languages of Windows; WKWebView only the first one of macOS.
  */
 function systemLocale(): Locale {
   const { languages, language } = window.navigator;
@@ -73,6 +76,9 @@ function systemLocale(): Locale {
       normalized?.startsWith("zh-hans-")
     ) {
       return "zh-CN";
+    }
+    if (normalized === "pt" || normalized === "pt-br" || normalized?.startsWith("pt-br-")) {
+      return "pt-BR";
     }
     const primary = normalized?.split("-")[0];
     if (isLocale(primary)) {

@@ -96,6 +96,12 @@ const CONTRACT_TYPES: Partial<Record<number, string>> = {
 /** The name of the field a failure names. */
 const field = (key: string | undefined) => fieldName(de, key ?? "");
 
+/** A day the commands name as "20280131", written out in the language's own way. */
+const dayText = (value: string | undefined) => {
+  const [y, m, d] = [Number(value?.slice(0, 4)), Number(value?.slice(4, 6)), Number(value?.slice(6, 8))];
+  return new Date(y, m - 1, d).toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" });
+};
+
 /** The noun of the kind of record a failure names, or "Eintrag" when it names none; each of them is masculine. */
 const recordNoun = (entity: string | undefined) =>
   entity === "player" || entity === "staff" || entity === "club" ? nouns[entity].one : "Eintrag";
@@ -317,6 +323,8 @@ const errors: ErrorTexts = {
     "Der Verein hat in seiner 1. Mannschaft keinen Spieler mit einem gewöhnlichen Vertrag, nach dessen Vorbild der " +
     "neue Vertrag entstehen könnte.",
   "sign.noDate": () => "Der Editor kann das Spieldatum nicht lesen, mit dem ein neuer Vertrag beginnt.",
+  "loan.end": (p) => `Die Leihe muss nach seinem Wechsel enden, spätestens mit seinem Vertrag: zwischen ${dayText(p.earliest)} und ${dayText(p.latest)}.`,
+  "loan.noModel": () => "Das Spiel hat keine eigene laufende Leihe als Vorlage für diese. Versuchen Sie es nach einem Tag erneut.",
   "move.outOfRange": (p) =>
     `${p.value} ist kein gültiger Wert für ${field(p.field)}: Erlaubt sind ${p.min} bis ${p.max}.`,
   "move.changed": () => `Das Spiel hat diesen Speicher inzwischen geändert; ${reload}.`,
@@ -453,6 +461,10 @@ const errors: ErrorTexts = {
   "mass.tooMany": (p) =>
     `Es gibt ${p.count} Treffer. Grenzen Sie die Suche oder die Filter für eine Massenbearbeitung auf höchstens ` +
     `${p.limit} ein.`,
+  "recipe.tooOld": (p) =>
+    `Der Spieler ist ${p.age}: Dieses Rezept ist für Spieler von höchstens ${p.oldest} Jahren.`,
+  "recipe.ageUnknown": () => "Das Alter des Spielers ist nicht bekannt, und dieses Rezept richtet sich danach.",
+  "recipe.outOfDate": () => "Diese Vorschau ist nicht mehr aktuell. Öffnen Sie das Rezept erneut.",
   "mass.outOfDate": () =>
     "Diese Vorschau ist nicht mehr aktuell. Erstellen Sie die Vorschau der Massenbearbeitung erneut.",
 };
@@ -654,6 +666,9 @@ export const de: Strings = {
     jadedness: "Erschöpfung",
     morale: "Moral",
     "contract.wage": "Gehalt pro Woche",
+    wageShare: "Gehaltsanteil",
+    monthlyFee: "monatliche Gebühr",
+    optionFee: "Kaufoption",
     "contract.loyalty_bonus": "Loyalitätsbonus pro Woche",
     "contract.happiness": "Zufriedenheit",
     "contract.playing_time_happiness": "Zufriedenheit mit Einsatzzeiten",
@@ -761,8 +776,7 @@ export const de: Strings = {
     joined: "Im Verein seit",
     extendContract: (years: number) => `Um ${years} Jahre verlängern`,
     extendingContract: "Wird verlängert…",
-    extendContractTitle: (years: number, until: string) =>
-      `Der Vertrag läuft ${years} Jahre länger, bis ${until}; unter Änderungen rückgängig zu machen`,
+    extendContractTitle: (years: number, until: string) => `Der Vertrag läuft ${years} Jahre länger, bis ${until}`,
     squadStatus: "Teamstatus",
     squadStatusName: (status) => SQUAD_STATUSES[status] ?? `Status ${status}`,
     contractType: "Vertragsart",
@@ -789,8 +803,7 @@ export const de: Strings = {
     keepPlaying: "Karriereende verhindern",
     keepingPlaying: "Wird verhindert…",
     keepPlayingTitle:
-      "Nimmt sein Karriereende aus den Plänen des Spiels und gibt ihm die Spielereigenschaft „Spielt so lange wie " +
-      "möglich“ statt „Beendet Karriere auf höchstem Niveau“; unter Änderungen rückgängig zu machen",
+      "Streicht sein geplantes Karriereende und gibt ihm die Spielereigenschaft „Spielt so lange wie möglich“",
 
     // Medizinisch
     morale: (value) => `${value} / 20`,
@@ -801,12 +814,9 @@ export const de: Strings = {
     noUnhappiness: "Nichts macht ihn unzufrieden",
     removeUnhappiness: "Alle entfernen",
     removingUnhappiness: "Wird entfernt…",
-    removeUnhappinessTitle:
-      "Nimmt jeden Grund für Unzufriedenheit von seiner Liste, wie es „Alle entfernen“ in FMRTE tut; unter Änderungen " +
-      "rückgängig zu machen",
+    removeUnhappinessTitle: "Nimmt jeden Grund für Unzufriedenheit von seiner Liste",
     removeUnhappinessFollows:
-      "Die Gründe für Unzufriedenheit, die seine Mitspieler seinetwegen haben, enden von selbst, sobald das Spiel " +
-      "weiterläuft: Klicken Sie im Spiel auf Fortfahren",
+      "Die Gründe seiner Mitspieler enden, sobald das Spiel weiterläuft: Klicken Sie im Spiel auf Fortfahren",
     concernSince: (date) => `seit ${date}`,
     concernAbout: (name) => `wegen ${name}`,
     concernKind: (kind) => (kind === 1 ? "Besorgt" : kind === 2 ? "Intern" : `Art ${kind}`),
@@ -825,16 +835,14 @@ export const de: Strings = {
     loanUntil: "Bis",
     loanNumber: "Rückennummer dort",
     recall: "Von Leihe zurückrufen",
-    recallTitle: "Holt ihn zu seinem Verein zurück: Die Leihe endet heute. Fragt nach, bevor sich etwas ändert",
+    recallTitle: "Holt ihn heute zu seinem Verein zurück; fragt vorher nach",
     recallAgain: "Erneut zurückrufen",
     makePermanent: "Fest verpflichten",
-    makePermanentTitle:
-      "Verpflichtet ihn fest bei dem Verein, an den er verliehen ist, mit einem Vertrag dort. Fragt nach, bevor sich " +
-      "etwas ändert",
+    makePermanentTitle: "Verpflichtet ihn fest bei dem Verein, an den er verliehen ist; fragt vorher nach",
     recalledWaiting: "Zurückgerufen · Rückkehr ausstehend",
     endsTodayWaiting: "Endet heute · Rückkehr ausstehend",
-    pendingTitle: (parent) =>
-      `Heute ist der letzte Tag der Leihe: Fahren Sie im Spiel einen Tag fort, dann ist er wieder bei ${parent}.`,
+    pendingTitle:
+      (parent) => `Die Leihe endet heute: Fahren Sie im Spiel einen Tag fort, dann ist er wieder bei ${parent}`,
     endPassed: (date) =>
       `Die Leihe sollte am ${date} enden, aber das Spiel hat ihn nicht zurückgeholt. Rufen Sie ihn erneut zurück und ` +
       "fahren Sie dann einen Tag fort.",
@@ -890,11 +898,9 @@ export const de: Strings = {
     clauseProfitShare: (percent, amount) => `${percent} des Gewinns über ${amount}`,
     clauseWage: (amount) => `${amount} pro Woche`,
     moraleTitle:
-      "Das Spiel zeigt die Moral als allgemeine Zufriedenheit des Spielers: „Neutral“ bei 10, „Eher zufrieden“ bei 11, " +
-      "äußerst zufrieden bei 15 und 20",
+      "Die allgemeine Zufriedenheit im Spiel: „Neutral“ bei 10, „Eher zufrieden“ bei 11, äußerst zufrieden bei 15 und 20",
     jadednessTitle:
-      "Wie sehr der Spieler vom Spielen ausgelaugt ist, was Ruhe wieder abbaut: -500 ist voll erholt, und je höher der " +
-      "Wert, desto dringender braucht er eine Pause",
+      "Wie ausgelaugt er vom Spielen ist: -500 ist voll erholt, und je höher der Wert, desto dringender die Pause",
     noInjuries: "Keine Verletzungen",
     unknownInjury: "Unbekannte Verletzung",
     injuryStarted: (date) => `Seit ${date}`,
@@ -910,8 +916,7 @@ export const de: Strings = {
     // Über den Attributen, während das Profil angezeigt wird
     maxAttributes: "Attribute maximieren",
     maxAttributesTitle:
-      "Setzt jedes Attribut dieses Spielers auf den besten Wert: 20, und 1 für Verletzungsanfälligkeit und " +
-      "Unsportlichkeit",
+      "Setzt jedes Attribut auf den besten Wert: 20, und 1 für Verletzungsanfälligkeit und Unsportlichkeit",
     maxAttributesDone: (count) =>
       count === 0 ? "Jedes Attribut steht bereits auf dem besten Wert" : `${changes(count)} geschrieben`,
     maxAttributesUndone: (count) =>
@@ -920,20 +925,14 @@ export const de: Strings = {
     undoMaxTitle: "Schreibt seine alten Attribute zurück ins Spiel",
     freezeAttributes: "Attribute einfrieren",
     freezeAttributesNote:
-      "Solange die App geöffnet und verbunden ist, werden seine Attribute nicht schlechter: Was das Spiel abzieht, wird " +
-      "wiederhergestellt, und Verbesserungen zählen weiterhin. Die App merkt sich das für diesen Spielstand und friert " +
-      "sie erneut ein, wenn sie sich damit verbindet.",
+      "Seine Attribute werden nicht schlechter, solange die App geöffnet und verbunden ist; Verbesserungen zählen weiterhin",
     maxStaffAttributesTitle: "Setzt jedes Attribut dieses Mitarbeiters auf den besten Wert: 20",
     undoMaxStaffTitle: "Schreibt die alten Attribute zurück ins Spiel",
     freezeStaffAttributesNote:
-      "Solange die App geöffnet und verbunden ist, werden die Attribute nicht schlechter: Was das Spiel abzieht, wird " +
-      "wiederhergestellt, und Verbesserungen zählen weiterhin. Die App merkt sich das für diesen Spielstand und friert " +
-      "sie erneut ein, wenn sie sich damit verbindet.",
+      "Die Attribute werden nicht schlechter, solange die App geöffnet und verbunden ist; Verbesserungen zählen weiterhin",
     freezeFitness: "Energie und Spielpraxis einfrieren",
     freezeFitnessNote:
-      "Solange die App geöffnet und verbunden ist, sinken seine Energie und Spielpraxis nicht: Was das Spiel abzieht, " +
-      "wird wiederhergestellt, und Zuwächse zählen weiterhin, sodass er bei 100 % bleibt. Die App merkt sich das " +
-      "für diesen Spielstand.",
+      "Seine Energie und Spielpraxis sinken nicht, solange die App geöffnet und verbunden ist; Zuwächse zählen weiterhin",
     freezePositions: "Einfrieren",
     freezePositionsInfo: "Was bewirkt das Einfrieren der Positionen?",
     freezePositionsNote:
@@ -1132,10 +1131,7 @@ export const de: Strings = {
     perWeek: "pro Woche",
     noFinances: "FM führt Finanzen nur für Vereine in den gespielten Ligen.",
     freeze: "Geld einfrieren",
-    freezeNote:
-      "Solange die App geöffnet und verbunden ist, sinkt der Kontostand nicht: Was das Spiel abzieht, wird " +
-      "wiederhergestellt, und Einnahmen zählen weiterhin. Die App merkt sich das für diesen Spielstand und friert ihn " +
-      "erneut ein, wenn sie sich damit verbindet.",
+    freezeNote: "Der Kontostand sinkt nicht, solange die App geöffnet und verbunden ist; Einnahmen zählen weiterhin",
 
     // Stadion
     stadium: "Stadion",
@@ -1143,16 +1139,12 @@ export const de: Strings = {
     seating: "Sitzplätze",
     used: "Genutzt",
     usedAll: "Vollständig",
-    usedTitle:
-      "Der Teil der Kapazität, den das Spiel zulässt, wenn es sie begrenzt (etwa während Plätze gesperrt sind); 0 " +
-      "bedeutet die gesamte Kapazität",
+    usedTitle: "Der Teil der Kapazität, den das Spiel zulässt, wenn es sie begrenzt; 0 bedeutet die gesamte Kapazität",
     expansion: "Ausbaubar auf",
     noStadium: "Das Stadion dieses Vereins konnte nicht gelesen werden.",
     stadiumName: "Name",
     rename: "Umbenennen",
-    renameTitle:
-      "Gibt dem Stadion einen anderen Namen; er wird sofort geschrieben und lässt sich unter Änderungen rückgängig " +
-      "machen",
+    renameTitle: "Gibt dem Stadion einen anderen Namen; er wird sofort geschrieben",
     renameInfoLabel: "Wie funktioniert das Umbenennen?",
     renameInfo:
       "Das Spiel speichert keine Stadionnamen in seinen Spielständen: Es übernimmt sie jedes Mal aus seiner Datenbank, " +
@@ -1189,7 +1181,7 @@ export const de: Strings = {
     actionsLabel: "Aktionen für alle Mitarbeiter",
     releaseAll: (count) => (count === 0 ? "Alle Verträge auflösen" : `Alle Verträge auflösen (${format(count)})`),
     releaseAllTitle:
-      "Löst auf einmal die Verträge aller Mitarbeiter des Vereins auf, außer Ihrem und denen des Vorstands; vorher fragt ein Fenster nach",
+      "Löst die Verträge aller Mitarbeiter des Vereins auf, außer Ihrem und denen des Vorstands; fragt vorher nach",
     releaseNone: "Bei keinem Mitarbeiter dieses Vereins kann der Vertrag aufgelöst werden",
     hint: "Alle außer Ihnen und dem Vorstand verlassen den Verein sofort. Rückgängig gibt es auch unter Änderungen.",
     released: (count) =>
@@ -1228,8 +1220,7 @@ export const de: Strings = {
 
     moveAll: "Alle Mitarbeiter transferieren",
     moveAllTitle:
-      "Transferiert auf einmal alle Mitarbeiter des Vereins zu einem anderen Verein, außer Ihnen und dem Vorstand; " +
-      "vorher fragt ein Fenster nach",
+      "Transferiert alle Mitarbeiter des Vereins zu einem anderen Verein, außer Ihnen und dem Vorstand; fragt vorher nach",
     moveNone: "Kein Mitarbeiter dieses Vereins kann transferiert werden",
     moved: (count, club) =>
       count === 1
@@ -1347,6 +1338,16 @@ export const de: Strings = {
     squadHeading: (team, count) => `${team}: ${format(count)} Spieler`,
     squadLabel: (team) => `Spieler der Nationalmannschaft: ${team}`,
     squadNote: "Die Spieler, die das Spiel für diese Mannschaft aufführt, in seiner Reihenfolge. Nominierungen, Kapitäne und der Vertrag des Trainers werden hier nicht bearbeitet.",
+    details: {
+      nation: "Nation",
+      founded: "Verband gegründet",
+      continent: "Kontinent",
+      staff: (count) => `Personal des Verbands (${format(count)})`,
+      noStaff: "Kein Personal des Verbands gefunden.",
+      job: "Aufgabe in der Nationalmannschaft",
+      team: "Mannschaft",
+      staffNote: "Aus dem Spiel gelesen; hier nicht bearbeitet. Die Aufgabe ist die beim Verband, nicht die bei einem Verein.",
+    },
     actionsHint: "Die Aktionen betreffen alle Spieler, die die erste Mannschaft aufführt. Rückgängig gibt es auch unter Änderungen.",
     noTeams: "Das Spiel führt für dieses Team keine Mannschaften, daher gibt es keinen Kader und kein Ansehen zu zeigen.",
     reading: "Kader wird gelesen …",
@@ -1402,9 +1403,9 @@ export const de: Strings = {
     term: "Laufzeit",
     years: (count) => (count === 1 ? "1 Jahr" : `${format(count)} Jahre`),
     unnamed: (kind) => `Typ ${format(kind)}`,
-    unnamedTitle: "Diese Art von Vertrag wurde noch keinem Namen im Bildschirm des Spiels zugeordnet; möglicherweise zeigt er sie nicht an.",
+    unnamedTitle: "Diese Art von Vertrag wurde noch keinem Namen im Bildschirm des Spiels zugeordnet",
     ended: "Abgelaufen",
-    endedTitle: "Der Vertrag ist vor dem Datum im Spiel abgelaufen. Der Sponsoring-Bildschirm des Spiels zeigt ihn nicht mehr an.",
+    endedTitle: "Vor dem Datum im Spiel abgelaufen: Der Sponsoring-Bildschirm des Spiels zeigt ihn nicht mehr an",
     falls: (percent) => `Sinkt bei Abstieg um ${format(percent)} %`,
     rises: (percent) => `Steigt bei Aufstieg in die höchste Liga um ${format(percent)} %`,
     note: "Nur lesend. Das sind die Beträge, die das Spiel für jeden Vertrag speichert. Der Sponsoring-Bildschirm zeigt die Verträge, die noch nicht abgelaufen sind.",
@@ -1426,7 +1427,7 @@ export const de: Strings = {
     reading: "Die Kaderregeln der Wettbewerbe werden aus dem Spiel gelesen … Das dauert einige Sekunden.",
     readAgain: "Neu lesen",
     readAgainTitle: "Die Regeln erneut aus dem Spiel lesen",
-    listNote: "Wettbewerbe ohne Kaderregeln werden nicht aufgeführt.",
+    listNote: "Aufgeführt sind nur die Wettbewerbe, die das Spiel in diesem Spielstand austrägt.",
     unavailableTitle: "Keine Kaderregeln anzuzeigen",
     unavailableBuild: "Noch niemand hat geprüft, wo diese Version des Spiels die Kaderregeln der Wettbewerbe ablegt; der Editor zeigt daher keine an, statt den falschen Speicher zu lesen.",
     unavailableUnreadable: "Der Editor hat die Kaderregeln dort gesucht, wo er sie in dieser Version des Spiels erwartet, doch was er fand, sieht nicht nach den Daten des Spiels aus; deshalb zeigt er keine an.",
@@ -1453,6 +1454,7 @@ export const de: Strings = {
     begins: (year) => `beginnt ${year}`,
     noRules: "Keine Kaderregeln.",
     noNext: "Das Spiel führt keine Regeln für die nächste Saison.",
+    noneGiven: "Das Spiel gibt diesem Wettbewerb keine Kaderregeln vor, hier gibt es also nichts zu ändern.",
     ruleColumns: {
       rule: "Regel",
       where: "Gezählt bei",
@@ -1518,14 +1520,17 @@ export const de: Strings = {
     },
     yearsTitle: "Die Saisons, für die die Regeln des Landes diese Regel vorsehen, nach dem Jahr, in dem eine Saison beginnt",
     leftAlone: "Unberührt",
-    notSavedTitle: "Die Regeln des Landes, wie ein Spielstand sie speichert, enthalten keine solche Regel; eine Änderung wäre beim Laden des Spielstands weg. Der Editor lässt sie unberührt.",
+    notSavedTitle:
+      "Der Spielstand enthält keine solche Regel, eine Änderung wäre nach dem Laden weg: Der Editor lässt sie unberührt",
     notACountTitle: "Ein Geldbetrag, keine Spielerzahl: Der Editor lässt ihn unberührt.",
     noneChangeable: "Diese Regeln lassen sich noch nicht ändern, zu keinem Zeitpunkt: Der Editor ändert eine Regel nur, wenn er sie auch in den Regeln findet, die der Spielstand speichert, damit die Änderung nach dem Laden des Spielstands noch da ist, und die Regeln dieses Wettbewerbs hat er dort nicht gefunden. Bisher gilt das für die Frauenligen, die Major League Soccer und einige Pokale.",
     unsavedNote: "Das Spiel speichert die Regeln dieses Wettbewerbs in keinem Spielstand: Es erstellt sie bei jedem Laden selbst neu, und für jede neue Saison erneut. Deshalb hält der Editor eine Änderung hier fest: Er schreibt sie ins laufende Spiel, merkt sie sich für diese Karriere und schreibt sie erneut, sobald er sich verbindet oder die Daten neu liest. Verbinden Sie den Editor nach dem Laden eines Spielstands einmal (oder klicken Sie auf „Daten neu laden“), damit die Änderung wieder da ist. „Rückgängig“ unter „Änderungen“ gibt sie wieder frei.",
     heldTag: "Festgehalten",
-    heldTitle: (original) => `Der Editor hält diese Anzahl fest und schreibt sie erneut, sobald er das Spiel liest. Der Wert des Spiels ist ${format(original)}.`,
+    heldTitle: (original) =>
+      `Der Editor hält diese Anzahl fest und schreibt sie bei jedem Lesen des Spiels erneut; der Wert des Spiels ist ${format(original)}`,
     savedDiffers: (value) => `Die Regeln im Spielstand enthalten ${format(value)}`,
-    savedDiffersTitle: "Das Spiel richtet sich nach der Liste und erstellt die Liste beim Laden des Spielstands aus den Regeln im Spielstand. Eine hier gespeicherte Änderung setzt beides.",
+    savedDiffersTitle:
+      "Das Spiel spielt nach der Liste und erstellt sie beim Laden aus dem Spielstand; eine Änderung hier setzt beides",
     edit: "Regeln ändern",
     editTitle: "Die Anzahlen der Kaderregeln dieses Wettbewerbs ändern",
     save: "Regeln speichern",
@@ -1558,8 +1563,7 @@ export const de: Strings = {
     previewTag: "Browser-Vorschau · Beispieldaten",
     noDate: "Kein Spieldatum",
     noDateTitle:
-      "FMLibreEditor konnte das Spieldatum in dieser Version des Spiels nicht lesen, daher wird kein Alter angezeigt " +
-      "und Altersfilter finden niemanden. Suchen Sie nach Updates.",
+      "Das Spieldatum konnte nicht gelesen werden: kein Alter, und Altersfilter finden niemanden. Suchen Sie nach Updates.",
     reload: "Daten neu laden",
     refresh: "Aktualisieren",
     detecting: "Football Manager wird gesucht…",
@@ -1674,15 +1678,12 @@ export const de: Strings = {
       names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} und ${names[names.length - 1]}`,
     allow: "Trotzdem bearbeiten",
     allowTitle:
-      "Schaltet das Bearbeiten ein, bis FMLibreEditor geschlossen wird oder sich neu verbindet. Sichern Sie vorher Ihren " +
-      "Spielstand.",
+      "Schaltet das Bearbeiten ein, bis die App geschlossen wird oder sich neu verbindet. Sichern Sie vorher Ihren Spielstand.",
   },
 
   diagnostics: {
     copy: "Diagnose kopieren",
-    copyTitle:
-      "Kopiert, was FMLibreEditor im Spiel gefunden hat, zum Einfügen in einen Fehlerbericht. Enthält keine Namen oder " +
-      "Pfade.",
+    copyTitle: "Kopiert für einen Fehlerbericht, was die App im Spiel gefunden hat; enthält keine Namen oder Pfade",
     copied: "Kopiert",
     failed: (reason) => `Die Diagnose konnte nicht kopiert werden: ${reason}`,
   },
@@ -1708,7 +1709,7 @@ export const de: Strings = {
     download: "Herunterladen",
     install: "Aktualisieren",
     installTitle:
-      "Lädt die neue Version herunter und installiert sie; FMLibreEditor schließt sich und öffnet sich mit ihr neu",
+      "Lädt die neue Version herunter und installiert sie; die App schließt sich und öffnet sich mit ihr neu",
     preparing: "Wird vorbereitet…",
     downloading: (percent) =>
       percent === null ? "Wird heruntergeladen…" : `Wird heruntergeladen… ${percent} %`,
@@ -1785,7 +1786,8 @@ export const de: Strings = {
     inGame: "Im Spiel",
     inGameTitle: "Das Spiel hatte diesen Wert, als die Daten zuletzt gelesen wurden",
     notInGame: "Nicht im Spiel",
-    notInGameTitle: "Das Spiel hatte diesen Wert beim letzten Lesen der Daten nicht: Das Spiel wurde nach der Änderung nicht gespeichert, oder es hat den Wert seitdem geändert",
+    notInGameTitle:
+      "Beim letzten Lesen nicht im Spiel: nach der Änderung nicht gespeichert, oder das Spiel hat den Wert seitdem geändert",
     /** In the place of Undo for an earlier change that cannot be undone from here, and its hover text. */
     historyOnly: "Verlauf",
     historyOnlyTitle: "Vor der letzten Verbindung der App gemacht: Zum Rückgängigmachen wäre der damalige Speicher des Spiels nötig",
@@ -1793,7 +1795,7 @@ export const de: Strings = {
     batchNotInGame: (count) => `${format(count)} nicht im Spiel`,
     /** Empties the list and the history of the career; the question that asks first, and its two answers. */
     clearHistory: "Verlauf löschen",
-    clearHistoryTitle: "Diese Liste leeren und den Verlauf dieser Karriere vergessen. Die Änderungen bleiben im Spiel.",
+    clearHistoryTitle: "Diese Liste leeren und den Verlauf dieser Karriere vergessen; die Änderungen bleiben im Spiel",
     confirmClear: "Den Verlauf dieser Karriere löschen? Die Änderungen bleiben im Spiel, lassen sich von hier aus aber nicht mehr rückgängig machen.",
     keepHistory: "Behalten",
     clearConfirm: "Löschen",
@@ -1802,6 +1804,7 @@ export const de: Strings = {
     released: (name) => `Vertrag von ${name} aufgelöst`,
     fee: (amount) => `Ablöse ${amount}`,
     arranged: (date) => `Das Spiel führt den Wechsel am ${date} aus`,
+    arrangedLoan: (day, until) => `Das Spiel führt die Leihe am ${day} aus, bis ${until}`,
     optionRemoved: (amount) => `Kaufoption (${amount}) entfernt`,
     healed: (count) => (count === 1 ? "1 Verletzung geheilt" : `${format(count)} Verletzungen geheilt`),
     lifted: (count) => (count === 1 ? "1 Sperre aufgehoben" : `${format(count)} Sperren aufgehoben`),
@@ -1868,15 +1871,9 @@ export const de: Strings = {
   export: {
     button: "Exportieren",
     buttonTitle: {
-      player:
-        "Schreibt die Spieler, die die Liste zeigt, in eine CSV- oder JSON-Datei, für eine Tabellenkalkulation oder ein " +
-        "Skript",
-      staff:
-        "Schreibt die Mitarbeiter, die die Liste zeigt, in eine CSV- oder JSON-Datei, für eine Tabellenkalkulation oder " +
-        "ein Skript",
-      club:
-        "Schreibt die Vereine, die die Liste zeigt, in eine CSV- oder JSON-Datei, für eine Tabellenkalkulation oder ein " +
-        "Skript",
+      player: "Schreibt die Spieler, die die Liste zeigt, in eine CSV- oder JSON-Datei",
+      staff: "Schreibt die Mitarbeiter, die die Liste zeigt, in eine CSV- oder JSON-Datei",
+      club: "Schreibt die Vereine, die die Liste zeigt, in eine CSV- oder JSON-Datei",
     },
     title: { player: "Spieler exportieren", staff: "Mitarbeiter exportieren", club: "Vereine exportieren" },
     scope: (entity, count) =>
@@ -1930,7 +1927,7 @@ export const de: Strings = {
 
     /** The export of the Changes view: a CSV file of the changes its search and filters show. */
     changes: {
-      buttonTitle: "Die Änderungen, die die Liste zeigt, in eine CSV-Datei schreiben, für eine Tabellenkalkulation oder ein Skript",
+      buttonTitle: "Die Änderungen, die die Liste zeigt, in eine CSV-Datei schreiben",
       title: "Änderungen exportieren",
       /** What the export covers: everything the list's search and filters select, or, with none on, the whole history. */
       scope: (count, filtering) =>
@@ -2012,8 +2009,7 @@ export const de: Strings = {
     ofCurrent: "% des aktuellen Werts",
     percentTitle: "Ein Prozentsatz des aktuellen Werts: 100 behält ihn bei, 110 erhöht ihn um ein Zehntel, 50 halbiert ihn",
     addYearsTitle:
-      "Jahre, die zu jedem Datum addiert werden; Tag und Monat bleiben, eine negative Zahl verschiebt es zurück. " +
-      "Aus dem 29. Februar wird in einem Jahr ohne ihn der 28. Februar",
+      "Zu jedem Datum addierte Jahre; eine negative Zahl verschiebt es zurück, aus dem 29. Februar kann der 28. werden",
     years: "Jahre",
     invalidAdd: (min, max) => `Geben Sie eine ganze Zahl von ${format(min)} bis ${format(max)} ein`,
     invalidPercent: (min, max) => `Geben Sie einen ganzen Prozentwert von ${min} bis ${max} ein`,
@@ -2100,7 +2096,7 @@ export const de: Strings = {
     from: "Von",
     to: "Zu",
 
-    modeLabel: "Transfer, jetzt verschieben oder Tausch",
+    modeLabel: "Transfer, Leihe, jetzt verschieben oder Tausch",
     modeMove: "Jetzt verschieben",
     modeSwap: "Gegen einen Spieler tauschen",
     modeArrange: "Transfer",
@@ -2126,6 +2122,32 @@ export const de: Strings = {
       "Unter Änderungen aufgeführt; ein Rückgängig nimmt den Transfer bis zu diesem Tag zurück",
     ],
     arrangeButton: "Transfer vereinbaren",
+
+    modeLoan: "Leihe",
+    loanNote: "Das Spiel führt die Leihe an seinem nächsten Tag aus, wie bei seinen eigenen; danach ist er wieder bei seinem Verein.",
+    loanChecking: "Leihe wird geprüft…",
+    loanOn: (date: string) => `Das Spiel führt die Leihe am ${date} aus`,
+    loanUntil: (date: string) => `Die Leihe dauert bis ${date}`,
+    loanWage: (money: string, share: number) => `Der Verein zahlt ${money} pro Woche (${format(share)} % seines Gehalts)`,
+    loanMonthlyFee: (money: string) => `Monatliche Gebühr ${money}`,
+    loanOption: (money: string) => `Kaufoption über ${money}`,
+    loanDoes: [
+      "Jetzt vereinbart: Das Spiel führt die Leihe aus, wenn es seinen nächsten Tag erreicht",
+      "Seine Historie führt die Leihe auf; am Tag nach dem letzten Tag kehrt er zu seinem Verein zurück",
+      "Der Verein zahlt seinen Anteil am Gehalt und, falls gesetzt, die monatliche Gebühr",
+      "Mit Kaufoption kann der aufnehmende Verein ihn am Ende der Leihe zu deren Betrag verpflichten",
+    ],
+    loanDoesHeading: "Was die Leihe bewirkt",
+    loanHint: "Im Spiel ändert sich nichts, bis Sie auf Leihe vereinbaren klicken.",
+    loanButton: "Leihe vereinbaren",
+    loanLastDay: "Letzter Tag der Leihe",
+    loanLastDayHint: "Am nächsten Tag ist er wieder bei seinem Verein",
+    loanShare: "Übernommener Gehaltsanteil",
+    loanShareHint: "Das zahlt der aufnehmende Verein; den Rest sein Verein",
+    loanShareInvalid: "Geben Sie eine ganze Zahl von 0 bis 100 ein",
+    loanMonthly: "Monatliche Leihgebühr",
+    loanOptionFee: "Kaufoption",
+    loanOptionFeeHint: "Der aufnehmende Verein kann ihn am Ende der Leihe zu dieser Ablöse verpflichten; leer: keine",
 
     // Die Wahl des Vereins
     searchLabel: "Verein suchen, zu dem der Spieler wechselt",
@@ -2532,58 +2554,40 @@ export const de: Strings = {
     liftNone: "Niemand in dieser Mannschaft ist gesperrt",
     inspireAll: "Alle motivieren",
     inspireAllTitle:
-      "Setzt die Moral jedes Spielers dieser Mannschaft auf 20, den Höchstwert, und entfernt seine Gründe für " +
-      "Unzufriedenheit",
+      "Setzt die Moral jedes Spielers auf 20, den Höchstwert, und entfernt seine Gründe für Unzufriedenheit",
     maxCohesion: "Teambuilding maximieren",
     maxCohesionTitle:
-      "Setzt das Teambuilding jedes Spielers dieser Mannschaft mit dem Verein auf 100, den Höchstwert. Das Spiel zeigt " +
-      "das Teambuilding der Mannschaft auf seiner Seite Mannschaftsgefüge, sobald es weiterläuft: Klicken Sie im Spiel " +
-      "auf Fortfahren",
+      "Setzt das Teambuilding jedes Spielers mit dem Verein auf 100, den Höchstwert; das Spiel zeigt es, sobald es weiterläuft",
     cohesionNone:
-      "Der Editor kann das Teambuilding dieser Mannschaft nicht lesen: Diese Version des Spiels wurde dafür nicht " +
-      "geprüft, oder keiner ihrer Spieler hat einen Eintrag für den Verein",
+      "Nicht lesbar: Diese Version des Spiels wurde dafür nicht geprüft, oder kein Spieler hat einen Eintrag für den Verein",
     cohesionWithout: (count) =>
       count === 1
         ? "1 Spieler hat noch kein Teambuilding mit dem Verein"
         : `${format(count)} Spieler haben noch kein Teambuilding mit dem Verein`,
     maxTactics: "Taktik maximieren",
     maxTacticsTitle:
-      "Lässt jeden Spieler dieser Mannschaft die Taktik, die sie spielt, bestmöglich kennen, in den acht Bereichen der " +
-      "Seite Taktische Effektivität, wie es wochenlanges Training täte. Die Attribute bleiben, wie sie sind. Die " +
-      "Bereiche sinken wieder, wenn das Training altert, nach etwa sechs Wochen, und eine andere Taktik braucht einen " +
-      "weiteren Klick. Das Spiel zeigt sie, sobald es weiterläuft: Klicken Sie im Spiel auf Fortfahren",
+      "Lässt jeden Spieler die Taktik der Mannschaft bestmöglich kennen; das sinkt nach etwa sechs Wochen, wie Training",
     tacticsNone:
-      "Der Editor kann nicht lesen, wie gut diese Mannschaft ihre Taktik kennt: Diese Version des Spiels wurde dafür " +
-      "nicht geprüft, oder die Mannschaft spielt keine Taktik, die Sie wählen",
+      "Nicht lesbar: Diese Version des Spiels wurde dafür nicht geprüft, oder die Mannschaft spielt keine Taktik, die Sie wählen",
     tacticsUntrained: (count) =>
       count === 1
         ? "1 Spieler trainiert nicht (etwa wegen einer Verletzung): Sein Trainingsverlauf bleibt, wie er ist"
         : `${format(count)} Spieler trainieren nicht (etwa wegen einer Verletzung): Ihr Trainingsverlauf bleibt, wie er ist`,
     refreshAll: "Alle regenerieren",
     refreshAllTitle:
-      "Setzt Energie und Spielpraxis jedes Spielers dieser Mannschaft auf 100 % und lässt ihn sich voll erholen " +
-      "(Erschöpfung -500)",
+      "Setzt Energie und Spielpraxis jedes Spielers auf 100 % und lässt ihn sich voll erholen (Erschöpfung -500)",
     batchTraits: "Eigenschaften für Kader",
     batchTraitsTitle: "Bevorzugte Spielweisen für Spieler dieser Mannschaft hinzufügen oder entfernen",
     maxAll: "Attribute maximieren",
     maxAllTitle:
-      "Setzt jedes Attribut jedes Spielers dieser Mannschaft auf den besten Wert: 20, und 1 für " +
-      "Verletzungsanfälligkeit und Unsportlichkeit",
+      "Setzt jedes Attribut jedes Spielers auf den besten Wert: 20, und 1 für Verletzungsanfälligkeit und Unsportlichkeit",
     atItsBest: "Mannschaft in Bestform",
     atItsBestTitle:
-      "„Alle heilen“, „Alle motivieren“, „Alle regenerieren“, „Teambuilding maximieren“ und „Taktik maximieren“ mit " +
-      "einem Klick, den ein einziges „Rückgängig“ zurücknimmt. Attribute und Sperren bleiben, wie sie sind. Ein " +
-      "Schritt, der nicht ausgeführt werden kann, etwa „Alle heilen“, wenn niemand verletzt ist, wird übersprungen, " +
-      "und das Ergebnis nennt ihn. Die Bereiche der Taktik sinken wieder, wenn das Training altert, nach etwa sechs " +
-      "Wochen, und eine andere Taktik braucht einen weiteren Klick. Das Spiel zeigt die Änderungen, sobald es " +
-      "weiterläuft: Klicken Sie im Spiel auf Fortfahren",
+      "Heilt, motiviert und regeneriert alle, maximiert Teambuilding und Taktik mit einem Klick; ein „Rückgängig“ nimmt es zurück",
     atItsBestSkipped: (step, reason) => `„${step}“ übersprungen: ${reason}`,
     destroy: "Mannschaft in Tiefstform",
     destroyTitle:
-      "Bringt jeden Spieler dieser Mannschaft auf seinen Tiefstwert: Moral und Zufriedenheit, Energie, Spielpraxis " +
-      "und Erschöpfung, Teambuilding mit dem Verein und, wenn Sie die Taktik der Mannschaft wählen, wie gut er sie " +
-      "kennt. Kein Wert wird besser, als er ist; Attribute, Verletzungen und Sperren bleiben. Es fragt vorher, und " +
-      "ein einziges „Rückgängig“ nimmt alles zurück",
+      "Bringt Moral, Fitness, Teambuilding und Taktikkenntnis jedes Spielers auf den Tiefstwert; fragt vorher nach",
     destroySteps: {
       demoralize: "Moral und Zufriedenheit",
       exhaust: "Energie und Spielpraxis",
@@ -2614,17 +2618,13 @@ export const de: Strings = {
     freezeLabel: "Ganze Mannschaft einfrieren",
     freezeAttributes: "Attribute einfrieren",
     freezeAttributesTitle:
-      "Solange die App geöffnet und verbunden ist, werden die Attribute jedes Spielers dieser Mannschaft nicht " +
-      "schlechter: Was das Spiel abzieht, wird wiederhergestellt, und Verbesserungen zählen weiterhin",
+      "Die Attribute jedes Spielers dieser Mannschaft werden nicht schlechter, solange die App geöffnet und verbunden ist",
     freezeFitness: "Energie und Spielpraxis einfrieren",
     freezeFitnessTitle:
-      "Solange die App geöffnet und verbunden ist, sinken Energie und Spielpraxis jedes Spielers dieser Mannschaft " +
-      "nicht: Was das Spiel abzieht, wird wiederhergestellt. Nutzen Sie zuerst „Alle regenerieren“, um sie bei " +
-      "100 % zu halten",
+      "Energie und Spielpraxis jedes Spielers sinken nicht, solange die App verbunden ist; für 100 % zuerst „Alle regenerieren“",
     freezePositions: "Positionen einfrieren",
     freezePositionsTitle:
-      "Solange die App geöffnet und verbunden ist, bleiben die Positionsbewertungen jedes Spielers dieser Mannschaft, " +
-      "wie sie sind: Eine Bewertung, die das Spiel erhöht oder senkt, wird zurückgesetzt",
+      "Die Positionsbewertungen jedes Spielers bleiben, wie sie sind, solange die App geöffnet und verbunden ist",
     frozenCount: (frozen, total) => `${format(frozen)} von ${format(total)}`,
     freezeHint:
       "Das Einfrieren betrifft jeden Spieler der Liste und bleibt bei ihm, wohin er auch wechselt. Die App merkt sich " +
@@ -2698,8 +2698,8 @@ export const de: Strings = {
     bannedTitle: (count) => (count === 1 ? "1 Sperre" : `${format(count)} Sperren`),
     unrest: "Unruhe",
     unrestTitle: (count) =>
-      `${count === 1 ? "1 Mitspieler hat" : `${format(count)} Mitspieler haben`} einen Grund, seinetwegen unzufrieden zu ` +
-      "sein. „Alle entfernen“ in seinem Profil löst das, sobald das Spiel weiterläuft",
+      `${count === 1 ? "1 Mitspieler ist" : `${format(count)} Mitspieler sind`} seinetwegen unzufrieden; ` +
+      "„Alle entfernen“ in seinem Profil löst das, sobald das Spiel weiterläuft",
     onLoan: "Verliehen",
     onLoanTitle: "An einen anderen Verein verliehen",
     loanee: "Geliehen",
@@ -3240,6 +3240,8 @@ export const de: Strings = {
       p: "Knipser",
       tcf: "Mitarbeitender Mittelstürmer",
       ocf: "Umschaltstürmer",
+      gk: "Goalkeeper",
+      wm: "Wide Midfielder",
     },
     reasons: {
       listed: () => "Auf Transferliste",
@@ -3270,6 +3272,51 @@ export const de: Strings = {
       unwanted: () => "Teamstatus: Nicht benötigt",
       listed: () => "Bereits auf der Transferliste",
     },
+  },
+
+  /** Recipes (`RecipeMenu`): see `en.ts`. */
+  recipes: {
+    button: "Rezepte",
+    buttonTitle: "Fertige Sätze von Änderungen, erst mit Vorschau",
+    names: {
+      wonderkid: "Zum Wunderkind machen",
+      injuryProof: "Verletzungsfest machen",
+      longCareer: "Karriere verlängern",
+      richClub: "Verein reich machen",
+      topFacilities: "Beste Einrichtungen",
+    },
+    notes: {
+      wonderkid:
+        "Bis 21 Jahre: potenzielle Fähigkeit mindestens 180, Fähigkeit und Attribute passend zum Alter. Höhere " +
+        "Werte bleiben.",
+      injuryProof: "Verletzungsanfälligkeit 1, Grundfitness 20, Ausdauer mindestens 15, Verletzungen geheilt.",
+      longCareer:
+        "Kein geplantes Karriereende, Vertrag noch mindestens drei Jahre, Grundfitness 20, Professionalität " +
+        "mindestens 18.",
+      richClub: "Kontostand, Transferbudget und Gehaltsbudgets auf das Niveau der reichsten Vereine.",
+      topFacilities: "Alle fünf Einrichtungen auf 20.",
+    },
+    tooOld: (oldest: number) => `Für Spieler von höchstens ${oldest} Jahren`,
+    command: (recipe: string) => `Rezept: ${recipe}`,
+    working: "Änderungen werden berechnet…",
+    summary: (changes: number, kept: number, left: number) =>
+      [
+        changeCount(changes),
+        kept > 0 && (kept === 1 ? "1 Wert ist schon so gut" : `${format(kept)} Werte sind schon so gut`),
+        left > 0 && valuesLeftAlone(left),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    tableLabel: "Änderungen, die das Rezept vornehmen würde",
+    keptHeading: (count: number) =>
+      count === 1
+        ? "1 Wert bleibt, wie er ist: schon so gut"
+        : `${format(count)} Werte bleiben, wie sie sind: schon so gut`,
+    keptLabel: "Werte, die schon so gut sind",
+    valueColumn: "Wert",
+    leftLabel: "Was das Rezept unverändert lässt",
+    undo: "Dieses Rezept rückgängig machen",
+    undoTitle: "Schreibt alles, was dieses Rezept geändert hat, zurück ins Spiel",
   },
 
   /** A player's development: the Development tab of his profile, the note under his abilities, the squad's arrows (see en.ts). */
@@ -3365,6 +3412,36 @@ export const de: Strings = {
     link: "Neuigkeiten",
     command: "Neu in dieser Version",
     versions: {
+      "0.5.5": [
+        {
+          title: "FM 27.1.1.",
+          text: "Das Update vom 24. November ist auf Game Pass, Steam und dem Mac bekannt, und alles funktioniert darauf wie zuvor. Erscheint künftig ein Update, liest die App die Vereinsfinanzen und die gespielte Taktik weiter, bis eine Version folgt, die es kennt.",
+        },
+        {
+          title: "Wettbewerbe.",
+          text: "Unter „Wettbewerbe“ sehen und ändern Sie die Kaderregeln jedes Wettbewerbs, etwa wie viele ausländische Spieler ein Kader melden darf, für diese und die nächste Saison getrennt. Unter Windows und auf Macs mit Apple Silicon.",
+        },
+        {
+          title: "Leihen.",
+          text: "„Leihe“, neu im Transfer-Dialog, vereinbart eine Leihe für den nächsten Tag im Spiel, in einer Transferperiode oder außerhalb. Sie legen den letzten Tag fest, den Anteil am Gehalt, den der andere Verein zahlt, eine monatliche Gebühr und auf Wunsch eine Kaufoption. Unter Windows und auf Macs mit Apple Silicon.",
+        },
+        {
+          title: "Rezepte.",
+          text: "Fertige Sätze von Änderungen für einen Spieler oder einen Verein: „Zum Wunderkind machen“, „Verletzungsfest machen“, „Karriere verlängern“, „Verein reich machen“ und „Beste Einrichtungen“. Jedes zeigt vor dem Schreiben, was es ändert, und ein einziges „Rückgängig“ nimmt es zurück.",
+        },
+        {
+          title: "Entwicklung.",
+          text: "Die App hält jeden Spieler einmal pro Spielwoche fest, wenn sie das Spiel liest, und das Profil eines Spielers zeigt es unter „Entwicklung“: seine Fähigkeit, sein Potenzial, seinen Wert und seine Attribute über Ihre Karriere.",
+        },
+        {
+          title: "B-Mannschaften.",
+          text: "Unter „Kader“ eines Vereins stehen nach den eigenen Mannschaften auch seine B-Mannschaften, etwa Castilla bei Real Madrid, und die Mannschaftsaktionen wirken auch dort.",
+        },
+        {
+          title: "Kürzere Hinweise.",
+          text: "Die Hinweise an Schaltflächen sind je eine Zeile lang und stehen in einem kleinen Kasten statt in einem langen Streifen quer über das Fenster.",
+        },
+      ],
       "0.5.4": [
         {
           title: "Transfers im Karriereverlauf.",

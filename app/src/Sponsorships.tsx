@@ -60,9 +60,9 @@ function Deal({ deal }: { deal: Sponsorship }) {
   return (
     <div className={`sponsor-deal${deal.ended ? " ended" : ""}`}>
       <h4>
-        <span title={deal.name === null ? text.unnamedTitle : undefined}>{deal.name ?? text.unnamed(deal.kind)}</span>
+        <span data-tip={deal.name === null ? text.unnamedTitle : undefined}>{deal.name ?? text.unnamed(deal.kind)}</span>
         {deal.ended && (
-          <span className="sponsor-ended" title={text.endedTitle}>
+          <span className="sponsor-ended" data-tip={text.endedTitle}>
             {text.ended}
           </span>
         )}

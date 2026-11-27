@@ -20,7 +20,7 @@ export function CompareToggle({ comparison, player }: { comparison: Comparison; 
       className="compare-toggle"
       aria-pressed={included}
       aria-disabled={blocked || undefined}
-      title={included ? text.remove : blocked ? text.full(MAX_COMPARED) : text.add}
+      data-tip={included ? text.remove : blocked ? text.full(MAX_COMPARED) : text.add}
       onClick={() => {
         if (!blocked) {
           comparison.toggle(player);

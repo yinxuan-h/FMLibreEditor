@@ -1,0 +1,42 @@
+# FM27 on Steam for macOS (app 4530370, build 26797085), the update of 24 November 2026 (version 27.1.1.2511875): the
+# Intel half of the universal game_plugin, which Intel Macs run, and Apple silicon Macs under Rosetta. Found in the file,
+# not read in a running game: __DATA starts 0x6000 earlier (0x5D20000), and the code's RIP-relative loads peak where
+# build 26620374's did, moved with it (the date and the retirement manager's static 0x20 more back, the arrays and the
+# game's own object 0x30 more), with the same loads around each: 7,631 at the date, 197 and 181 at the players' begin
+# and end, 19 and 19 at the staff's, 106 and 94 at the clubs', 66 at the retirement manager's static and 537 at the
+# game's own object's.
+name = "FM27 Steam build 26797085 (macOS, Intel)"
+edition = 27
+storefront = "steam"
+
+# The in-game date.
+current_date = 0x5D2D6F0
+
+# The static pointer to the retirement manager, 0x9810 before the date as in the builds before; its class is checked
+# before it is used.
+retirement_manager = 0x5D23EE0
+
+# A static pointer to the game's own object (game_plugin::GAME_UI), 0x1AE8 after the players pair as in build
+# 26620374, as the arm64 half's second one is 0x1AC8 after its pair. Its class is checked before it is used.
+game_ui = 0x5D4EE20
+
+# game_plugin as mapped in memory: its LC_UUID identifies the build and the architecture.
+[plugin]
+uuid = "D1D81C1A-44AD-3342-B6D4-B8DDF2EA6B61"
+
+# RVAs in game_plugin of the (begin, end) pointer pairs of the entity arrays.
+[arrays]
+players = 0x5D4D338
+staff = 0x5D4D380
+clubs = 0x5D4D4F0
+
+# [national_teams] is not here: the places of the national teams were not read on this build, so the National teams
+# tab shows nothing on it (see docs/DEVELOPING.md, National teams).
+
+# What this build lays out otherwise than layout-macos.toml, as the arm64 half does: both halves are laid out alike.
+[layout.club_finance]
+corporate = 0x8AD
+
+[layout.tactics]
+tactics = 0x1008
+current = 0x1020

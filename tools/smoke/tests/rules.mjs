@@ -1,7 +1,8 @@
 // The Competitions tab: the squad rules of the competitions the game is playing, this season's and next season's, as
 // the app reads them in one pass over the game's memory, against the probe's `rules`, which reads them on its own; the
-// tab's list and its search, the panel of a competition with an area for each season, its Change rules button turning
-// the counts into inputs (Cancel: nothing is saved), and Read again. With --writes, one rule is set through the
+// tab's list (every competition being played, those with no squad rule too) and its search, the panel of a competition
+// with an area for each season, its Change rules button turning the counts into inputs (Cancel: nothing is saved), the
+// panel of a competition with no squad rule, and Read again. With --writes, one rule is set through the
 // command and put back with Undo, and one is typed in the panel, saved and undone: the probe reads each back, in the
 // list and in the nation's rules the save keeps. On a build whose profile does not turn the squad rules on, the tab
 // saying why.
@@ -18,6 +19,14 @@ const ROWS = `[...document.querySelectorAll("table.competition-grid tbody tr")].
 const limit = (compare) => (compare < 0 ? "at most" : "at least");
 const ruleKey = (rule) => `${limit(rule.compare)}|${rule.value}|${rule.name ?? "kind"}`;
 const editable = (rule) => (rule.source !== null || rule.unsaved) && rule.value >= 0 && rule.value <= 255;
+const hasRules = (competition) => competition.current.length + (competition.next?.length ?? 0) > 0;
+
+/** How many competitions `fmlibre-probe rules` finds being played, and how many of them have squad rules. */
+function probePlayed(probe) {
+  // UID 0 is no competition's: the probe prints its counts and no competition.
+  const m = /(\d+) competitions being played, (\d+) with squad rules/.exec(probe.run(["rules", "0"]));
+  return m ? { total: Number(m[1]), ruled: Number(m[2]) } : null;
+}
 
 /**
  * What `fmlibre-probe rules UID` prints for one competition: the rules of each season as "limit|value|name" keys, as
@@ -85,11 +94,16 @@ export async function run({ app, report, probe, writes: mayWrite }) {
     return;
   }
   const competitions = view.competitions;
+  const ruled = competitions.filter(hasRules);
   const rules = competitions.flatMap((c) => [...c.current, ...(c.next ?? [])]);
-  report.note(`${competitions.length} competitions with squad rules, ${rules.length} rules, ${rules.filter(editable).length} ` +
-    `the editor changes; read in ${((Date.now() - started) / 1000).toFixed(1)} s`);
-  report.check("competitions have squad rules, and every one listed has some",
-    competitions.length > 0 && competitions.every((c) => c.current.length + (c.next?.length ?? 0) > 0));
+  report.note(`${competitions.length} competitions, ${ruled.length} with squad rules, ${rules.length} rules, ` +
+    `${rules.filter(editable).length} the editor changes; read in ${((Date.now() - started) / 1000).toFixed(1)} s`);
+  report.check("competitions have squad rules", ruled.length > 0);
+  // Those with none are listed too, so that a search finds them (#274: Slovakia's divisions seemed unknown).
+  const played = probePlayed(probe);
+  report.check("the app lists every competition the probe finds being played, with squad rules or none",
+    competitions.length === played?.total && ruled.length === played?.ruled,
+    `${competitions.length} listed, ${ruled.length} with rules; the probe: ${JSON.stringify(played)}`);
   report.check("nearly every rule is of a kind the game names",
     rules.filter((rule) => rule.name !== null).length >= 0.9 * rules.length);
   const shared = competitions.filter((c) => c.sharedWith.length > 0);
@@ -115,7 +129,7 @@ export async function run({ app, report, probe, writes: mayWrite }) {
   await app.waitFor(`${ROWS}.length > 0`, "the competitions' rows", 120000);
   await app.setInput(`${VIS}(".search input")`, "");
   await app.waitFor(`${ROWS}.length === ${competitions.length}`, "every competition listed");
-  report.check("the tab lists every competition with squad rules", true, `${competitions.length} rows`);
+  report.check("the tab lists every competition, those with no squad rule too", true, `${competitions.length} rows`);
   await openCompetition(app, chosen);
   const areas = await app.js(`[...${GROUP}.querySelectorAll(".rule-season")].map((area) => ({
     heading: area.querySelector("h4").childNodes[0].textContent,
@@ -155,6 +169,20 @@ export async function run({ app, report, probe, writes: mayWrite }) {
   await sleep(300);
   await app.waitFor(`${again} && !${again}.disabled && !!${GROUP}`, "the rules read again", 120000);
   report.check("Read again shows them again", true);
+
+  // A competition the game gives no squad rule: found, and its panel says so, with nothing to change.
+  const bare = competitions.find((c) => !hasRules(c));
+  if (bare) {
+    await openCompetition(app, bare);
+    const none = `/gives this competition no squad rules/.test(${GROUP}?.textContent ?? "")`;
+    await app.waitFor(none, `${bare.name}'s panel saying it has no squad rule`);
+    const left = await app.js(`${GROUP}.querySelectorAll(".rule-season, .prize-actions button, input").length`);
+    report.check(`the panel of ${bare.name}, which has no squad rule, says the game gives it none, with nothing to change`,
+      left === 0, `${left} areas, buttons or inputs`);
+    await app.shot("rules-none");
+  } else {
+    report.skip("a competition with no squad rule", "every competition the game plays has some");
+  }
 
   if (!mayWrite) {
     report.skip("changing a squad rule", "writes to the game: run with --writes, on a save you can lose");

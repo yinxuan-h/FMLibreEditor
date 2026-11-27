@@ -135,7 +135,7 @@ export function CaptainMenu({ name, holds, editable, busy, onPick }: CaptainMenu
         // While a change is under way the button is only dimmed (aria-disabled): a disabled button loses focus.
         aria-disabled={busy || undefined}
         disabled={!editable}
-        title={editable ? text.menuTitle : readOnlyNote}
+        data-tip={editable ? text.menuTitle : readOnlyNote}
         onClick={() => {
           if (open) {
             setAnchor(null);

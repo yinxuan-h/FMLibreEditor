@@ -1,9 +1,11 @@
-// The Competitions tab: the competitions that have squad rules, and beside the list the rules of the one picked, this
-// season's and next season's in an area each: how many foreign players a squad may register, how many goalkeepers, how
-// many players in all, and what a team may pick for a match (docs/recon/fm27-league-rules.md). While the game can be
-// written to, the counts can be changed, season by season. The editor finds the rules in one pass over the game's
-// memory, which takes a few seconds, the first time the tab is shown; after that it keeps them, with its own changes.
-// Competitions played under the same lists (a division and its groups) share their rules, and say so.
+// The Competitions tab: the competitions the game is playing, and beside the list the squad rules of the one picked,
+// this season's and next season's in an area each: how many foreign players a squad may register, how many
+// goalkeepers, how many players in all, and what a team may pick for a match (docs/recon/fm27-league-rules.md). While
+// the game can be written to, the counts can be changed, season by season. About a quarter of the competitions have no
+// squad rule (Scotland's and Slovakia's top divisions, most cups): they are listed too, so that a search finds them,
+// and their panel says the game gives them none. The editor finds the rules in one pass over the game's memory, which
+// takes a few seconds, the first time the tab is shown; after that it keeps them, with its own changes. Competitions
+// played under the same lists (a division and its groups) share their rules, and say so.
 
 import { useContext, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { competitionRules, setCompetitionRules } from "./editing";
@@ -40,6 +42,10 @@ const folded = (value: string) =>
     .replace(/ı/g, "i")
     .toLowerCase();
 
+/** Whether the game gives `competition` a squad rule, this season or the next. */
+const hasRules = (competition: CompetitionRules) =>
+  competition.current.length > 0 || (competition.next?.length ?? 0) > 0;
+
 type Read = { view: CompetitionRulesRead } | { error: string };
 
 interface CompetitionBrowserProps {
@@ -48,7 +54,7 @@ interface CompetitionBrowserProps {
   active: boolean;
 }
 
-/** The competitions with squad rules, and the rules of the one picked beside them; or why there are none to show. */
+/** The competitions the game plays, and the squad rules of the one picked beside them; or why there are none to show. */
 export function CompetitionBrowser({ version, active }: CompetitionBrowserProps) {
   const [start] = useState(() => restored("competitions", readTab));
   const [read, setRead] = useState<Read | null>(null);
@@ -164,7 +170,7 @@ export function CompetitionBrowser({ version, active }: CompetitionBrowserProps)
           </label>
           <span className="count">{view ? text.summary(all.length, rows.length) : ""}</span>
           {view && (
-            <button type="button" disabled={reading} title={text.readAgainTitle} onClick={() => readNow(true)}>
+            <button type="button" disabled={reading} data-tip={text.readAgainTitle} onClick={() => readNow(true)}>
               {text.readAgain}
             </button>
           )}
@@ -196,7 +202,7 @@ export function CompetitionBrowser({ version, active }: CompetitionBrowserProps)
                 <th className="col-name">{text.columns.name}</th>
                 <th className="col-league">{text.columns.nation}</th>
                 <th className="num col-founded">{text.columns.level}</th>
-                <th className="num col-rep" title={text.rulesCountTitle}>
+                <th className="num col-rep" data-tip={text.rulesCountTitle}>
                   {text.columns.rules}
                 </th>
                 <th className="num col-uid">{text.columns.uid}</th>
@@ -233,7 +239,9 @@ export function CompetitionBrowser({ version, active }: CompetitionBrowserProps)
                       {competition.level === null ? profileText.none : text.level(competition.level + 1)}
                     </td>
                     <td className="num col-rep">
-                      {text.rulesCount(competition.current.length, competition.next?.length ?? null)}
+                      <span className={hasRules(competition) ? undefined : "muted"}>
+                        {text.rulesCount(competition.current.length, competition.next?.length ?? null)}
+                      </span>
                     </td>
                     <td className="num uid col-uid">{competition.uid}</td>
                   </tr>
@@ -242,7 +250,14 @@ export function CompetitionBrowser({ version, active }: CompetitionBrowserProps)
             </tbody>
           </table>
           {view === null && read === null && <p className="empty">{text.reading}</p>}
-          {view !== null && rows.length === 0 && <p className="empty">{text.empty(query, nation !== "")}</p>}
+          {/* A search that finds none says which competitions are listed: those the game is playing in this save. */}
+          {view !== null && rows.length === 0 && (
+            <p className="empty">
+              {text.empty(query, nation !== "")}
+              <br />
+              {text.listNote}
+            </p>
+          )}
           {view !== null && rows.length > 0 && <p className="note competition-list-note">{text.listNote}</p>}
         </div>
       </section>
@@ -360,17 +375,30 @@ function CompetitionPanel({ competition, names, held, onSaved, onFailed, onClose
   // How a change lasts: in the save, or, where the game keeps the rules in none, for as long as the editor holds it.
   const lasts = competition.unsaved ? text.unsavedNote : text.lasts;
   const level = competition.level === null ? null : `${text.columns.level} ${text.level(competition.level + 1)}`;
+  const frame = {
+    picture: <NationFlag uid={competition.nationUid} size={PICTURE_SIZE.clubLogo} label={competition.nation ?? ""} />,
+    name: competition.name,
+    fullName: competition.shortName,
+    vitals: [competition.nation ?? text.international, level, `${profileText.uid} ${competition.uid}`],
+    wide: true,
+    loaded: { details: competition },
+    onClose,
+  };
+
+  // A competition the game gives no squad rule: nothing to change, and nothing more to say.
+  if (!hasRules(competition)) {
+    return (
+      <ProfileFrame {...frame}>
+        <section className="profile-group squad-rules">
+          <h3>{text.title}</h3>
+          <p className="note">{text.noneGiven}</p>
+        </section>
+      </ProfileFrame>
+    );
+  }
 
   return (
-    <ProfileFrame
-      picture={<NationFlag uid={competition.nationUid} size={PICTURE_SIZE.clubLogo} label={competition.nation ?? ""} />}
-      name={competition.name}
-      fullName={competition.shortName}
-      vitals={[competition.nation ?? text.international, level, `${profileText.uid} ${competition.uid}`]}
-      wide
-      loaded={{ details: competition }}
-      onClose={onClose}
-    >
+    <ProfileFrame {...frame}>
       <section className="profile-group squad-rules">
         <h3>{text.title}</h3>
         <p className="note">{text.intro}</p>
@@ -402,7 +430,8 @@ function CompetitionPanel({ competition, names, held, onSaved, onFailed, onClose
               type="button"
               className="heal-toggle"
               disabled={!editable || !anyEditable}
-              title={!anyEditable ? text.noneChangeable : editable ? text.editTitle : readOnlyNote}
+              // Why none can be changed is said in the notice above the rules.
+              data-tip={!anyEditable ? undefined : editable ? text.editTitle : readOnlyNote}
               onClick={() => {
                 setError(null);
                 setDraft({});
@@ -578,7 +607,7 @@ function RuleRow(props: RuleRowProps) {
         {tags.length > 0 && (
           <span className="rule-tags">
             {tags.map((tag) => (
-              <span key={tag.key} className="tag" title={tag.title}>
+              <span key={tag.key} className="tag" data-tip={tag.title}>
                 {tag.label}
               </span>
             ))}
@@ -608,7 +637,7 @@ function RuleRow(props: RuleRowProps) {
             }}
           />
         ) : (
-          <span className={canEdit ? "rule-value" : "rule-value muted"} title={fixedTitle}>
+          <span className={canEdit ? "rule-value" : "rule-value muted"} data-tip={fixedTitle}>
             {formatNumber(rule.value)}
           </span>
         )}

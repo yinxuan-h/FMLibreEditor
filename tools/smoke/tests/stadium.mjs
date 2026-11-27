@@ -119,8 +119,10 @@ export async function run({ app, report, probe }) {
   const file = join(app.folder, "data", "frozen.json");
   const remembered = () => (existsSync(file) ? readFileSync(file, "utf8") : "");
   report.check("remembers the new name for this save", remembered().includes(JSON.stringify(other)), "not in frozen.json");
-  probe.run(["stadium-name", club.uid, room.name]);
-  report.check("the probe gives the stadium its old name, as the game does", probedName(probe, club.uid) === room.name, probedName(probe, club.uid));
+  // Read by the same probe right after it writes: a second probe, started after it, can come after the app's hold has
+  // given the new name back.
+  const given = probe.run(["stadium-name", club.uid, room.name]).match(/^renamed[^:]*: "(.*)" \(/m)?.[1] ?? null;
+  report.check("the probe gives the stadium its old name, as the game does", given === room.name, given);
   const back = await eventually(() => probedName(probe, club.uid) === other, 8000);
   report.check("the app gives the new name back within seconds", back, probedName(probe, club.uid));
 

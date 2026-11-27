@@ -40,6 +40,7 @@ use fmlibre_mem::{Process, is_user_pointer};
 use serde::Serialize;
 
 use crate::clubs::ClubSummary;
+use crate::locate::Manager;
 use crate::own_memory::Growth;
 use crate::players::{PlayerIndex, PlayerSummary};
 use crate::profile::FamiliarityLayout;
@@ -276,10 +277,9 @@ impl Session {
     }
 
     /// The histories of training the training manager keeps for the players of `club`'s human manager, for the probe.
-    /// `None` where the layout or the build does not place them, or it keeps none for the club.
+    /// `None` where the layout does not place them or the training manager is not found, or it keeps none for the club.
     pub fn training_histories(&self, club: &ClubSummary) -> Result<Option<Vec<TrainingHistory>>, MoveError> {
-        let (Some(f), Some(rva)) = (&self.layout.familiarity, self.profile.as_ref().and_then(|p| p.training_manager))
-        else {
+        let (Some(f), Some(rva)) = (&self.layout.familiarity, self.training_manager_rva()) else {
             return Ok(None);
         };
         let process = &self.process;
@@ -295,15 +295,21 @@ impl Session {
         ))
     }
 
-    /// The tactic the team at `team` plays and its players' histories; `None` where the layout or the build does not
-    /// place them, or no human manager picks its tactic.
+    /// Where the static pointer to the training manager is, by RVA: where the build profile puts it, or for a build
+    /// without one where the editor finds it ([`Session::manager_place`]).
+    fn training_manager_rva(&self) -> Option<u64> {
+        self.manager_place(Manager::Training).map(|place| place.rva)
+    }
+
+    /// The tactic the team at `team` plays and its players' histories; `None` where the layout does not place them or
+    /// the managers are not found, or no human manager picks its tactic.
     fn team_tactic(&self, club: &ClubSummary, team: usize) -> Result<Option<TeamTactic>, MoveError> {
         let (Some(f), Some(instructions)) =
             (&self.layout.familiarity, self.layout.tactics.as_ref().map(|t| t.instructions))
         else {
             return Ok(None);
         };
-        let Some(rva) = self.profile.as_ref().and_then(|p| p.training_manager) else {
+        let Some(rva) = self.training_manager_rva() else {
             return Ok(None);
         };
         let Some(block) = self.tactic_in_use(self.team_object(club, team)?)? else {
@@ -535,10 +541,10 @@ pub(crate) fn record_holds(process: &Process, f: &FamiliarityLayout, at: u64) ->
 }
 
 /// How many players the training manager keeps a history for, and whether every one checks out: for the checks.
-/// `None` where the build's profile places no training manager. A manager without a club has none listed.
+/// `None` where the training manager is not found. A manager without a club has none listed.
 pub(crate) fn histories_hold(session: &Session, f: &FamiliarityLayout) -> Option<(u64, bool)> {
     let process = &session.process;
-    let rva = session.profile.as_ref().and_then(|p| p.training_manager)?;
+    let rva = session.training_manager_rva()?;
     let Some(manager) = process.read_u64(session.plugin.base + rva).ok().filter(|&m| is_user_pointer(m)) else {
         return Some((0, false));
     };

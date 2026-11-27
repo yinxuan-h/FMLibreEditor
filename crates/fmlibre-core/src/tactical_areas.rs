@@ -8,6 +8,7 @@
 use fmlibre_mem::is_user_pointer;
 
 use crate::clubs::ClubSummary;
+use crate::locate::Manager;
 use crate::session::Session;
 use crate::transfer::MoveError;
 
@@ -18,10 +19,18 @@ const MOST_DEPTH: usize = 64;
 
 impl Session {
     /// The address of the tactic the human manager plays with the team at `team`, one of a club's teams, as the build
-    /// keeps the managers' tactics ([`crate::TacticsLayout`]). `None` when the build or the layout does not place them,
-    /// or when no human manager picks the team's tactics.
+    /// keeps the managers' tactics ([`crate::TacticsLayout`]). `None` when the layout does not place them or the tactics
+    /// manager is not found, or when no human manager picks the team's tactics.
+    ///
+    /// On a build without a profile, whose layout nobody read on it (see [`crate::profile::layout_lender`]), the
+    /// tactics are taken only where their list is that of a `simatch::PREPARED_TACTICS_CREATOR_ARRAY`, the class the
+    /// layout's selections name, by the vtable before it: two words from the wrong place are not. The index of the one
+    /// in use is the class's own, 0x18 after the list, and has to be within it.
     pub fn tactic_in_use(&self, team: u64) -> Result<Option<u64>, MoveError> {
-        let (Some(rva), Some(t)) = (self.profile.as_ref().and_then(|p| p.tactics_manager), &self.layout.tactics) else {
+        let Some(t) = &self.layout.tactics else {
+            return Ok(None);
+        };
+        let Some(rva) = self.manager_place(Manager::Tactics).map(|place| place.rva) else {
             return Ok(None);
         };
         let process = &self.process;
@@ -48,6 +57,9 @@ impl Session {
                 let key = process.read_u32(node + t.key)? as i32;
                 if key == id {
                     let value = node + t.value;
+                    if !self.known_build() && !self.lists_tactics(value + t.tactics) {
+                        return Ok(None);
+                    }
                     let (begin, end) = (process.read_u64(value + t.tactics)?, process.read_u64(value + t.tactics + 8)?);
                     let current = process.read_bytes(value + t.current, 1)?[0] as i8;
                     let count = if is_user_pointer(begin) && end >= begin { (end - begin) / 8 } else { 0 };
@@ -61,6 +73,16 @@ impl Session {
             }
         }
         Ok(None)
+    }
+
+    /// Whether `list` is the list of tactic blocks of an object of the class of the selections
+    /// ([`crate::SelectionLayout`]), which keeps it at the selection's `list`, after its vtable.
+    fn lists_tactics(&self, list: u64) -> bool {
+        let Some(selection) = &self.layout.selection else {
+            return false;
+        };
+        let object = list.wrapping_sub(selection.list);
+        self.process.read_u64(object).is_ok_and(|vtable| self.selection_vtables().contains(&vtable))
     }
 
     /// The options of the tactic the human manager plays with the senior team of `club` in the six areas that take

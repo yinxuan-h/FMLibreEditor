@@ -427,14 +427,19 @@ pub(crate) fn finances_look_real(bytes: &[u8], f: &ClubFinanceLayout) -> bool {
         && i32_at(f.total_wage_budget) >= 0
 }
 
-/// The class (vtable) of the full finance record: the one shared by the clubs whose
-/// finances look real, when nearly all of them share one. Only records of this class
-/// are long enough to hold the budgets, so only they are ever written.
-pub(crate) fn full_finance_class(process: &Process, module: &Module, array: &ArrayRef, layout: &Layout) -> Option<u64> {
+/// The class (vtable) of the full finance record, and a record of it: the one shared by
+/// the clubs whose finances look real, when nearly all of them share one. Only records of
+/// this class are long enough to hold the budgets, so only they are ever written.
+pub(crate) fn full_finance_class(
+    process: &Process,
+    module: &Module,
+    array: &ArrayRef,
+    layout: &Layout,
+) -> Option<(u64, u64)> {
     let f = &layout.club_finance;
     let (begin, count) = array.locate(process, module).ok()?;
     let pointers = process.read_bytes(begin, (count * 8) as usize).ok()?;
-    let mut classes: BTreeMap<u64, usize> = BTreeMap::new();
+    let mut classes: BTreeMap<u64, (usize, u64)> = BTreeMap::new();
     let mut real = 0;
     for chunk in pointers.as_chunks::<8>().0 {
         let club = u64::from_le_bytes(*chunk);
@@ -450,10 +455,11 @@ pub(crate) fn full_finance_class(process: &Process, module: &Module, array: &Arr
         };
         if finances_look_real(&bytes, f) {
             real += 1;
-            *classes.entry(u64::from_le_bytes(bytes[..8].try_into().expect("8 bytes"))).or_default() += 1;
+            let class = u64::from_le_bytes(bytes[..8].try_into().expect("8 bytes"));
+            classes.entry(class).or_insert((0, finance)).0 += 1;
         }
     }
-    let (&class, &count) = classes.iter().max_by_key(|&(_, &count)| count)?;
+    let (&class, &(count, record)) = classes.iter().max_by_key(|&(_, &(count, _))| count)?;
     // One class for (nearly) every real-looking record, and more than a handful of them.
-    (count >= 10 && count * 100 >= real * 99).then_some(class)
+    (count >= 10 && count * 100 >= real * 99).then_some((class, record))
 }

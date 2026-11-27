@@ -95,7 +95,7 @@ export function MassEditButton({ entity, filters, list }: MassEditButtonProps) {
         className="mass-edit-toggle"
         aria-haspopup="dialog"
         disabled={total === null}
-        title={text.buttonTitle}
+        data-tip={text.buttonTitle}
         onClick={open}
       >
         {text.button}
@@ -451,7 +451,7 @@ function MassEditDialog({ entity, scope, onClose }: { entity: Entity; scope: Mas
                       type="button"
                       className="mass-add"
                       disabled={rows.length >= MAX_OPERATIONS}
-                      title={rows.length >= MAX_OPERATIONS ? text.addFieldFull(MAX_OPERATIONS) : undefined}
+                      data-tip={rows.length >= MAX_OPERATIONS ? text.addFieldFull(MAX_OPERATIONS) : undefined}
                       onClick={addRow}
                     >
                       <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -465,7 +465,7 @@ function MassEditDialog({ entity, scope, onClose }: { entity: Entity; scope: Mas
                       type="submit"
                       className="mass-preview"
                       disabled={!complete}
-                      title={complete ? undefined : text.previewBlocked}
+                      data-tip={complete ? undefined : text.previewBlocked}
                     >
                       {busy === "preview" ? text.previewing : text.preview}
                     </button>
@@ -522,7 +522,7 @@ function MassEditDialog({ entity, scope, onClose }: { entity: Entity; scope: Mas
               type="button"
               className="mass-undo"
               disabled={busy !== null}
-              title={text.undoTitle}
+              data-tip={text.undoTitle}
               onClick={() => void undo()}
             >
               {busy === "undo" ? text.undoing : text.undo}
@@ -533,7 +533,7 @@ function MassEditDialog({ entity, scope, onClose }: { entity: Entity; scope: Mas
               type="button"
               className="primary mass-apply"
               disabled={current === null || current.changes === 0 || busy !== null}
-              title={applyTitle}
+              data-tip={applyTitle}
               onClick={() => void apply()}
             >
               {busy === "apply" ? text.applying : text.apply}
@@ -646,13 +646,13 @@ function OperationRow(props: OperationRowProps) {
           aria-label={text.values[draft.kind]}
           aria-invalid={message !== null || undefined}
           aria-describedby={message === null ? undefined : noteId}
-          title={hover}
+          data-tip={hover}
           onChange={(e) => onText(draft.id, e.currentTarget.value)}
           // A wheel turned over the focused input would change its value: let go of it, so the dialog scrolls instead.
           onWheel={(e) => e.currentTarget.blur()}
         />
         {draft.kind === "scale" && (
-          <span className="mass-unit" title={text.percentTitle}>
+          <span className="mass-unit" data-tip={text.percentTitle}>
             {text.ofCurrent}
           </span>
         )}
@@ -662,7 +662,7 @@ function OperationRow(props: OperationRowProps) {
           </span>
         )}
         {years && (
-          <span className="mass-unit" title={text.addYearsTitle}>
+          <span className="mass-unit" data-tip={text.addYearsTitle}>
             {text.years}
           </span>
         )}

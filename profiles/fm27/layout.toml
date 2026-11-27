@@ -371,14 +371,19 @@ player_person = 0x290
 # The tactic block the first entry of a selection's list points at (see docs/recon/fm27-tactics-and-value.md). Read
 # on the Steam save (15 August 2027) with Monza's tactic, against the game's tactics screen in three formations and
 # role sets: the eleven in-possession slots, then the eleven out-of-possession ones, in the selection's order, each
-# 0x48 bytes with the role's mask at +0x10. The game rewrites the block, or builds a new one, when the manager leaves
-# the tactics screen.
+# 0x48 bytes. The game rewrites the block, or builds a new one, when the manager leaves the tactics screen.
+#
+# A record starts 0x30 before the role's mask, with the place's position, as on macOS (see layout-macos.toml), and
+# `pairing` names for each in-possession slot the out-of-possession slot of the same place. Both were checked against
+# the tactics screen on Steam build 26797085 (a 4-2-3-1 and a 4-3-3, both phases); not on Game Pass or Epic.
 [tactic]
-in_possession = 0x148
-out_of_possession = 0x468
+in_possession = 0x118
+out_of_possession = 0x438
 slot_size = 0x48
-role = 0x10               # in a slot: the u64 role mask
+role = 0x40               # in a record: the u64 role mask
+position = 0x00           # in a record: the u32 mask of the place's position
 style = 0x100
+pairing = 0x79C
 
 # The tactics each human manager keeps for each of his teams, as on macOS (see layout-macos.toml and
 # tactical_areas.rs), which the game reads to tell how well the players know the tactic in use. The build profile's
@@ -525,6 +530,12 @@ director_of_football = 0x148
 # Canada. Each of those plays in another nation's leagues, which 0xD8 names (England, the Republic of Ireland,
 # Switzerland, the United States); every other club has the same nation at both.
 nation = 0xE8
+# The teams the club runs that belong to other clubs (#254, found by xyypt21): a list of team pointers like `teams`.
+# The game keeps a B team as a club of its own, and its parent lists that club's senior team here: 1. FC Nürnberg lists
+# 1. FC Nürnberg II's, Real Madrid C.F. those of Real Madrid Castilla C.F. and Real Madrid C.F. C. Read on Game Pass
+# 0.9.2562.0 (probe `linked-teams`): 731 of 29,737 clubs hold one to three, 814 in all, each a team in the list of
+# teams of another club: its senior team (812) or its under-19s (2). No club that is listed lists one itself.
+linked_teams = 0x30
 
 # A club's stadium (db::STADIUM, 0xC0 bytes), which its senior team points at. Read on the Game Pass build with
 # Manchester United's Old Trafford: capacity 74,879, all of it seated, 74,310 in use, room to grow to 95,285; and
@@ -567,6 +578,9 @@ youth_recruitment = 0x12D
 
 # Only clubs in the leagues being played have the full finance record; the others
 # use a smaller class, so readers check that these values look sane before use.
+# The full record is a db::CLUB_FINANCE (386 on the Game Pass save of 4 August 2027), the smaller one a
+# db::CLUB_FINANCE_BASE (33,790). Read with corporate facilities misplaced at 0x8B1 on Game Pass 0.9.2562.0, 10 of the
+# smaller records looked real, values read past their end; so a build without a profile reads only records of `class`.
 [club_finance]
 balance = 0x0C            # i32 pounds
 transfer_budget = 0x7C4   # i32 pounds
@@ -574,6 +588,7 @@ total_wage_budget = 0x808 # i32 pounds per week
 wage_budget = 0x814       # i32 pounds per week, the spending wage budget
 ticket_price = 0x864      # f32 pounds, average match ticket
 corporate = 0x8A9         # u8 1..20, corporate facilities
+class = "db::CLUB_FINANCE"
 
 [nation]
 uid = 0x0C                # u32 (Argentina: 1649, as graphics packs map its flag)
@@ -685,6 +700,46 @@ due_number = 0x0C         # u32 the offer's number
 player_offer_numbers = 0x320 # in a player: pointer to his record of offers' numbers, a list of u32
 player_entries = 0x328    # in a player: pointer to his record of entries, a list of pointers
 record_size = 0x28        # a record: (begin, end, capacity), then 16 bytes of nothing
+
+# A loan agreed for a later day, kept as a transfer is: an offer of its own class in the manager's list, whose first
+# 0x90 bytes are a transfer offer's (kind 1; its fee is the monthly fee, and +0xA8 is not a pointer here), the loan
+# contract the player is to have held by an entry of kind 1, and the move due on that day. Read on Game Pass
+# 0.9.2562.0, on a save of 4 August 2027, from the game's 608 loan offers and the contracts they offered: an offered
+# loan contract holds the offer's terms, and its wage is his own times the share (80% of £18,336 a week: £14,668).
+[transfers.loan]
+offer_class = "LOAN_OFFER"
+offer_size = 0x128        # slots of the game's pool of loan offers
+offer_cleared = [0xB0, 0xB8, 0xC0, 0xC8, 0xD0, 0xD8, 0xE0, 0xE8] # two lists and two pointers; +0xE8 the add-ons
+offer_flags = 0xF8        # u32, as the loan contract's flags ([loan.terms])
+offer_wage = [0x100, 0x108] # i32 pounds a week, the part of his wage the club he joins pays
+offer_unused_fee = 0x104  # i32 pounds a month when he is not used
+offer_option_fee = 0x110  # i32 pounds, -1 for none
+# u8, the kind of the future fee, which the game copies into the loan contract (in all 388 loans made on Steam 26797085,
+# save of 30 October 2026): 0xFF where there is none (331 of 333), 0xFE an option the club he joins may take up (all 24,
+# which keep no entry; the game shows an "Optional Future Fee"), and 0x64, 0x14 or 0xFF a mandatory one (30, which keep
+# an entry holding the contract he signs when the fee is paid; a "Mandatory Future Fee").
+offer_fee_kind = 0x124
+contract_fee_kind = 0xF7
+offer_unset = [0x114]     # i32 -1 (482,245 on one loan of 608)
+# Not known, and what the 227 made or accepted loans whose club pays a part of the wage mostly hold: 1 at +0x87 (222),
+# and where the flags are 0x40 (93), 0 at +0x88 and 8 bytes of zero at +0x118, as other loans do not.
+offer_usual = [[0x87, 1], [0x88, 0]]
+offer_usual_zero = [0x118]
+offer_share = [0x120, 0x122] # u16 percent of his wage the club he joins pays (100, 90, 80; 0 where no wage is paid)
+# u32, how long the loan runs, the same in the offer and in the loan contract: 0x1000 for a season (498 of the 529 loan
+# contracts: 382 to 29 June 2028 and 91 to 31 December 2027, as their leagues' seasons end), 0x10, 0x20 and 0x40 for some
+# months (to December 2027, January and February 2028), 0x4000 for more than one season. The loan ends on the loan
+# contract's end, whatever this holds (a recall moves only that); the editor writes 0x1000.
+offer_length = 0x10C
+contract_length = 0xE8
+contract_size = 0x100     # slots of the game's pool of loan contracts
+contract_status_again = 0x56
+contract_wage_again = 0xD4
+contract_cleared = [0x28, 0x30, 0x60, 0x68] # +0x30 reasons to be unhappy, +0x68 the add-ons (null in 407 of 529)
+# What the 187 loan contracts held by entries, not yet in force, all hold: i32 -1 (+0xC4 and +0xC8 on 526 and 528 of
+# the 529 loan contracts; +0xD8, +0xDC and +0xE0 hold amounts in some running ones), and u32 0.
+contract_unset = [0xC4, 0xC8, 0xD8, 0xDC, 0xE0]
+contract_zero = [0xE4]
 
 # The rules a competition's squads are registered under (crates/fmlibre-core/src/rules.rs and
 # docs/recon/fm27-league-rules.md). The game keeps a competition as it is played in an object of its own

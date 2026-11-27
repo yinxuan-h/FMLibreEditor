@@ -328,7 +328,7 @@ export function ScoutRecommendations({
                   className="scout-spot"
                   data-position={key}
                   aria-pressed={key === brief.position}
-                  title={
+                  data-tip={
                     line && status
                       ? text.positionTip(depthLineName(line.key), line.players.length, line.target, text.status[status])
                       : positionLabel(key)
@@ -363,7 +363,7 @@ export function ScoutRecommendations({
                 type="button"
                 data-purpose={purpose}
                 aria-pressed={brief.purpose === purpose}
-                title={text.purposeTips[purpose]}
+                data-tip={text.purposeTips[purpose]}
                 onClick={() => onBrief({ purpose })}
               >
                 {text.purposes[purpose]}

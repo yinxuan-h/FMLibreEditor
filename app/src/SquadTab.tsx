@@ -155,6 +155,9 @@ const STEPS: Partial<Record<TeamAction, readonly TeamAction[]>> = {
   destroy: ["demoralize", "exhaust", "minCohesion", "minTactics"],
 };
 
+/** Whether the two are the same team: `index` alone is its place among its own club's teams (see `ClubTeam`). */
+const sameTeam = (a: ClubTeam, b: ClubTeam) => a.clubUid === b.clubUid && a.index === b.index;
+
 /** The role the player holds in the team, if any. */
 function roleOf(team: ClubTeam, uid: number): CaptainRole | null {
   return team.captain === uid ? "captain" : team.viceCaptain === uid ? "viceCaptain" : null;
@@ -171,7 +174,7 @@ export type Undo = () => Promise<BatchUndo>;
  * made to only.
  */
 export interface Result {
-  /** The team's place in the club's list (see `ClubTeam.index`). */
+  /** The team's place among the teams the squad shows. */
   team: number;
   message: string;
   /** Whether the message is why it did not happen. */
@@ -225,8 +228,8 @@ export function SquadTab({ clubUid, clubName, version, panel, label, overview }:
   const [batchTraitsOpen, setBatchTraitsOpen] = useState(false);
   const batchTraitsButton = useRef<HTMLButtonElement>(null);
   const wasBatchTraitsOpen = useRef(false);
-  // The team that is shown, by its place in the club's list.
-  const [teamIndex, setTeamIndex] = useState(0);
+  // The team that is shown, by its place among those the squad shows: the club's own, then its linked teams.
+  const [teamSlot, setTeamSlot] = useState(0);
   const [order, setOrder] = useState(DEFAULT_ORDER);
   // Whether a write is under way, or done and waiting for the squad to be read again.
   const [busy, setBusy] = useState(false);
@@ -242,11 +245,12 @@ export function SquadTab({ clubUid, clubName, version, panel, label, overview }:
 
   const teams = loaded?.details;
   // A team that is no longer there (the game changed) gives way to the first one.
-  const team = teams?.find((candidate) => candidate.index === teamIndex) ?? teams?.[0];
+  const team = teams?.[teamSlot] ?? teams?.[0];
+  const slot = teams && team ? teams.indexOf(team) : 0;
   const players = useMemo(() => (team ? sorted(team.players, order) : []), [team, order]);
   // What each of them was at the record the app compares with, where it keeps records of the career.
   const earlier = useEarlierAbilities(team?.players.map((player) => player.uid) ?? [], version);
-  const shownResult = result !== null && result.team === team?.index ? result : null;
+  const shownResult = result !== null && team && result.team === slot ? result : null;
 
   useEffect(() => {
     alive.current = true;
@@ -321,9 +325,10 @@ export function SquadTab({ clubUid, clubName, version, panel, label, overview }:
     }
   };
 
+  // Each writes to the shown team, as a team of the club it belongs to: a linked team's is not the club of the squad.
   const act = (target: ClubTeam, action: TeamAction) =>
-    write(target.index, async () => {
-      const report = await teamAction(clubUid, target.index, action);
+    write(slot, async () => {
+      const report = await teamAction(target.clubUid, target.index, action);
       // Whether the step `step` ran: the action itself, or a step of Team at its best or Destroy that was not skipped.
       const ran = (step: TeamAction) =>
         action === step ||
@@ -345,7 +350,7 @@ export function SquadTab({ clubUid, clubName, version, panel, label, overview }:
         untrained > 0 ? text.tacticsUntrained(untrained) : null,
       ];
       return {
-        team: target.index,
+        team: slot,
         message: notes.filter((note) => note !== null).join(" · "),
         failed: false,
         problems: [...skipped, ...refusalLines(report.failed)],
@@ -355,10 +360,10 @@ export function SquadTab({ clubUid, clubName, version, panel, label, overview }:
     });
 
   const batchTraits = (target: ClubTeam, addTraits: number[], removeTraits: number[]) =>
-    write(target.index, async () => {
-      const report = await batchTraitsTeam(clubUid, target.index, addTraits, removeTraits);
+    write(slot, async () => {
+      const report = await batchTraitsTeam(target.clubUid, target.index, addTraits, removeTraits);
       return {
-        team: target.index,
+        team: slot,
         message: text.written(report.applied),
         failed: false,
         problems: refusalLines(report.failed),
@@ -368,8 +373,8 @@ export function SquadTab({ clubUid, clubName, version, panel, label, overview }:
 
   // Freezing writes nothing to the game itself, but the squad is read again all the same, for its rows to say so.
   const freeze = (target: ClubTeam, kind: FreezeKind, on: boolean) =>
-    write(target.index, async () => {
-      const done = await freezeTeam(clubUid, target.index, kind, on);
+    write(slot, async () => {
+      const done = await freezeTeam(target.clubUid, target.index, kind, on);
       const said =
         kind === "attributes"
           ? on
@@ -383,7 +388,7 @@ export function SquadTab({ clubUid, clubName, version, panel, label, overview }:
               ? text.frozePositions
               : text.unfrozePositions;
       return {
-        team: target.index,
+        team: slot,
         message: said(done.changed),
         failed: false,
         problems: refusalLines(done.failed),
@@ -406,10 +411,10 @@ export function SquadTab({ clubUid, clubName, version, panel, label, overview }:
     });
 
   const makeCaptain = (target: ClubTeam, role: CaptainRole, player: SquadPlayer) =>
-    write(target.index, async () => {
-      const change = await setCaptain(clubUid, target.index, role, player.uid);
+    write(slot, async () => {
+      const change = await setCaptain(target.clubUid, target.index, role, player.uid);
       return {
-        team: target.index,
+        team: slot,
         message: captainMessage(role, player.name, change.captaincy),
         failed: false,
         problems: [],
@@ -456,7 +461,7 @@ export function SquadTab({ clubUid, clubName, version, panel, label, overview }:
 
       {teams && team && (
         <>
-          <TeamSummary teams={teams} team={team} onTeam={setTeamIndex} />
+          <TeamSummary teams={teams} team={team} onTeam={setTeamSlot} />
 
           {overview?.(team, (player, from) => {
             opener.current = from;
@@ -491,7 +496,7 @@ export function SquadTab({ clubUid, clubName, version, panel, label, overview }:
             ref={resultBox}
             result={shownResult}
             busy={busy}
-            onUndo={(take) => void undo(team.index, take)}
+            onUndo={(take) => void undo(slot, take)}
           />
 
           <div className="squad-table-wrap">
@@ -568,7 +573,8 @@ export function SquadTab({ clubUid, clubName, version, panel, label, overview }:
 interface TeamSummaryProps {
   teams: readonly ClubTeam[];
   team: ClubTeam;
-  onTeam: (index: number) => void;
+  /** Shows another team, by its place in `teams`. */
+  onTeam: (slot: number) => void;
 }
 
 /** The switch between the teams, and under it how many players the shown team lists and who its captains are. */
@@ -590,12 +596,12 @@ function TeamSummary({ teams, team, onTeam }: TeamSummaryProps) {
   return (
     <div className="squad-summary">
       <div className="squad-teams" role="group" aria-label={text.teamsLabel}>
-        {teams.map((candidate) => (
+        {teams.map((candidate, slot) => (
           <button
-            key={candidate.index}
+            key={`${candidate.clubUid}:${candidate.index}`}
             type="button"
-            aria-pressed={candidate.index === team.index}
-            onClick={() => onTeam(candidate.index)}
+            aria-pressed={sameTeam(candidate, team)}
+            onClick={() => onTeam(slot)}
           >
             {teamLabel(candidate)}
           </button>
@@ -806,7 +812,7 @@ function FreezeBox({ label, title, frozen, total, waiting, busy, onChange }: Fre
   }, [some]);
 
   return (
-    <label className="freeze-toggle" title={title}>
+    <label className="freeze-toggle" data-tip={title}>
       <input
         ref={box}
         type="checkbox"
@@ -851,7 +857,7 @@ export function ActionButton({ label, title, waiting, busy, onPress, className, 
       disabled={waiting}
       aria-disabled={busy || undefined}
       aria-busy={busy || undefined}
-      title={title}
+      data-tip={title}
       onClick={() => !busy && onPress()}
     >
       {label}
@@ -884,7 +890,7 @@ export function ResultLine({ result, busy, onUndo, ref }: ResultLineProps) {
                 type="button"
                 className="squad-action"
                 aria-disabled={busy || undefined}
-                title={text.undoTitle}
+                data-tip={text.undoTitle}
                 onClick={() => result.undo && onUndo(result.undo)}
               >
                 {text.undo}
@@ -991,7 +997,7 @@ function Tags({ player }: { player: SquadPlayer }) {
         </span>
       )}
       {player.concernedTeammates > 0 && (
-        <span className="tag injured" title={text.unrestTitle(player.concernedTeammates)}>
+        <span className="tag injured" data-tip={text.unrestTitle(player.concernedTeammates)}>
           {text.unrest}
         </span>
       )}

@@ -169,11 +169,11 @@ export function ScoutSimilar({ overview, version, brief, onBrief, onOpen, onComp
                 </div>
               </div>
             )}
-            <label className="scout-check" title={text.cheaperTitle}>
+            <label className="scout-check" data-tip={text.cheaperTitle}>
               <input type="checkbox" checked={brief.cheaper} onChange={(e) => onBrief({ cheaper: e.currentTarget.checked })} />
               {text.cheaper}
             </label>
-            <label className="scout-check" title={text.youngerTitle}>
+            <label className="scout-check" data-tip={text.youngerTitle}>
               <input type="checkbox" checked={brief.younger} onChange={(e) => onBrief({ younger: e.currentTarget.checked })} />
               {text.younger}
             </label>

@@ -149,7 +149,7 @@ export function SavedFilterControls<Fields extends object, Order extends ColumnO
     <>
       {form === null ? (
         filtered && (
-          <button ref={saveButton} type="button" className="filter-save" title={text.saveTitle} onClick={begin}>
+          <button ref={saveButton} type="button" className="filter-save" data-tip={text.saveTitle} onClick={begin}>
             {text.save}
           </button>
         )

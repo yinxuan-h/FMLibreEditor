@@ -58,7 +58,7 @@ export function ReleaseButton({ player, kind = "player" }: ReleaseButtonProps) {
         type="button"
         className="release-toggle"
         aria-haspopup="dialog"
-        title={kind === "staff" ? text.staffButtonTitle : text.buttonTitle}
+        data-tip={kind === "staff" ? text.staffButtonTitle : text.buttonTitle}
         onClick={() => setOpened(player)}
       >
         {text.button}

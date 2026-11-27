@@ -77,7 +77,7 @@ export function LeaguePrizesGroup({ club, version }: { club: number; version: nu
         <p className="note">{text.paysNothing}</p>
       )}
       {view !== null && !view.unavailable && (
-        <button type="button" disabled={reading} title={text.readAgainTitle} onClick={() => readNow(true)}>
+        <button type="button" disabled={reading} data-tip={text.readAgainTitle} onClick={() => readNow(true)}>
           {reading ? text.reading : text.readAgain}
         </button>
       )}
@@ -233,7 +233,7 @@ function StageAmounts({ club, index, league, stage, several, onSaved }: StageAmo
             type="button"
             className="heal-toggle"
             disabled={!editable}
-            title={text.editTitle}
+            data-tip={text.editTitle}
             onClick={() => {
               setError(null);
               setDraft({});

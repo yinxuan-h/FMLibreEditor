@@ -43,7 +43,7 @@ export function CompatibilityNotice(props: {
       </div>
       <span className="update-actions">
         {unknown && connection.writable && (
-          <button type="button" className="primary" title={text.allowTitle} disabled={busy} onClick={onAllow}>
+          <button type="button" className="primary" data-tip={text.allowTitle} disabled={busy} onClick={onAllow}>
             {text.allow}
           </button>
         )}

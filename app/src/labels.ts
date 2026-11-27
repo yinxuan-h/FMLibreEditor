@@ -138,7 +138,7 @@ export const leaguePrizesText = strings.leaguePrizes;
 export const sponsorshipsText = strings.sponsorships;
 /** The Clubs tab's national teams: the list, the profile of a national team and why there may be none. */
 export const nationalText = strings.national;
-/** The Competitions tab: the competitions with squad rules, and the rules of the one picked, season by season. */
+/** The Competitions tab: the competitions the game plays, and the squad rules of the one picked, season by season. */
 export const competitionsText = strings.competitions;
 
 /**
@@ -226,14 +226,20 @@ export interface TeamId {
   index: number;
   kind?: number;
   ageLimit?: number | null;
+  /** For a linked team (see `ClubTeam`), the name of the club it belongs to. */
+  linkedClub?: string | null;
 }
 
 /**
  * The name of a club's team as its squad screen shows it: the first team, a team by its age limit ("U21"), a B team,
  * and any other by its place in the club's list ("Team 3"). Where only the place is known, as in the Changes view, a
- * team other than the first is named by it alone.
+ * team other than the first is named by it alone. A linked team goes by its club's name ("FC Nürnberg II"), with the
+ * team's own after it where it is not that club's first.
  */
-export function teamLabel({ index, kind, ageLimit }: TeamId): string {
+export function teamLabel({ index, kind, ageLimit, linkedClub }: TeamId): string {
+  if (linkedClub) {
+    return index === 0 ? linkedClub : `${linkedClub} · ${teamLabel({ index, kind, ageLimit })}`;
+  }
   if (index === 0) {
     return squadText.teams.first;
   }
@@ -315,6 +321,9 @@ export const scoutingText = strings.scouting;
 
 /** "My club", the page the app opens on (see `MyClub`). */
 export const homeText = strings.home;
+
+/** Recipes: ready-made sets of changes to one player or one club (see `RecipeMenu`). */
+export const recipeText = strings.recipes;
 
 /** A player's development: the Development tab of his profile, the note under his abilities, a squad's changes. */
 export const progressText = strings.progress;

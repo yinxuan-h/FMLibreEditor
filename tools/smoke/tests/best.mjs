@@ -180,9 +180,10 @@ export async function run({ app, report, probe }) {
   const buttons = `[...(${tab}?.querySelectorAll(".squad-buttons button") ?? [])]`;
   const best = `${buttons}.find((b) => b.textContent === "Team at its best")`;
   await app.waitFor(`${best} && !${best}.disabled && !${best}.hasAttribute("aria-disabled")`, "Team at its best", 30000);
-  const title = await app.js(`${best}.title`);
+  // What it does is its note, in a small box while the pointer rests on it.
+  const title = await app.note(best, "Team at its best");
   report.check(
-    "the Squad tab has Team at its best first, before More actions and Destroy, its hover text naming the five steps",
+    "the Squad tab has Team at its best first, before More actions and Destroy, its note naming the five steps",
     (await app.js(`${buttons}[0] === ${best}`)) &&
       title.startsWith("Heal all, Inspire all, Refresh all, Max cohesion and Max tactics in one press"),
     title.slice(0, 90),

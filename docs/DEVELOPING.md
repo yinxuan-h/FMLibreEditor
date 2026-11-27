@@ -56,6 +56,8 @@ goes to the editor alone, which ends it (`fmlibre-mem`'s `macos/call.rs`). That 
 Apple silicon only: Rosetta does not let a thread's registers be set. These are functions the
 game has loaded; the editor writes no code into the game for them. The offer and the
 contract of such a transfer go in slots of the game's pools, as above (see `arranged.rs`).
+A loan is arranged the same way, with an offer of the game's loan class and a loan contract
+(see docs/recon/fm27-loans.md), on Windows and on Apple silicon Macs.
 Until the day, the app refuses to move, swap or release the player another way: the game
 makes the transfer from the club he is at.
 
@@ -102,12 +104,12 @@ of their `(begin, end)` pairs); how a container reads is the layout's `[national
 `[national_teams]`, or whose arrays do not read as the game's (a container must point at a nation that points back at
 it, with the kind it is in; nearly all of them must), shows a note saying why in place of the list, and reads nothing
 else. The profiles that name them:
-Game Pass 0.9.2435.0 and 0.9.2524.0 and Steam builds 26577676 and 26620374 on Windows, and Steam builds 26385295 and
-26620374 on macOS, Apple silicon. For another build, find the two arrays as the recon note says (`fmlibre-probe instances
-db::NATION` leads to the nations, which point at the containers; the arrays are the two pairs of pointers to them that
-sit next to the clubs' array: on each of those builds 0xA8 and 0xC0 past the players' pair, which
-`fmlibre-probe column game_plugin.dll+<RVA> 0x0C` shows as 251 UIDs each) and add them; the unit test
-`only_the_builds_read_place_the_national_teams` lists the builds that have them.
+Game Pass 0.9.2435.0, 0.9.2524.0 and 0.9.2562.0 and Steam builds 26577676, 26620374 and 26797085 on Windows, and
+Steam builds 26385295, 26620374 and 26797085 on macOS, Apple silicon. For another build, find the two arrays as the
+recon note says (`fmlibre-probe instances db::NATION` leads to the nations, which point at the containers; the arrays
+are the two pairs of pointers to them that sit next to the clubs' array: on each of those builds 0xA8 and 0xC0 past
+the players' pair, which `fmlibre-probe column game_plugin.dll+<RVA> 0x0C` shows as 251 UIDs each) and add them; the
+unit test `only_the_builds_read_place_the_national_teams` lists the builds that have them.
 
 Each container lists the senior team and the youth teams, laid out as a club's teams (`[team]`). A national team's
 profile reads them all (`Session::national_sides`) and edits each one's reputation: `reputation` is the senior team's,
@@ -119,11 +121,19 @@ The senior team's profile has Heal all, Inspire all and Refresh all for the play
 has them: the `national_team_action` command reads the squad (`Session::national_squad`) and hands it to
 `act_on_players`, which `team_action` uses for a club's team too. The changes are one batch, undone as one.
 
+Above the teams, the profile shows what the game shows of the nation and its federation, read only
+(`Session::nation_details`, #210): the year the federation was founded, from the container, the continent's name, from
+the nation, and the federation's staff as the game's staff list of the nation's team has them: each team's manager and
+the people of the container's medical, coaching and scouting lists, each with the job and the team of his contract with
+the federation, which is not his contract with a club. Where they are is the layout's `[national.details]`, which only
+`layout-macos.toml` has so far: on Windows the profile shows none of it. `fmlibre-probe national-teams italia
+--details` prints them, and then how many of all the containers have each and the jobs of all their staff.
+
 ### After an update of the game
 
 Each build of the game moves its static data. A build profile in `profiles/` (identified by `game_plugin`'s headers)
-places the entity arrays, the in-game date, the retirement manager and the game's own object for each build the editor
-was checked with.
+places the entity arrays, the in-game date, the retirement manager, the game's own object and the tactics and training
+managers for each build the editor was checked with.
 For a build without one, or where a place a profile names does not check out, the editor looks for them itself
 (`crates/fmlibre-core/src/locate.rs`):
 - **The entity arrays** by scanning the plugin, in about half a second.
@@ -160,9 +170,13 @@ For a build without one, or where a place a profile names does not check out, th
   keep it, else by a search for a pointer to the one object of the class `game_plugin::GAME_UI`. Two statics point at
   it on Game Pass 0.9.2409.0 (0x5670EC8 and 0x5680140); either leads to it, and the profiles keep the second, which
   is where Steam build 26340721 keeps its own.
+- **The tactics and training managers' statics**, which the tactic in use, the players' familiarity with it and Max
+  tactics read, the same way: the one object of `TACTICS_MANAGER` and of `TRAINING_MANAGER`. On Game Pass 0.9.2562.0
+  without its profile the guess held the first (0xD218 before the players pair, as in 0.9.2524.0) and the search found
+  the second, 8 bytes off the distance 0.9.2524.0 keeps it at.
 
-With those, a build that keeps the object layout of the last one (as both updates of November 2026 did) shows ages
-and planned retirements as before. What stays different for such a build:
+With those, and the object layout of the newest build (see below), a build that keeps the layout of the last one shows
+ages, planned retirements, club finances and the tactic in use as before. What stays different for such a build:
 - **No writes by default.** The app says that this version of the game is new to it. It writes nothing until the user
   presses Edit anyway, which lasts until the app is closed or connects again.
 - **Checks before any write** (`crates/fmlibre-core/src/health.rs`), on every build. Each check samples up to 2,000
@@ -183,8 +197,8 @@ Each check was tried against a layout broken on purpose (a field group moved by 
 such layout failed its check. A layout that changed is not found again automatically: its checks keep what they cover
 read-only until `profiles/fm27/layout.toml` is fixed.
 
-Some of what the layout places has no check of its own, and a change there only leaves something unread. The update
-of 17 November 2026 made two such changes:
+Some of what the layout places has no check of its own among those, and a change there is meant to leave something
+unread, by a guard of its own (see below for how far that holds). The update of 17 November 2026 made two such changes:
 - The club finance record moved corporate facilities from 0x8A9 to 0x8AD. The full record is told from the smaller one
   of the clubs outside the leagues being played by values that look real (`finances_look_real` in `clubs.rs`), so no
   club's finances were read.
@@ -196,7 +210,41 @@ The Mac halves of Steam build 26620374 made the same two changes on the Mac layo
 
 As the builds before keep the old places, the layout keeps them, and the profiles of the builds since say where theirs
 are, in `[layout.<section>]` tables: a session reads its build's layout with those fields in place of the layout's
-(`layout_of`). The smoke tests `clubs` (finances) and `tactics` notice either change.
+(`layout_of`). The smoke tests `clubs` (finances) and `tactics` notice either change. The update of 24 November 2026
+(Game Pass 0.9.2562.0, and Steam build 26797085 on Windows and on the Mac) kept both changes, and its profiles the same
+tables. A build without a profile is read with the layout's own places, so until its profile is out, such a build
+shows no club's finances and no tactic in use.
+
+A build without a profile reads its objects as the newest build of its kind lays them out (`layout_lender` in
+`profile.rs`): with the `[layout.*]` tables of the newest built-in profile for the same kind of plugin (Windows' or
+the Mac's, whose tables are of different layout files), of its own storefront where there is one, and never with its
+own, so that `FMLIBRE_IGNORE_PROFILES=1` rehearses an update. On Windows the newest is the last linked, by the time stamp
+of the PE header; a Mac's UUID holds no time, so there it is the last one `BUILDS` lists, which a unit test keeps in
+the order of the Steam builds. An update is likelier to keep what the build before it moved than to move it back: the
+update of 24 November 2026 kept both places of 17 November, and Game Pass 0.9.2562.0, read without its profile, shows
+the same finances and the same tactics in use as with it. What an update moves itself stays unread until its profile
+says where, as on 17 November.
+
+Nobody has read the borrowed fields on the new build, so every field a profile may override has to be one a check
+guards, which leaves it unread rather than read wrong. A unit test (`every_override_is_a_field_a_check_guards` in
+`profile.rs`) refuses an override of any other; add one only with such a check, and say here which. Those of today:
+- `club_finance.corporate`. A club's finances are read only where the whole record looks real (`finances_look_real` in
+  `clubs.rs`: corporate facilities of 1–20, a ticket price of £1–1,000, budgets not below zero), and written only to
+  records of the class nearly all such records share. That alone does not hold: read at 0x8B1 on Game Pass 0.9.2562.0,
+  ten records of the smaller class, `db::CLUB_FINANCE_BASE`, looked real with values read past their end, and their
+  class passed for the full record's. So on a build without a profile that class must also be the one
+  `[club_finance]` names, `db::CLUB_FINANCE`, by the name of its type (`Session::finance_class`), and only the records
+  of that class show finances (`Session::club_details`).
+- `tactics.tactics` and `tactics.current`. On a build without a profile a team's tactics are taken only where their
+  list is that of a `simatch::PREPARED_TACTICS_CREATOR_ARRAY`, by its vtable 8 bytes before the list
+  (`Session::tactic_in_use`): the team's tactics hold one, after the set-piece routines. The index of the tactic in use
+  is that object's own, 0x18 after the list (a unit test keeps every layout and profile so), and must be within it.
+
+Where the borrowed places are wrong, the app shows what it showed before it borrowed them: in a club's profile "FM keeps
+finances only for clubs in the leagues being played." and no money to edit or freeze; in the Squad tab no tactical
+familiarity, Max tactics off with its hover text, and Team at its best skipping it (`team.noTactics`). Nothing is
+written to them. Tried on Game Pass 0.9.2562.0 with the lender's places moved on purpose (corporate facilities at
+0x8B1, the tactics at 0x1020 and 0x1038): no class of the full finance record, no club's finances, no tactic in use.
 
 #### On the day of an update
 
@@ -205,17 +253,19 @@ are, in `[layout.<section>]` tables: a session reads its build's layout with tho
    took is the one the game shows, and that it read it where the other builds keep their date.
 2. `fmlibre-probe profile --out profiles/fm27/<storefront>-<version>.toml` looks for everything as for a build
    without a profile, runs the checks with what it found, and writes the profile. It lists the values that read as a
-   plausible date, and whether the guessed and the searched places of the retirement manager and of the game object
-   agree. It does not look for the tactics and training managers, the national teams' arrays or what the build lays
-   out otherwise (it keeps those of the built-in profile, where there is one; for a new build, find them as their
-   notes in the other profiles say), but it says whether the class of the full finance record is found: where the
-   game keeps finances for the clubs of the leagues being played and it is not, the record moved. Compare a club's
-   record (the pointer at +0x150 of the object `fmlibre-probe club UID` names, dumped with `fmlibre-probe dump`) with
-   what the build before read for the same club (an export of the clubs, `fmlibre-probe clubs --export`), and put
-   what moved under the profile's `[layout.club_finance]`; `fmlibre-probe fields club --stats` then finds the class.
-   Likewise, where `fmlibre-probe training-history <the human manager's club>` finds no tactic in use, follow the
-   tactics manager's map to the team's tactics as `[tactics]` in layout.toml describes it, and put what moved under
-   `[layout.tactics]`.
+   plausible date, and whether the guessed and the searched places of the retirement manager, the game object and the
+   tactics and training managers agree. It writes the `[layout.*]` tables the session read with: for a new build those
+   of the newest build of its kind (see above), which only what it says next vouches for. It says whether the class of
+   the full finance record is found, and whether the tactic in use is found for each human manager's club: where the
+   game keeps finances for the clubs of the leagues being played and the class is not found, the record moved.
+   Compare a club's record (the pointer at +0x150 of the object `fmlibre-probe club UID` names, dumped with
+   `fmlibre-probe dump`) with what the build before read for the same club (an export of the clubs, `fmlibre-probe
+   clubs --export`), and put what moved under the profile's `[layout.club_finance]`; `fmlibre-probe fields club
+   --stats` then finds the class. Likewise, where a human manager picks his team's tactic and none is found in use
+   (`fmlibre-probe training-history <his club>`), follow the tactics manager's map to the team's tactics as `[tactics]`
+   in layout.toml describes it, and put what moved under `[layout.tactics]`. It does not look for the national teams'
+   arrays (it keeps those of the built-in profile, where there is one; for a new build, find them as their notes in the
+   other profiles say).
 3. Add the file to `BUILDS` in `crates/fmlibre-core/src/profile.rs`; a unit test fails until it is there.
    A club's finances show no league prize money on the new build, and cannot change it, until someone has checked
    that `fmlibre-probe prizes` lists the amounts the game's Rules pages show, and added `prize_money = true` to the
@@ -226,10 +276,16 @@ are, in `[layout.<section>]` tables: a session reads its build's layout with tho
    on that page and come back from a save, before `squad_rules = true` goes in.
 4. Build the app (`npm run release`), and run the smoke tests on both storefronts (see
    [`tools/smoke`](../tools/smoke/README.md)).
+5. Add the build to its table in [COMPATIBILITY.md](COMPATIBILITY.md), with what its profile turns on.
 
 To rehearse this on a build the editor knows, set `FMLIBRE_IGNORE_PROFILES=1` before starting the app or the probe:
 every build is then one without a profile. On both builds of November 2026, the search finds exactly the places their
-profiles name, and `fmlibre-probe profile` says so ("the same places").
+profiles name, and `fmlibre-probe profile` says so ("the same places"). On Game Pass 0.9.2562.0 it writes every place
+and override its profile names but the national teams' arrays and what was checked against the game's screens
+(`prize_money`, `sponsorships`, `squad_rules`). The build then borrows its layout from the newest other profile of its
+kind (`fmlibre-probe calibrate` says which, in its "Object layout" line): on the first build of an update that moved
+what a profile overrides, that is the layout from before the update, so finances or the tactic in use stay unread
+there, as they would have on the day.
 
 ### On macOS
 
@@ -379,7 +435,7 @@ with the same quoting, separator and byte order mark as the lists.
 3. **The `Release` workflow** (`.github/workflows/release.yml`) builds, on GitHub's Windows
    and macOS machines:
    - `FMLibreEditor-Setup.exe`, a per-user NSIS installer in English, Turkish, Spanish, German,
-     French, Italian, Japanese, Korean, Russian and Simplified Chinese;
+     French, Italian, Japanese, Korean, Brazilian Portuguese, Russian and Simplified Chinese;
    - `FMLibreEditor-portable.zip`;
    - `FMLibreEditor-macOS.zip`, the universal app with the bridge and its launcher;
    - `FMLibreEditor-macOS.app.tar.gz`, the same app, which installed macOS apps update from.
@@ -441,6 +497,7 @@ fmlibre-probe player 7458500                         # everything read for one p
 fmlibre-probe staff arteta                           # search staff; staff-member <id> for details; --export FILE as players
 fmlibre-probe clubs tottenham                        # search clubs; club <uid> for details; --export FILE as players
 fmlibre-probe national-teams italia --squad            # a nation's men's and women's teams, and the first one's squad; no writes
+fmlibre-probe national-teams italia --details          # what their profiles show of the nation and federation; no writes
 fmlibre-probe fields player                          # what the editor can change (also: staff)
 fmlibre-probe get player 7458500                     # those fields' values for one player
 fmlibre-probe set player 7458500 attribute.finishing 18 --shown   # change one: this writes to the game
