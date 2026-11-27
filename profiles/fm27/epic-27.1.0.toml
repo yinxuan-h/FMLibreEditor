@@ -37,8 +37,8 @@ sponsorships = true
 
 # game_plugin as mapped in memory; these values identify the build.
 [plugin]
-size_of_image = 0x18095000
-link_timestamp = 0x6AF5C793
+size_of_image = 0x17C88000
+link_timestamp = 0x6AFF567B
 
 # RVAs in game_plugin of the (begin, end) pointer pairs of the entity arrays.
 [arrays]

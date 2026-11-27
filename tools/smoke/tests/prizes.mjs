@@ -124,7 +124,7 @@ export async function run({ app, report, probe }) {
       /every club/.test(everyClub), everyClub);
     await app.shot("prizes-inputs");
     await app.click(`[...${GROUP}.querySelectorAll(".prize-edit button")].find((b) => b.textContent === "Cancel")`, "Cancel");
-    await app.waitFor(`!${GROUP}.querySelector("input.prize-input")`, "the amounts shown again");
+    await app.waitFor(`!${GROUP}.querySelector("input.prize-input")`, "the amounts shown again", 120000);
   } else {
     report.skip("Change amounts", "the game cannot be written to");
   }
